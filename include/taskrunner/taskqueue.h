@@ -60,15 +60,19 @@ template<typename Func, typename... Args>
 auto TaskQueue::enqueue(Func func, Args&&... args) -> std::future<decltype(func(args...))> {
     using return_type = decltype(func(args...));
 
-    std::packaged_task<return_type()> task(std::bind(std::forward<Func>(func), std::forward<Args>(args)...));
-    std::future<return_type> res = task.get_future();
+    // 创建 packaged_task 并获取 future
+    //std::packaged_task<return_type()> task(std::bind(std::forward<Func>(func), std::forward<Args>(args)...));
+    std::shared_ptr<std::packaged_task<return_type()>> task =
+        std::make_shared<std::packaged_task<return_type()>>(
+            std::bind(std::forward<Func>(func), std::forward<Args>(args)...));
+
+    std::future<return_type> res = task->get_future();
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        tasks_.emplace([task=std::move(task)](){ task(); });
+        tasks_.emplace([t=std::move(task)]() mutable { (*t)(); });
     }
     condition_.notify_one();
 
     return res;
 }
-

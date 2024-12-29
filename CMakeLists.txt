@@ -23,7 +23,7 @@ endif()
 
 #find_package(doctest REQUIRED PATHS ${DOCTEST_ROOT}/scripts/cmake)
 
-include_directories(${DOCTEST_ROOT}/doctest)
+include_directories(${DOCTEST_ROOT})
 include_directories(${PROJECT_SOURCE_DIR}/include)
 include_directories(${PROJECT_SOURCE_DIR}/include/taskrunner)
 

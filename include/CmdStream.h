@@ -1,65 +1,61 @@
-CmdStream.hpp
+#ifndef CMD_STREAM_H
+#define CMD_STREAM_H
 
-#ifndef CMD_STREAM_HPP
-#define CMD_STREAM_HPP
+#include "CmdBuffer.h"
+#include "EventQueue.h"
 
-#include <memory>
-#include <variant>
-#include <functional>
-#include "EventQueue.hpp"
-#include "CmdBuffer.hpp"
-#include "TaskRunner.hpp"
-
-namespace async_task_system {
+namespace async_task {
 
 class CmdStream {
 public:
-    CmdStream(bool isOrdered) : isOrdered_(isOrdered), eventQueue_() {
-        buffer_ = TaskRunner::getInstance().allocateCmdBuffer(isOrdered);
+    CmdStream(bool isOrdered) {
+        cmdBuffer_ = std::make_unique<CmdBuffer>(isOrdered);
     }
 
     template<typename R>
     std::future<R> launch(std::function<R()> task) {
         auto promise = std::make_shared<std::promise<R>>();
         auto future = promise->get_future();
-        buffer_->emplace<Task>([task, promise] {
+        cmdBuffer_->emplace([task, promise]() {
             try {
-                R result = task();
-                promise->set_value(result);
+                promise->set_value(task());
             } catch (...) {
                 promise->set_exception(std::current_exception());
             }
         });
-        triggerEvent();
+        eventQueue_.push({Event::TASK, cmdBuffer_.get(), []{}});
         return future;
     }
 
     void launch(Task task) {
-        buffer_->emplace<Task>(std::move(task));
-        triggerEvent();
+        cmdBuffer_->emplace(std::move(task));
+        eventQueue_.push({Event::TASK, cmdBuffer_.get(), []{}});
     }
 
     void launch(CmdBuffer cmdBuffer) {
-        buffer_->emplace<CmdBuffer&>(cmdBuffer);
-        triggerEvent();
+        cmdBuffer_->emplace(std::move(cmdBuffer));
+        eventQueue_.push({Event::TASK, cmdBuffer_.get(), []{}});
     }
 
     void launch(Barrier& barrier) {
-        buffer_->emplace<Barrier&>(barrier);
-        triggerEvent();
+        cmdBuffer_->emplace(barrier);
+        eventQueue_.push({Event::TASK, cmdBuffer_.get(), []{}});
     }
 
-    void triggerEvent() {
-        eventQueue_.push({Event::TASK, buffer_.get(), []{}});
+    CmdBuffer* getCmdBuffer() {
+        return cmdBuffer_.get();
+    }
+
+    EventQueue& getEventQueue() {
+        return eventQueue_;
     }
 
 private:
-    bool isOrdered_;
+    std::unique_ptr<CmdBuffer> cmdBuffer_;
     EventQueue eventQueue_;
-    std::unique_ptr<CmdBuffer> buffer_;
 };
 
-} // namespace async_task_system
+} // namespace async_task
 
-#endif // CMD_STREAM_HPP
+#endif // CMD_STREAM_H
 

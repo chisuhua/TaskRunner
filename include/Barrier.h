@@ -1,20 +1,20 @@
-#ifndef BARRIER_HPP
-#define BARRIER_HPP
+#ifndef BARRIER_H
+#define BARRIER_H
 
 #include <memory>
 #include <future>
 
-namespace async_task_system {
+namespace async_task {
 
-using BarrierType = enum { RELEASE, ACQUIRE, WAIT };
+enum BarrierType { RELEASE, ACQUIRE, WAIT, GROUP };
 
 struct Barrier {
     BarrierType type;
     std::shared_ptr<std::promise<bool>> promise;
-    bool value;
+    int groupId;
 };
 
-} // namespace async_task_system
+} // namespace async_task
 
-#endif // BARRIER_HPP
+#endif // BARRIER_H
 

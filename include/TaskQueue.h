@@ -1,37 +1,42 @@
-#ifndef TASK_QUEUE_HPP
-#define TASK_QUEUE_HPP
+#ifndef TASK_QUEUE_H
+#define TASK_QUEUE_H
 
 #include <queue>
 #include <mutex>
 #include <variant>
 #include <functional>
 
-namespace async_task_system {
+namespace async_task {
 
 using Task = std::function<void()>;
+using TaskBuffer = std::deque<Task>;
 
 class TaskQueue {
 public:
+    TaskQueue() {}
+
     void push(Task task) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        queue_.push(std::variant<Task, TaskBuffer>(std::move(task)));
+        std::unique_lock<std::mutex> lock(mutex_);
+        queue_.push(std::move(task));
     }
 
     void push(TaskBuffer taskBuffer) {
-        std::lock_guard<std::mutex> lock(mutex_);
-        queue_.push(std::variant<Task, TaskBuffer>(std::move(taskBuffer)));
+        std::unique_lock<std::mutex> lock(mutex_);
+        queue_.push(std::move(taskBuffer));
     }
 
-    std::variant<Task, TaskBuffer> pop() {
-        std::lock_guard<std::mutex> lock(mutex_);
-        if (queue_.empty()) return std::variant<Task, TaskBuffer>{};
-        std::variant<Task, TaskBuffer> task = std::move(queue_.front());
+    std::optional<std::variant<Task, TaskBuffer>> pop() {
+        std::unique_lock<std::mutex> lock(mutex_);
+        if (queue_.empty()) {
+            return std::nullopt;
+        }
+        auto task = std::move(queue_.front());
         queue_.pop();
         return task;
     }
 
     bool isEmpty() const {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::unique_lock<std::mutex> lock(mutex_);
         return queue_.empty();
     }
 
@@ -40,7 +45,7 @@ private:
     mutable std::mutex mutex_;
 };
 
-} // namespace async_task_system
+} // namespace async_task
 
-#endif // TASK_QUEUE_HPP
+#endif // TASK_QUEUE_H
 

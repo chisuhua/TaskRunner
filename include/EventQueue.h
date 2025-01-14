@@ -1,15 +1,13 @@
-EventQueue.hpp
-
-#ifndef EVENT_QUEUE_HPP
-#define EVENT_QUEUE_HPP
+#ifndef EVENT_QUEUE_H
+#define EVENT_QUEUE_H
 
 #include <queue>
-#include <mutex>
-#include <condition_variable>
 #include <variant>
 #include <functional>
+#include <condition_variable>
+#include <mutex>
 
-namespace async_task_system {
+namespace async_task {
 
 struct Event {
     enum Type { TASK, TODO_OTHERS };
@@ -20,6 +18,8 @@ struct Event {
 
 class EventQueue {
 public:
+    EventQueue() {}
+
     void push(Event event) {
         std::unique_lock<std::mutex> lock(mutex_);
         queue_.push(std::move(event));
@@ -28,16 +28,14 @@ public:
 
     Event pop() {
         std::unique_lock<std::mutex> lock(mutex_);
-        while (queue_.empty()) {
-            cond_var_.wait(lock);
-        }
+        cond_var_.wait(lock, [this] { return !queue_.empty(); });
         Event event = std::move(queue_.front());
         queue_.pop();
         return event;
     }
 
     bool isEmpty() const {
-        std::lock_guard<std::mutex> lock(mutex_);
+        std::unique_lock<std::mutex> lock(mutex_);
         return queue_.empty();
     }
 
@@ -47,7 +45,7 @@ private:
     std::condition_variable cond_var_;
 };
 
-} // namespace async_task_system
+} // namespace async_task
 
-#endif // EVENT_QUEUE_HPP
+#endif // EVENT_QUEUE_H
 

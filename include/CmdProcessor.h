@@ -1,7 +1,5 @@
-CmdProcessor.hpp
-
-#ifndef CMD_PROCESSOR_HPP
-#define CMD_PROCESSOR_HPP
+#ifndef CMD_PROCESSOR_H
+#define CMD_PROCESSOR_H
 
 #include <thread>
 #include <vector>
@@ -10,29 +8,78 @@ CmdProcessor.hpp
 #include <queue>
 #include <variant>
 #include <functional>
-#include "TaskQueue.hpp"
-#include "EventQueue.hpp"
-#include "CmdBuffer.hpp”
-#include "Barrier.hpp"
-#include "TaskRunner.hpp"
+#include "TaskQueue.h"
+#include "EventQueue.h"
+#include "CmdBuffer.h"
+#include "Barrier.h"
+#include "TaskRunner.h"
 
-namespace async_task_system {
+namespace async_task {
 
 class CmdProcessor {
 public:
-    CmdProcessor(TaskQueue& taskQueue, std::vector<EventQueue*>& eventQueues)
-        : taskQueue_(taskQueue), eventQueues_(eventQueues) {}
+    CmdProcessor(TaskQueue& taskQueue, EventQueue& dispatchToProcessorQueue, EventQueue& processorToDispatchQueue)
+        : taskQueue_(taskQueue), dispatchToProcessorQueue_(dispatchToProcessorQueue), processorToDispatchQueue_(processorToDispatchQueue) {}
+
+    void updateAllTaskQueues(const std::vector<TaskQueue*>& allTaskQueues) {
+        allTaskQueues_ = allTaskQueues;
+    }
 
     void start() {
         thread_ = std::thread(&CmdProcessor::eventLoop, this);
     }
 
     void stop() {
-        for (auto& eventQueue : eventQueues_) {
-            eventQueue->push({Event::TODO_OTHERS, nullptr, []{}});
-        }
+        dispatchToProcessorQueue_.push({Event::TODO_OTHERS, nullptr, []{}});
         if (thread_.joinable()) {
             thread_.join();
+        }
+    }
+
+private:
+    void eventLoop() {
+        while (true) {
+            bool hasWork = false;
+
+            // Check dispatchToProcessorQueue
+            if (!dispatchToProcessorQueue_.isEmpty()) {
+                try {
+                    std::unique_lock<std::mutex> lock(dispatchToProcessorQueue_.mutex_);
+                    if (!dispatchToProcessorQueue_.isEmpty()) {
+                        Event event = dispatchToProcessorQueue_.pop();
+                        lock.unlock();
+                        switch (event.type) {
+                            case Event::TASK:
+                                processActiveQueue(*event.activeQueue, taskQueue_);
+                                hasWork = true;
+                                break;
+                            case Event::TODO_OTHERS:
+                                event.callback();
+                                return;
+                        }
+                    }
+                } catch (const std::exception& e) {
+                    // Handle exception if needed
+                    std::cerr << "Exception in eventLoop: " << e.what() << std::endl;
+                }
+            }
+
+            // Steal work if no work found in dispatchToProcessorQueue
+            if (!hasWork) {
+                hasWork = stealWork();
+            }
+
+            // Process tasks in taskQueue_ if work is still not found
+            if (!hasWork && !taskQueue_.isEmpty()) {
+                work();
+                hasWork = true;
+            }
+
+            // If all queues and taskQueue_ are empty, wait
+            if (!hasWork) {
+                std::unique_lock<std::mutex> lock(globalMutex_);
+                globalCondVar_.wait(lock, [this] { return !allQueuesEmpty() || !taskQueue_.isEmpty(); });
+            }
         }
     }
 
@@ -47,8 +94,7 @@ public:
     void handleBarrier(BarrierType type, CmdBuffer& activeQueue, Barrier& barrier) {
         switch (type) {
             case RELEASE:
-                activeQueue.setFenceValue(true, barrier.promise);
-                TaskRunner::getInstance().setFencePromise(&activeQueue, barrier.promise);
+                activeQueue.setFenceValue(barrier.promise, barrier.groupId);
                 break;
             case ACQUIRE:
                 if (barrier.promise->get_future().wait_for(std::chrono::seconds(0)) == std::future_status::ready) {
@@ -59,12 +105,16 @@ public:
                 }
                 break;
             case WAIT:
-                TaskRunner::getInstance().pauseCmdBuffer(&activeQueue);
+                auto waitPromise = std::make_shared<std::promise<bool>>();
+                activeQueue.setFenceValue(waitPromise, 0); // Set the fence value with default group ID 0
+                TaskRunner::getInstance().pauseCmdBuffer(&activeQueue, waitPromise);
+                break;
+            case GROUP:
+                activeQueue.addPendingCmdCnt(barrier.groupId);
                 break;
         }
     }
 
-private:
     void processOrderedQueue(CmdBuffer& activeQueue, TaskQueue& taskQueue) {
         while (true) {
             auto task = activeQueue.getTask();
@@ -108,37 +158,18 @@ private:
         }
     }
 
-    void eventLoop() {
-        while (true) {
-            bool hasWork = false;
-            for (auto& eventQueue : eventQueues_) {
-                if (!eventQueue->isEmpty()) {
-                    Event event = eventQueue->pop();
-                    switch (event.type) {
-                        case Event::TASK:
-                            processActiveQueue(*event.activeQueue, taskQueue_);
-                            hasWork = true;
-                            break;
-                        case Event::TODO_OTHERS:
-                            return;
-                    }
-                }
-            }
-
-            if (!hasWork) {
-                work();
-            }
-
-            if (allQueuesEmpty()) {
-                std::unique_lock<std::mutex> lock(mutex_);
-                cond_var_.wait(lock, [this] { return !allQueuesEmpty(); });
-            }
-        }
-    }
-
     void work() {
         while (true) {
+            if (taskQueue_.isEmpty()) {
+                break;
+            }
+            std::unique_lock<std::mutex> lock(taskQueue_.mutex_);
+            if (taskQueue_.isEmpty()) {
+                lock.unlock();
+                break;
+            }
             auto task = taskQueue_.pop();
+            lock.unlock();
             if (task.index() == 0) {
                 std::get<Task>(task)();
             } else if (task.index() == 1) {
@@ -154,20 +185,35 @@ private:
     }
 
     bool allQueuesEmpty() const {
-        for (auto& eventQueue : eventQueues_) {
-            if (!eventQueue->isEmpty()) return false;
-        }
-        return taskQueue_.isEmpty();
+        return dispatchToProcessorQueue_.isEmpty();
     }
 
-    TaskQueue taskQueue_;
-    std::vector<EventQueue*> eventQueues_;
+    bool stealWork() {
+        for (auto& otherTaskQueue : allTaskQueues_) {
+            if (&otherTaskQueue != &taskQueue_ && !otherTaskQueue->isEmpty()) {
+                std::unique_lock<std::mutex> lock(otherTaskQueue->mutex_);
+                if (!otherTaskQueue->queue_.empty()) {
+                    auto task = otherTaskQueue->queue_.front();
+                    otherTaskQueue->queue_.pop();
+                    lock.unlock(); // Unlock before processing the task
+                    taskQueue_.push(task);
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    TaskQueue& taskQueue_;
+    EventQueue& dispatchToProcessorQueue_;
+    std::vector<TaskQueue*> allTaskQueues_;
     std::thread thread_;
     mutable std::mutex mutex_;
     std::condition_variable cond_var_;
+    EventQueue& processorToDispatchQueue_;
 };
 
-} // namespace async_task_system
+} // namespace async_task
 
-#endif // CMD_PROCESSOR_HPP
+#endif // CMD_PROCESSOR_H
 

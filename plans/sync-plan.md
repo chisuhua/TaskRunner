@@ -140,7 +140,7 @@ UsrLinuxEmu 团队                          TaskRunner 团队
 | 状态 | 任务 | 依赖 | 同步点 |
 |------|------|------|--------|
 | ⬜ 待实现 | 在 `gpu_driver.cpp` 新增 System C 分支 (switch case `'G'`) | Phase 0 | - |
-| ⬜ 待实现 | 实现 `GPU_IOCTL_GET_DEVICE_INFO` | - | **S1** |
+| ✅ 已完成 | 实现 `GPU_IOCTL_GET_DEVICE_INFO` | S1 双方确认 | **S1** |
 | ⬜ 待实现 | 实现 `GPU_IOCTL_ALLOC_BO` (支持 domain) | S1 | **S2** |
 | ⬜ 待实现 | 实现 `GPU_IOCTL_FREE_BO` | S2 | - |
 | ⬜ 待实现 | 实现 `GPU_IOCTL_MAP_BO` | S2 | - |
@@ -153,7 +153,7 @@ UsrLinuxEmu 团队                          TaskRunner 团队
 
 | 同步点 | 问题 | 需要 TaskRunner 回答 |
 |--------|------|---------------------|
-| **S1** | GET_DEVICE_INFO 返回哪些字段？ | TaskRunner 需要哪些 device 属性 (vendor_id, vram_size, compute_units...) |
+| ~~**S1**~~ | ~~GET_DEVICE_INFO 返回哪些字段？~~ | ✅ **已完成** (Issue #9) |
 | **S2** | ALLOC_BO 的 domain 参数取值？ | VRAM/GTT/CPU 三选一还是多选？ |
 | **S2** | ALLOC_BO 返回的 handle 格式？ | u32 够用还是需要 64-bit？ |
 | **S3** | PUSHBUFFER_SUBMIT_BATCH 的 entries 格式？ | gpu_gpfifo_entry 结构体的各字段含义 |

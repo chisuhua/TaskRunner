@@ -1,0 +1,25 @@
+# Build artifacts
+build/
+*.o
+*.so
+*.a
+*.out
+
+# Temporary files
+temp/
+*.tmp
+*.swp
+*~
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# External projects (should be in gitmodules)
+UsrLinuxEmu/

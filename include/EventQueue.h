@@ -9,6 +9,8 @@
 
 namespace async_task {
 
+class CmdBuffer;  // Forward declaration
+
 struct Event {
     enum Type { TASK, TODO_OTHERS };
     Type type;
@@ -38,6 +40,9 @@ public:
         std::unique_lock<std::mutex> lock(mutex_);
         return queue_.empty();
     }
+
+    // Provide access to mutex_ for external locking (needed by CmdProcessor)
+    std::mutex& getMutex() { return mutex_; }
 
 private:
     std::queue<Event> queue_;

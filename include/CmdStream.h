@@ -4,6 +4,11 @@
 #include "CmdBuffer.h"
 #include "EventQueue.h"
 
+// Forward declaration to avoid circular dependency
+namespace async_task {
+    class TaskRunner;
+}
+
 namespace async_task {
 
 class CmdStream {
@@ -23,23 +28,23 @@ public:
                 promise->set_exception(std::current_exception());
             }
         });
-        eventQueue_.push({Event::TASK, cmdBuffer_.get(), []{}});
+        eventQueue_.push(Event{Event::TASK, cmdBuffer_.get(), []{}});
         return future;
     }
 
     void launch(Task task) {
         cmdBuffer_->emplace(std::move(task));
-        eventQueue_.push({Event::TASK, cmdBuffer_.get(), []{}});
+        eventQueue_.push(Event{Event::TASK, cmdBuffer_.get(), []{}});
     }
 
-    void launch(CmdBuffer cmdBuffer) {
-        cmdBuffer_->emplace(std::move(cmdBuffer));
-        eventQueue_.push({Event::TASK, cmdBuffer_.get(), []{}});
+    void launch(CmdBuffer& cmdBuffer) {
+        cmdBuffer_->emplace(cmdBuffer);
+        eventQueue_.push(Event{Event::TASK, cmdBuffer_.get(), []{}});
     }
 
     void launch(Barrier& barrier) {
         cmdBuffer_->emplace(barrier);
-        eventQueue_.push({Event::TASK, cmdBuffer_.get(), []{}});
+        eventQueue_.push(Event{Event::TASK, cmdBuffer_.get(), []{}});
     }
 
     CmdBuffer* getCmdBuffer() {
@@ -50,8 +55,10 @@ public:
         return eventQueue_;
     }
 
-private:
+    // Make cmdBuffer_ accessible for TaskRunner
     std::unique_ptr<CmdBuffer> cmdBuffer_;
+
+private:
     EventQueue eventQueue_;
 };
 

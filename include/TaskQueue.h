@@ -5,6 +5,7 @@
 #include <mutex>
 #include <variant>
 #include <functional>
+#include <optional>
 
 namespace async_task {
 
@@ -36,6 +37,17 @@ public:
     }
 
     bool isEmpty() const {
+        std::unique_lock<std::mutex> lock(mutex_);
+        return queue_.empty();
+    }
+
+    // Provide access to mutex_ for external locking (needed by CmdProcessor)
+    std::mutex& getMutex() { return mutex_; }
+    
+    // Provide access to queue_ for stealing (needed by CmdProcessor)
+    std::queue<std::variant<Task, TaskBuffer>>& getQueue() { return queue_; }
+    
+    bool isEmptyInternal() const {
         std::unique_lock<std::mutex> lock(mutex_);
         return queue_.empty();
     }

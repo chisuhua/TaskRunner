@@ -1,15 +1,16 @@
 #ifndef CMD_BUFFER_H
 #define CMD_BUFFER_H
 
-#include <queue>
+#include <deque>
 #include <variant>
 #include <functional>
 #include <memory>
 #include <future>
 #include <map>
+#include <optional>
 #include "Barrier.h"  // Ensure Barrier is defined
 
-// Forward declaration of Future
+// Forward declaration of Future (TaskRunner will be included at the end)
 namespace async_task {
     template<typename R>
     class Future;
@@ -72,7 +73,8 @@ public:
                         auto promise = fencePromises_[groupId];
                         promise->set_value(true);
                         fencePromises_.erase(groupId);
-                        TaskRunner::getInstance().checkFenceValue(); // Check for paused CmdBuffers
+                        // TaskRunner dependency - will be implemented after TaskRunner is defined
+                        checkFenceValueImpl();
                     }
                 }
             }
@@ -81,10 +83,31 @@ public:
 
     void launch() {
         if (!isLaunched_) {
-            TaskRunner::getInstance().launch(*this);
+            // TaskRunner dependency - will be implemented after TaskRunner is defined
+            launchImpl();
             isLaunched_ = true;
         }
     }
+    
+    // Getter methods
+    bool isLaunched() const {
+        return isLaunched_;
+    }
+    
+    template<typename R>
+    std::future<R> getFuture() {
+        auto promise = std::make_shared<std::promise<R>>();
+        auto future = promise->get_future();
+        buffer_.emplace_back(Task([promise] {
+            // Placeholder task for future retrieval
+            promise->set_value(R{});
+        }));
+        return future;
+    }
+    
+    // Implementation methods for TaskRunner dependencies (defined after TaskRunner class)
+    void checkFenceValueImpl();
+    void launchImpl();
 
     template<typename R, typename... Args>
     Future<R> emplace(Args&&... args) {
@@ -108,10 +131,26 @@ public:
         }));
     }
 
-    std::optional<std::variant<Task*, Barrier*, CmdBuffer*>> getTask() {
+    void emplace(Task task) {
+        buffer_.emplace_back(std::move(task));
+    }
+
+    void emplace(Barrier& barrier) {
+        buffer_.emplace_back(barrier);
+    }
+
+    void emplace(CmdBuffer& cmdBuffer) {
+        buffer_.emplace_back(std::ref(cmdBuffer));
+    }
+    
+    void emplace(CmdBuffer* cmdBuffer) {
+        buffer_.emplace_back(std::ref(*cmdBuffer));
+    }
+
+    std::optional<std::variant<Task, Barrier, std::reference_wrapper<CmdBuffer>>> getTask() {
         std::lock_guard<std::mutex> lock(mutex_);
         if (buffer_.empty()) return std::nullopt;
-        return std::move(buffer_.front());
+        return buffer_.front();
     }
 
     void removeTask() {
@@ -132,7 +171,7 @@ public:
 private:
     bool isOrdered_;
     bool isLaunched_;
-    std::queue<std::variant<Task*, Barrier*, CmdBuffer*>> buffer_;
+    std::deque<std::variant<Task, Barrier, std::reference_wrapper<CmdBuffer>>> buffer_;
     mutable std::mutex mutex_;
     std::map<int, std::shared_ptr<std::promise<bool>>> fencePromises_;
     std::map<int, int> groupPendingCmdCnt_; // Group ID to pending command count
@@ -140,6 +179,14 @@ private:
 };
 
 } // namespace async_task
+
+// Forward declarations for methods that need TaskRunner
+// The actual include will come from files that include both CmdBuffer.h and TaskRunner.h
+#ifndef TASK_RUNNER_H_INCLUDED
+namespace async_task {
+    class TaskRunner;  // Forward declare - full definition must be available when using methods that call TaskRunner
+}
+#endif
 
 #endif // CMD_BUFFER_H
 

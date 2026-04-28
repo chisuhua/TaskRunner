@@ -155,27 +155,33 @@ UsrLinuxEmu 团队                          TaskRunner 团队
 |--------|------|---------------------|
 | ~~**S1**~~ | ~~GET_DEVICE_INFO 返回哪些字段？~~ | ✅ **已完成** (Issue #9) |
 | **S2** | ALLOC_BO domain/handle/flags/gpu_va | ✅ **已完成** (Issue #3) |
-| **S3** | PUSHBUFFER_SUBMIT_BATCH entries 格式？ | 即将发起 |
+| **S3** | PUSHBUFFER entries 格式确认 | ✅ **已完成** (Issue #4) |
+| **S3.5** | fence_id 返回机制扩展 | ⚠️ Phase 1.5 结构体扩展 |
 
-### 2.5.1 S2 结果 (2026-04-28)
+### 2.5.3 S3 结果 (2026-04-28)
 
-> ✅ **阻塞解除** — Issue #3 确认完成
+> ✅ **大部分阻塞解除** — Q3-1, Q3-2, Q3-4 已确认
 
-**Q2-1 domain 参数**:
-- VRAM ✅, GTT ✅, CPU ✅, 多选组合 ✅
+**Q3-1 MEMCPY 映射**:
+- method: ✅ GPU_OP_MEMCPY (0x102)
+- payload[0]=src, payload[1]=dst, payload[2]=size, payload[3-6]=0
+- semaphore: ⚠️ Phase 1 忽略，填 0
 
-**Q2-2 handle 格式**:
-- u32 ✅, handle 0 无效(从1开始), 范围 0-65535
+**Q3-2 LAUNCH_KERNEL 映射**:
+- method: ✅ GPU_OP_LAUNCH_KERNEL (0x100)
+- payload[0]=内核索引, payload[1]=grid_dim, payload[2]=block_dim
+- kernel_name 通过预注册内核表索引传递
 
-**Q2-3 flags 支持**:
-- DEVICE_LOCAL ✅, HOST_VISIBLE ✅, CXL_SHARED 占位(Phase 2)
+**Q3-3 fence 返回机制**:
+- ⚠️ 需要结构体扩展: `gpu_pushbuffer_args` 增加 `fence_id` 字段
+- Phase 1.5 实施，或 Phase 1 采用简化方案
 
-**Q2-4 gpu_va 返回值**:
-- ✅ Phase 1 返回有效值
+**Q3-4 entry_count=1**:
+- ✅ 确认正确
 
 ---
 
-## 三、Phase 1 后续同步点
+## 三、Phase 1 同步点完成状态
 
 | 状态 | 任务 | 依赖 | 同步点 |
 |------|------|------|--------|

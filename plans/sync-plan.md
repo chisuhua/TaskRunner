@@ -154,12 +154,28 @@ UsrLinuxEmu 团队                          TaskRunner 团队
 | 同步点 | 问题 | 需要 TaskRunner 回答 |
 |--------|------|---------------------|
 | ~~**S1**~~ | ~~GET_DEVICE_INFO 返回哪些字段？~~ | ✅ **已完成** (Issue #9) |
-| **S2** | ALLOC_BO 的 domain 参数取值？ | VRAM/GTT/CPU 三选一还是多选？ |
-| **S2** | ALLOC_BO 返回的 handle 格式？ | u32 够用还是需要 64-bit？ |
-| **S3** | PUSHBUFFER_SUBMIT_BATCH 的 entries 格式？ | gpu_gpfifo_entry 结构体的各字段含义 |
-| **S3** | fence_handle 返回位置？ | 直接写回 args 还是通过独立字段？ |
+| **S2** | ALLOC_BO domain/handle/flags/gpu_va | ✅ **已完成** (Issue #3) |
+| **S3** | PUSHBUFFER_SUBMIT_BATCH entries 格式？ | 即将发起 |
 
-### 3.2 TaskRunner 侧任务 (参考)
+### 2.5.1 S2 结果 (2026-04-28)
+
+> ✅ **阻塞解除** — Issue #3 确认完成
+
+**Q2-1 domain 参数**:
+- VRAM ✅, GTT ✅, CPU ✅, 多选组合 ✅
+
+**Q2-2 handle 格式**:
+- u32 ✅, handle 0 无效(从1开始), 范围 0-65535
+
+**Q2-3 flags 支持**:
+- DEVICE_LOCAL ✅, HOST_VISIBLE ✅, CXL_SHARED 占位(Phase 2)
+
+**Q2-4 gpu_va 返回值**:
+- ✅ Phase 1 返回有效值
+
+---
+
+## 三、Phase 1 后续同步点
 
 | 状态 | 任务 | 依赖 | 同步点 |
 |------|------|------|--------|

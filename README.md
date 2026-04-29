@@ -217,3 +217,16 @@ CmdProcessor 处理栅栏时，会根据栅栏类型执行相应的操作，如�
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## 相关文档
+
+- [AGENTS.md](AGENTS.md) - Agent 开发指南（构建命令、架构、命名规范）
+- [plans/sync-plan.md](plans/sync-plan.md) - TaskRunner-UsrLinuxEmu 协调计划
+- [UsrLinuxEmu/docs/07-integration/](UsrLinuxEmu/docs/07-integration/) - GPU 联调指南
+
+## 同步状态
+
+| 阶段 | 状态 | 日期 |
+|------|------|------|
+| Phase 0-1 (S0-S4) | ✅ 完成 | 2026-04-29 |
+| Phase 1.5 | 🚧 待推进 | - |

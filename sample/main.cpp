@@ -88,16 +88,22 @@ void threadFunction(int id) {
 
 } // namespace async_task
 
-// DOCTEST main implementation
-DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
-
 // Forward declare threadFunction to use it in main tests
 namespace async_task {
     void threadFunction(int id);
 }
 
-// Wrapper function for CLI main to call
-int test_main(int argc, char* argv[]) {
-    return doctest::Context(argc, argv).run();
+int main(int argc, char* argv[]) {
+    doctest::Context context;
+    context.applyCommandLine(argc, argv);
+    
+    int res = context.run();
+    if (context.shouldExit()) {
+        return res;
+    }
+    
+    async_task::threadFunction(1);
+    
+    return res;
 }
 

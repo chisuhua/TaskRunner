@@ -14,6 +14,8 @@
 
 #include <cstdint>
 #include <cstddef>
+#include <cstring>
+#include <cstdio>
 #include <string>
 #include <fcntl.h>
 #include <unistd.h>
@@ -110,6 +112,116 @@ public:
             return -1;
         }
         return 0;
+    }
+
+    // ============================================================
+    // Phase 1.5 便捷方法
+    // ============================================================
+
+    /**
+     * 获取 Warp 大小
+     * @return Warp 大小 (NVIDIA=32, AMD CDNA=64, AMD RDNA=32)
+     */
+    u32 get_warp_size() {
+        struct gpu_device_info info{};
+        if (get_device_info(&info) == 0) return info.warp_size;
+        return 0;
+    }
+
+    /**
+     * 获取 SIMD 单元数量
+     * @return SIMD 数量 (AMD CU 或 NVIDIA SM)
+     */
+    u32 get_simd_count() {
+        struct gpu_device_info info{};
+        if (get_device_info(&info) == 0) return info.simd_count;
+        return 0;
+    }
+
+    /**
+     * 获取峰值 FP32 性能
+     * @return 峰值 FP32 GFLOPS
+     */
+    u32 get_peak_fp32_gflops() {
+        struct gpu_device_info info{};
+        if (get_device_info(&info) == 0) return info.peak_fp32_gflops;
+        return 0;
+    }
+
+    /**
+     * 获取最大引擎时钟频率
+     * @return 最大时钟频率 (MHz)
+     */
+    u32 get_max_clock_frequency() {
+        struct gpu_device_info info{};
+        if (get_device_info(&info) == 0) return info.max_clock_frequency;
+        return 0;
+    }
+
+    /**
+     * 获取驱动版本字符串
+     * @param out 输出缓冲区
+     * @param size 缓冲区大小
+     * @return 0 成功，-1 失败
+     */
+    int get_driver_version_string(char* out, size_t size) {
+        struct gpu_device_info info{};
+        if (get_device_info(&info) != 0) return -1;
+        // 版本格式: 主.次.修订 (0x000500 = v0.5.0)
+        u8 major = (info.driver_version >> 8) & 0xFF;
+        u8 minor = (info.driver_version >> 4) & 0xFF;
+        u8 patch = info.driver_version & 0xFF;
+        snprintf(out, size, "v%u.%u.%u", major, minor, patch);
+        return 0;
+    }
+
+    /**
+     * 获取市场营销名称
+     * @param out 输出缓冲区
+     * @param size 缓冲区大小
+     * @return 0 成功，-1 失败
+     */
+    int get_marketing_name(char* out, size_t size) {
+        struct gpu_device_info info{};
+        if (get_device_info(&info) != 0) return -1;
+        strncpy(out, info.marketing_name, size - 1);
+        out[size - 1] = '\0';
+        return 0;
+    }
+
+    /**
+     * 打印完整设备信息 (调试用)
+     * @param os 输出流
+     */
+    void print_device_info(std::ostream& os = std::cout) {
+        struct gpu_device_info info{};
+        if (get_device_info(&info) != 0) {
+            os << "Failed to get device info\n";
+            return;
+        }
+
+        char version[32];
+        char name[64];
+        get_driver_version_string(version, sizeof(version));
+        get_marketing_name(name, sizeof(name));
+
+        os << "=== GPU Device Info ===\n";
+        os << "  Vendor ID:     0x" << std::hex << info.vendor_id << std::dec << "\n";
+        os << "  Device ID:     0x" << std::hex << info.device_id << std::dec << "\n";
+        os << "  VRAM Size:     " << (info.vram_size / (1024*1024*1024)) << " GB\n";
+        os << "  BAR0 Size:     " << (info.bar0_size / (1024*1024)) << " MB\n";
+        os << "  Compute Units: " << info.compute_units << "\n";
+        os << "  Warp Size:     " << info.warp_size << "\n";
+        os << "  SIMD Count:    " << info.simd_count << "\n";
+        os << "  Driver Ver:    " << version << "\n";
+        os << "  Firmware Ver:   0x" << std::hex << info.firmware_version << std::dec << "\n";
+        os << "  Max Clock:     " << info.max_clock_frequency << " MHz\n";
+        os << "  Mem Clock:     " << info.max_memory_clock_frequency << " MHz\n";
+        os << "  Mem Bus Width: " << info.memory_bus_width << "-bit\n";
+        os << "  Peak FP32:     " << info.peak_fp32_gflops << " GFLOPS\n";
+        os << "  PCIe BW:       " << info.pcie_bandwidth << " Mbps\n";
+        os << "  Architecture:  0x" << std::hex << info.architecture_id << std::dec << "\n";
+        os << "  Marketing:     " << name << "\n";
     }
 
     // ============================================================
@@ -226,7 +338,7 @@ public:
 
         struct gpu_pushbuffer_args args = {};
         args.stream_id = stream_id;
-        args.entries = entries;
+        args.entries_addr = reinterpret_cast<u64>(entries);
         args.count = count;
         args.flags = flags;
         args.fence_id = 0;  // 初始化

@@ -258,7 +258,7 @@ build/plugins/gpu_driver/
 | S1 | Phase 1 | ✅ 完成 | 2026-04-28 |
 | S2 | Phase 1 | ✅ 完成 | 2026-04-28 |
 | S3 | Phase 1 | ✅ 完成 | 2026-04-28 |
-| S3.5 | Phase 1.5 | ⏳ 待发起 | - |
+| S3.5 | Phase 1.5 | ✅ 已完成 (2026-05-13) | fence_id 返回机制已实现 |
 | S4 | Phase 1 | ⏳ 进行中 | - |
 | S5 | Phase 2 | ⏳ 待发起 | - |
 
@@ -269,7 +269,7 @@ build/plugins/gpu_driver/
 | Phase 0 | 7 | 5 | 2 |
 | Phase 1 (定义) | 6 | 6 | 0 |
 | Phase 1 (实现) | 6 | 6 | 0 |
-| Phase 1.5 | 3 | 2 | 1 |
+| Phase 1.5 | 3 | 3 | 0 |
 | Phase 2 | 5 | 0 | 5 |
 | **总计** | **27** | **19** | **8** |
 

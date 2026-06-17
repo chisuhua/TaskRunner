@@ -342,6 +342,7 @@ public:
         args.count = count;
         args.flags = flags;
         args.fence_id = 0;  // 初始化
+        args.va_space_handle = current_va_space_handle_;  // 透传 VA Space（0 = 跳过 H-1 校验）
 
         if (ioctl(fd_, GPU_IOCTL_PUSHBUFFER_SUBMIT_BATCH, &args) < 0) {
             std::cerr << "GpuDriverClient: GPU_IOCTL_PUSHBUFFER_SUBMIT_BATCH failed"
@@ -465,9 +466,34 @@ public:
         return wait_fence(fence_id, 0, &status);
     }
 
+    // ============================================================
+    // VA Space 透传 (H-1 closeout)
+    // ============================================================
+
+    /**
+     * 设置当前 VA Space handle
+     *
+     * 透传给后续 submit_batch() 调用。设为 0 时，H-1 校验
+     * (validate VA Space exists + validate Queue belongs to VA Space)
+     * 将被跳过（向后兼容 sentinel）。调用方应在创建 VA Space 后立即设置。
+     *
+     * @param va_space_handle VA Space handle (0 = 跳过校验)
+     */
+    void setCurrentVASpace(uint64_t va_space_handle) {
+        current_va_space_handle_ = va_space_handle;
+    }
+
+    /**
+     * 获取当前 VA Space handle
+     */
+    uint64_t getCurrentVASpace() const {
+        return current_va_space_handle_;
+    }
+
 private:
     int fd_;                      // 设备文件描述符
     std::string device_path_;      // 设备路径
+    uint64_t current_va_space_handle_ = 0;  // 默认 0 = 走 H-1 sentinel 跳过校验
 };
 
 /**

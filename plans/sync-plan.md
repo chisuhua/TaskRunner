@@ -151,6 +151,8 @@ UsrLinuxEmu 团队                          TaskRunner 团队
 **Issue**: TaskRunner #4
 **日期**: 2026-04-28
 
+**S3.1 va_space_handle 透传**（2026-06-17, change `h1-pushbuffer-validation-closeout`）：✅ 已加 `setCurrentVASpace()` API（opt-in，默认 0 走 H-1 sentinel 跳过校验）。`GpuDriverClient::submit_batch()` 在 ioctl 前自动透传 `current_va_space_handle_` 到 `args.va_space_handle`。ABI 兼容（旧调用方零行为变化）。
+
 **确认的 GPFIFO Entry 填充**:
 
 **MEMCPY (h2d/d2h)**:

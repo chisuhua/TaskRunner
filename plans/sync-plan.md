@@ -114,7 +114,23 @@ UsrLinuxEmu 团队                          TaskRunner 团队
 | gpfifo_capacity | ✅ 需要 | ✅ 1024 |
 | cache_line_size | ⚠️ 可选 | ✅ 64 |
 
-**Phase 1.5 新增字段**: warp_size, max_clock_frequency, driver_version
+**Phase 1.5 已完成字段** (2026-05-13):
+
+| 字段 | 类型 | 值 |
+|------|------|-----|
+| warp_size | u32 | 32 (NVIDIA 风格) |
+| max_clock_frequency | u32 | 1500 MHz |
+| driver_version | u32 | 0x000500 (v0.5.0) |
+| firmware_version | u32 | 0x000100 (v0.1.0) |
+| simd_count | u32 | 64 |
+| max_memory_clock_frequency | u32 | 2000 MHz |
+| memory_bus_width | u32 | 256-bit |
+| peak_fp32_gflops | u32 | 17000 |
+| pcie_bandwidth | u32 | 16000 Mbps |
+| architecture_id | u32 | 0x1001 |
+| marketing_name | char[64] | "UsrLinuxEmu Simulator v1" |
+
+**struct 总大小**: 144 字节
 
 ### 3.3 S2: ALLOC_BO 参数确认 ✅
 
@@ -134,6 +150,8 @@ UsrLinuxEmu 团队                          TaskRunner 团队
 
 **Issue**: TaskRunner #4
 **日期**: 2026-04-28
+
+**S3.1 va_space_handle 透传**（2026-06-17, change `h1-pushbuffer-validation-closeout`）：✅ 已加 `setCurrentVASpace()` API（opt-in，默认 0 走 H-1 sentinel 跳过校验）。`GpuDriverClient::submit_batch()` 在 ioctl 前自动透传 `current_va_space_handle_` 到 `args.va_space_handle`。ABI 兼容（旧调用方零行为变化）。
 
 **确认的 GPFIFO Entry 填充**:
 
@@ -218,8 +236,9 @@ build/plugins/gpu_driver/
 
 | 任务 | 状态 | 说明 |
 |------|------|------|
-| `gpu_pushbuffer_args` 增加 `fence_id` 字段 | ⏳ 待发起 | S3.5 同步点 |
-| `gpu_device_info` 增加 warp_size 等字段 | ⏳ 待发起 | S1 后续 |
+| `gpu_pushbuffer_args.fence_id` 字段 | ✅ 已定义 (UsrLinuxEmu 2026-05-08) | S3.5 同步点已完成 |
+| `gpu_device_info` 增加 warp_size 等字段 | ✅ 已完成 (2026-05-13) | struct 扩展到 144 字节，11 个新字段 |
+| Issue #13: Teardown SIGSEGV 修复 | ✅ 已修复 (2026-05-09, commit dd81e5c) | plugin_fini 销毁顺序修复 |
 
 ### 6.2 Phase 2 (待 S5 同步)
 
@@ -241,7 +260,7 @@ build/plugins/gpu_driver/
 | S1 | Phase 1 | ✅ 完成 | 2026-04-28 |
 | S2 | Phase 1 | ✅ 完成 | 2026-04-28 |
 | S3 | Phase 1 | ✅ 完成 | 2026-04-28 |
-| S3.5 | Phase 1.5 | ⏳ 待发起 | - |
+| S3.5 | Phase 1.5 | ✅ 已完成 (2026-05-13) | fence_id 返回机制已实现 |
 | S4 | Phase 1 | ⏳ 进行中 | - |
 | S5 | Phase 2 | ⏳ 待发起 | - |
 
@@ -252,9 +271,9 @@ build/plugins/gpu_driver/
 | Phase 0 | 7 | 5 | 2 |
 | Phase 1 (定义) | 6 | 6 | 0 |
 | Phase 1 (实现) | 6 | 6 | 0 |
-| Phase 1.5 | 2 | 0 | 2 |
+| Phase 1.5 | 3 | 3 | 0 |
 | Phase 2 | 5 | 0 | 5 |
-| **总计** | **26** | **17** | **9** |
+| **总计** | **27** | **19** | **8** |
 
 ---
 

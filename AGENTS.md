@@ -74,9 +74,9 @@ cd UsrLinuxEmu
 
 ## 已知问题
 
-- 插件 teardown 时 SIGSEGV - Issue #13 (UsrLinuxEmu)
-  - 原因: plugin_fini_internal() 未从 VFS 注销设备
-  - 不影响功能，测试完成后 teardown 时触发
+- ~~插件 teardown 时 SIGSEGV~~ - Issue #13 ✅ **已修复** (2026-05-09, commit dd81e5c)
+  - 修复: plugin_fini_internal() 销毁顺序改为 stop puller → reset → unregister device
+  - 验证: 所有测试 (test_gpu_plugin 等) 均正常 teardown，无 SIGSEGV
 
 ## GitHub Issues
 

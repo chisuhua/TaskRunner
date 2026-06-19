@@ -14,7 +14,7 @@ TaskRunner/
 │   └── cuda_scheduler.hpp    # CudaScheduler 类
 ├── tests/
 │   └── test_cuda_scheduler.cpp  # E2E 测试 (doctest)
-├── UsrLinuxEmu → ../UsrLinuxEmu/  # 符号链接，GPU 接口定义
+├── UsrLinuxEmu → ../../  # 符号链接，GPU 接口定义（2026-06-19 PR #6 修复路径，原 ../UsrLinuxEmu/ 断链）
 └── CMakeLists.txt
 ```
 
@@ -83,13 +83,14 @@ cd UsrLinuxEmu
 - TaskRunner: https://github.com/chisuhua/TaskRunner/issues/5 (Phase 1 完成)
 - UsrLinuxEmu:
   - Issue #11: VFS 单例问题 (已修复)
-  - Issue #12: Phase 1.5 fence_id 扩展
-  - Issue #13: Teardown SIGSEGV
+  - Issue #12: Phase 1.5 fence_id 扩展 (S3.5 已完成, 2026-05-13)
+  - Issue #13: Teardown SIGSEGV (已修复, 2026-05-09, commit dd81e5c)
 
 ## 状态追踪
 
 - 同步点 S0-S4 已完成 ✅
 - Phase 1 联调完成 (2026-04-29) ✅
-- Phase 1.5 待办:
-  - fence_id 扩展字段 (Issue #12)
-  - 修复 teardown SIGSEGV (Issue #13)
+- Phase 1.5 进度:
+  - ✅ S3.5 fence_id 返回机制 (2026-05-13, main commit a7f4463)
+  - ✅ S3.1 va_space_handle 透传 (2026-06-17, PR #6)
+  - ⏳ S5 (Phase 2 启动前发起)

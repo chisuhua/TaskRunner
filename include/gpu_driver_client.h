@@ -421,38 +421,133 @@ public:
     }
 
     // ============================================================
-    // H-3 Phase 2 占位 (5) - 抛异常保持纯虚覆盖合约
+    // H-3 Phase 2 (5) - 真实 ioctl wrapper (设计依据 design.md §5)
     // ============================================================
 
+    /**
+     * 创建 GPU 虚拟地址空间 (H-3 Phase 2)
+     * @param flags VA Space flags
+     * @return VA Space handle (>=1) 成功，0 失败
+     *
+     * D1: caller owns handle，**不**自动 set current_va_space_handle_。
+     * caller 需显式调用 set_current_va_space(handle) 才会触发 H-1 校验。
+     */
     uint64_t create_va_space(uint32_t flags) override {
-        (void)flags;
-        throw std::runtime_error("H-2.5: create_va_space not implemented; see H-3");
+        if (!is_open()) return 0;  // H-1 sentinel guard
+        struct gpu_va_space_args args = {};
+        args.page_size = 0;  // 0=4KB; 1=64KB（H-3 暂不暴露 page_size param）
+        args.flags = flags;
+        if (ioctl(fd_, GPU_IOCTL_CREATE_VA_SPACE, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_CREATE_VA_SPACE failed"
+                      << " (errno=" << errno << ")\n";
+            return 0;
+        }
+        return args.va_space_handle;  // 0 = 失败；非零 = 成功
     }
 
+    /**
+     * 销毁 GPU 虚拟地址空间 (H-3 Phase 2)
+     * @param va_space_handle VA Space handle
+     * @return 0 成功，-1 失败
+     *
+     * handle==0 是 H-1 sentinel 编程错误，按 spec R2 一致性**不**打 log。
+     */
     int destroy_va_space(uint64_t va_space_handle) override {
-        (void)va_space_handle;
-        throw std::runtime_error("H-2.5: destroy_va_space not implemented; see H-3");
+        if (!is_open()) return -1;
+        if (va_space_handle == 0) return -1;  // 守卫：拒绝 sentinel
+        if (ioctl(fd_, GPU_IOCTL_DESTROY_VA_SPACE, &va_space_handle) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_DESTROY_VA_SPACE failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return 0;
     }
 
+    /**
+     * 注册 GPU 到 VA Space (H-3 Phase 2, 多 GPU/P2P 场景)
+     * @param va_space_handle VA Space handle
+     * @param gpu_id GPU ID
+     * @param flags 注册标志
+     * @return 0 成功，-1 失败
+     */
     int register_gpu(uint64_t va_space_handle, uint32_t gpu_id, uint32_t flags) override {
-        (void)va_space_handle;
-        (void)gpu_id;
-        (void)flags;
-        throw std::runtime_error("H-2.5: register_gpu not implemented; see H-3");
+        if (!is_open()) return -1;
+        if (va_space_handle == 0) {
+            std::cerr << "[GpuDriverClient] register_gpu: rejected H-1 sentinel (va_space_handle=0)"
+                      << std::endl;
+            return -1;  // H-1 sentinel guard
+        }
+        struct gpu_register_gpu_args args = {};
+        args.va_space_handle = va_space_handle;
+        args.gpu_id = gpu_id;
+        args.flags = flags;
+        if (ioctl(fd_, GPU_IOCTL_REGISTER_GPU, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_REGISTER_GPU failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return 0;
     }
 
+    /**
+     * 创建 GPU 命令队列 (H-3 Phase 2)
+     * @param va_space_handle VA Space handle
+     * @param queue_type 队列类型 (GPU_QUEUE_COMPUTE/COPY/GRAPHICS)
+     * @param priority 队列优先级 0-100
+     * @param ring_buffer_size Ring buffer 大小（条目数）
+     * @return queue_handle (>=1) 成功，0 失败
+     *
+     * D2: 显式 create-destroy，不与 stream_id 隐式绑定。
+     * R2: 返回 u64，caller 必须保存完整 handle，submit 时取低 32 位作 stream_id。
+     */
     uint64_t create_queue(uint64_t va_space_handle, uint32_t queue_type,
                           uint32_t priority, uint64_t ring_buffer_size) override {
-        (void)va_space_handle;
-        (void)queue_type;
-        (void)priority;
-        (void)ring_buffer_size;
-        throw std::runtime_error("H-2.5: create_queue not implemented; see H-3");
+        if (!is_open()) return 0;
+        if (va_space_handle == 0) {
+            std::cerr << "[GpuDriverClient] create_queue: rejected H-1 sentinel (va_space_handle=0)"
+                      << std::endl;
+            return 0;  // H-1 sentinel guard
+        }
+        if (priority > 100) {
+            std::cerr << "[GpuDriverClient] create_queue: invalid priority " << priority
+                      << " (valid range: 0-100)" << std::endl;
+            return 0;  // 业务校验：priority 范围 0-100
+        }
+        if (ring_buffer_size == 0) {
+            std::cerr << "[GpuDriverClient] create_queue: invalid ring_buffer_size 0"
+                      << std::endl;
+            return 0;  // 业务校验：ring_buffer_size 必须 > 0
+        }
+        struct gpu_queue_args args = {};
+        args.va_space_handle = va_space_handle;
+        args.queue_type = queue_type;  // GPU_QUEUE_COMPUTE/COPY/GRAPHICS
+        args.priority = priority;
+        args.ring_buffer_size = ring_buffer_size;
+        if (ioctl(fd_, GPU_IOCTL_CREATE_QUEUE, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_CREATE_QUEUE failed"
+                      << " (errno=" << errno << ")\n";
+            return 0;
+        }
+        return args.queue_handle;  // u64, monotonic from 1 per R2
+        // 注：args.doorbell_pgoff 由 ioctl 路径不需要（H-3 走 ioctl，非 mmap）
     }
 
+    /**
+     * 销毁 GPU 命令队列 (H-3 Phase 2)
+     * @param queue_handle Queue handle
+     * @return 0 成功，-1 失败
+     *
+     * handle==0 是 H-1 sentinel 编程错误，按 spec R2 一致性**不**打 log。
+     */
     int destroy_queue(uint64_t queue_handle) override {
-        (void)queue_handle;
-        throw std::runtime_error("H-2.5: destroy_queue not implemented; see H-3");
+        if (!is_open()) return -1;
+        if (queue_handle == 0) return -1;  // 守卫
+        if (ioctl(fd_, GPU_IOCTL_DESTROY_QUEUE, &queue_handle) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_DESTROY_QUEUE failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return 0;
     }
 
 private:

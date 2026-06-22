@@ -1,0 +1,6 @@
+schema: spec-driven
+created: 2026-06-19
+status: DRAFT
+prerequisite: H-2.5  # h2-5-architecture-foundation
+supersedes_history: plans/2026-06-19-h2-phase2-openspec-skeleton/  # 原 H-2 已被拆分
+goal: "在 H-2.5 IGpuDriver 抽象之上实现 5 个 Phase 2 ioctl wrapper（create_va_space / destroy_va_space / register_gpu / create_queue / destroy_queue），补齐 TaskRunner 侧 VA Space + Queue 生命周期管理 API"

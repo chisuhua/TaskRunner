@@ -1,0 +1,9 @@
+schema: spec-driven
+created: 2026-06-19
+status: DEPRECATED  # ⚠️ 2026-06-19 弃用，已被 H-2.5 + H-3 取代
+deprecated_at: 2026-06-19
+deprecation_reason: "Path D 重构优先：Oracle review + explore 调查揭示 GpuDriverClient 是 dead code。骨架已拆分到 H-2.5（架构基础）和 H-3（VA Space/Queue 真实实现）"
+supersedes:
+  - plans/2026-06-19-h2-5-architecture-foundation/  # H-2.5
+  - plans/2026-06-19-h3-phase2-openspec-skeleton/   # H-3
+goal: "[DEPRECATED] 原目标：在 TaskRunner GpuDriverClient 加 5 个 Phase 2 wrapper。已被 H-3 取代。"

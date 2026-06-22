@@ -244,8 +244,8 @@ build/plugins/gpu_driver/
 
 | 任务 | 状态 |
 |------|------|
-| `GPU_IOCTL_CREATE_VA_SPACE` | ⏳ H-3 (Phase 2 实施) |
-| `GPU_IOCTL_CREATE_QUEUE` | ⏳ H-3 (Phase 2 实施) |
+| `GPU_IOCTL_CREATE_VA_SPACE` | ✅ H-3 完成 (2026-06-23, commits 241f3ed..8625b82) |
+| `GPU_IOCTL_CREATE_QUEUE` | ✅ H-3 完成 (2026-06-23, commits 241f3ed..8625b82) |
 | VA Space/Queue 抽象设计 | ✅ S5 完成 (2026-06-19, commit c64301c) |
 
 ---

@@ -1,15 +1,21 @@
 /**
  * cmd_cuda.cpp - CUDA CLI 命令实现 (System C)
  *
- * 实现 4 个 CUDA 命令，使用 GPU_IOCTL_* 接口:
+ * 实现 6 个 CUDA 命令，使用 GPU_IOCTL_* 接口:
  * 1. cuda_alloc <size> - 分配设备内存
  * 2. cuda_memcpy <h2d|d2h> <ptr> <offset> <size> - 内存拷贝
  * 3. cuda_launch <kernel_name> <grid_x> <grid_y> <grid_z> <block_x> <block_y> <block_z> - Kernel 启动
  * 4. cuda_wait <fence_id> - 等待 Fence
+ * 5. cuda_va_space create/destroy - VA Space 生命周期 (H-3 Phase 2)
+ * 6. cuda_queue create/destroy - Queue 生命周期 (H-3 Phase 2)
  *
  * H-2.5 (D6/D7/D8): BO 方法签名变更
  *  - alloc_bo_vram(size, flags) -> u64 (替代旧 alloc_bo_vram(size, &handle, &gpu_va))
  *  - map_bo() 不需要 (本 CLI 不映射 BO, 仅分配 handle)
+ *
+ * H-3 (Phase 2): 新增 cuda_va_space + cuda_queue subcommand
+ *   - cuda_va_space create/destroy: VA Space 生命周期
+ *   - cuda_queue create/destroy: Queue 生命周期
  */
 
 #include <iostream>
@@ -33,6 +39,10 @@ void print_cuda_help() {
     std::cout << "  cuda_memcpy <h2d|d2h> <ptr> <offset> <size>    - Memory copy (host<->device)\n";
     std::cout << "  cuda_launch <kernel> <gx> <gy> <gz> <bx> <by> <bz> - Launch kernel\n";
     std::cout << "  cuda_wait <fence_id>                           - Wait for fence\n";
+    std::cout << "  cuda_va_space create <flags>                - Create VA Space, print handle\n";
+    std::cout << "  cuda_va_space destroy <handle>              - Destroy VA Space by handle\n";
+    std::cout << "  cuda_queue create <va_space> <type> <prio> <ring> - Create Queue, print handle\n";
+    std::cout << "  cuda_queue destroy <handle>                 - Destroy Queue by handle\n";
     std::cout << "\n";
     std::cout << "Examples:\n";
     std::cout << "  cuda_alloc 4096\n";
@@ -40,6 +50,10 @@ void print_cuda_help() {
     std::cout << "  cuda_memcpy d2h 0x2000 0 512\n";
     std::cout << "  cuda_launch vector_add 1 1 1 256 1 1\n";
     std::cout << "  cuda_wait 1\n";
+    std::cout << "  cuda_va_space create 0\n";
+    std::cout << "  cuda_va_space destroy 1\n";
+    std::cout << "  cuda_queue create 1 0 50 4096\n";
+    std::cout << "  cuda_queue destroy 1\n";
 }
 
 uint64_t parse_number(const std::string& str) {
@@ -230,6 +244,139 @@ int cmd_cuda_wait(int argc, char* argv[]) {
     return 0;
 }
 
+/**
+ * H-3 Phase 2: cuda_va_space subcommand
+ * Usage:
+ *   cuda_va_space create <flags>                - Create VA Space, print va_space_handle
+ *   cuda_va_space destroy <handle>              - Destroy VA Space by handle
+ */
+int cmd_cuda_va_space(int argc, char* argv[]) {
+    if (argc < 1) {
+        std::cerr << "Error: cuda_va_space requires <create|destroy> argument\n";
+        return 1;
+    }
+
+    std::string subcommand = argv[0];
+
+    if (subcommand == "create") {
+        if (argc < 2) {
+            std::cerr << "Error: cuda_va_space create requires <flags> argument\n";
+            return 1;
+        }
+        uint32_t flags = static_cast<uint32_t>(parse_number(argv[1]));
+
+        if (!::async_task::gpu::g_gpu_client || !::async_task::gpu::g_gpu_client->is_open()) {
+            std::cout << "[STUB MODE] Simulating cuda_va_space create\n";
+            std::cout << "va_space_handle=1 (simulated)\n";
+            return 0;
+        }
+
+        uint64_t va_space_handle = ::async_task::gpu::g_gpu_client->create_va_space(flags);
+        if (va_space_handle == 0) {
+            std::cerr << "Error: GPU_IOCTL_CREATE_VA_SPACE failed\n";
+            return 1;
+        }
+
+        std::cout << "va_space_handle=" << va_space_handle << "\n";
+        return 0;
+
+    } else if (subcommand == "destroy") {
+        if (argc < 2) {
+            std::cerr << "Error: cuda_va_space destroy requires <handle> argument\n";
+            return 1;
+        }
+        uint64_t handle = parse_number(argv[1]);
+
+        if (!::async_task::gpu::g_gpu_client || !::async_task::gpu::g_gpu_client->is_open()) {
+            std::cout << "[STUB MODE] Simulating cuda_va_space destroy\n";
+            std::cout << "destroyed va_space_handle=" << handle << " (simulated)\n";
+            return 0;
+        }
+
+        int ret = ::async_task::gpu::g_gpu_client->destroy_va_space(handle);
+        if (ret < 0) {
+            std::cerr << "Error: GPU_IOCTL_DESTROY_VA_SPACE failed\n";
+            return 1;
+        }
+
+        std::cout << "destroyed va_space_handle=" << handle << "\n";
+        return 0;
+
+    } else {
+        std::cerr << "Error: Unknown cuda_va_space subcommand '" << subcommand << "', use 'create' or 'destroy'\n";
+        return 1;
+    }
+}
+
+/**
+ * H-3 Phase 2: cuda_queue subcommand
+ * Usage:
+ *   cuda_queue create <va_space> <type> <priority> <ring_size>  - Create Queue, print queue_handle
+ *   cuda_queue destroy <handle>                                  - Destroy Queue by handle
+ */
+int cmd_cuda_queue(int argc, char* argv[]) {
+    if (argc < 1) {
+        std::cerr << "Error: cuda_queue requires <create|destroy> argument\n";
+        return 1;
+    }
+
+    std::string subcommand = argv[0];
+
+    if (subcommand == "create") {
+        if (argc < 5) {
+            std::cerr << "Error: cuda_queue create requires <va_space> <type> <priority> <ring_size>\n";
+            return 1;
+        }
+        uint64_t va_space_handle = parse_number(argv[1]);
+        uint32_t queue_type = static_cast<uint32_t>(parse_number(argv[2]));
+        uint32_t priority = static_cast<uint32_t>(parse_number(argv[3]));
+        uint64_t ring_buffer_size = parse_number(argv[4]);
+
+        if (!::async_task::gpu::g_gpu_client || !::async_task::gpu::g_gpu_client->is_open()) {
+            std::cout << "[STUB MODE] Simulating cuda_queue create\n";
+            std::cout << "queue_handle=1 (simulated)\n";
+            return 0;
+        }
+
+        uint64_t queue_handle = ::async_task::gpu::g_gpu_client->create_queue(
+            va_space_handle, queue_type, priority, ring_buffer_size);
+        if (queue_handle == 0) {
+            std::cerr << "Error: GPU_IOCTL_CREATE_QUEUE failed\n";
+            return 1;
+        }
+
+        std::cout << "queue_handle=" << queue_handle << "\n";
+        std::cout << "  (R2 mapping: stream_id=" << (uint32_t)queue_handle << " = LOW32(queue_handle))\n";
+        return 0;
+
+    } else if (subcommand == "destroy") {
+        if (argc < 2) {
+            std::cerr << "Error: cuda_queue destroy requires <handle> argument\n";
+            return 1;
+        }
+        uint64_t handle = parse_number(argv[1]);
+
+        if (!::async_task::gpu::g_gpu_client || !::async_task::gpu::g_gpu_client->is_open()) {
+            std::cout << "[STUB MODE] Simulating cuda_queue destroy\n";
+            std::cout << "destroyed queue_handle=" << handle << " (simulated)\n";
+            return 0;
+        }
+
+        int ret = ::async_task::gpu::g_gpu_client->destroy_queue(handle);
+        if (ret < 0) {
+            std::cerr << "Error: GPU_IOCTL_DESTROY_QUEUE failed\n";
+            return 1;
+        }
+
+        std::cout << "destroyed queue_handle=" << handle << "\n";
+        return 0;
+
+    } else {
+        std::cerr << "Error: Unknown cuda_queue subcommand '" << subcommand << "', use 'create' or 'destroy'\n";
+        return 1;
+    }
+}
+
 int dispatch_cuda_command(const std::string& cmd, int argc, char* argv[]) {
     if (cmd == "cuda_alloc") {
         return cmd_cuda_alloc(argc, argv);
@@ -239,6 +386,10 @@ int dispatch_cuda_command(const std::string& cmd, int argc, char* argv[]) {
         return cmd_cuda_launch(argc, argv);
     } else if (cmd == "cuda_wait") {
         return cmd_cuda_wait(argc, argv);
+    } else if (cmd == "cuda_va_space") {
+        return cmd_cuda_va_space(argc, argv);
+    } else if (cmd == "cuda_queue") {
+        return cmd_cuda_queue(argc, argv);
     } else if (cmd == "cuda_help" || cmd == "--help") {
         print_cuda_help();
         return 0;

@@ -123,6 +123,8 @@ TEST_CASE("destroy_queue_succeeds_with_valid_handle") {
 
 TEST_CASE("create_va_space_guard_when_closed") {
     MockGpuDriver mock;
+    // 文档意图: 模拟 "is_open=false" 状态. 但 mock 实际不检查 is_open (mock_gpu_driver.hpp:244-248),
+    // 因此此 inject_error 在本测试路径中无观测效果, 仅记录 mock 实际行为.
     mock.inject_error("is_open", true);
     CudaScheduler scheduler(&mock);
 

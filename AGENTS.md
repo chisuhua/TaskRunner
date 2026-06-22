@@ -93,4 +93,5 @@ cd UsrLinuxEmu
 - Phase 1.5 进度:
   - ✅ S3.5 fence_id 返回机制 (2026-05-13, main commit a7f4463)
   - ✅ S3.1 va_space_handle 透传 (2026-06-17, PR #6)
-  - ⏳ S5 (Phase 2 启动前发起)
+  - ✅ S5 Architecture foundation (2026-06-19, UsrLinuxEmu commit c64301c) — IGpuDriver 抽象 + GpuDriverClient/CudaStub 实现 + CudaScheduler DI + MockGpuDriver + CLI 死调用修复
+  - ⏳ H-3 (Phase 2 VA Space/Queue 真实实现，待 S5 archive 后激活)

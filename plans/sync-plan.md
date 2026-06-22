@@ -240,13 +240,13 @@ build/plugins/gpu_driver/
 | `gpu_device_info` 增加 warp_size 等字段 | ✅ 已完成 (2026-05-13) | struct 扩展到 144 字节，11 个新字段 |
 | Issue #13: Teardown SIGSEGV 修复 | ✅ 已修复 (2026-05-09, commit dd81e5c) | plugin_fini 销毁顺序修复 |
 
-### 6.2 Phase 2 (待 S5 同步)
+### 6.2 Phase 2 (S5 已完成, 待 H-3 实施)
 
 | 任务 | 状态 |
 |------|------|
-| `GPU_IOCTL_CREATE_VA_SPACE` | ⏳ 待发起 S5 |
-| `GPU_IOCTL_CREATE_QUEUE` | ⏳ 待发起 S5 |
-| VA Space/Queue 抽象设计 | ⏳ 待同步 |
+| `GPU_IOCTL_CREATE_VA_SPACE` | ⏳ H-3 (Phase 2 实施) |
+| `GPU_IOCTL_CREATE_QUEUE` | ⏳ H-3 (Phase 2 实施) |
+| VA Space/Queue 抽象设计 | ✅ S5 完成 (2026-06-19, commit c64301c) |
 
 ---
 
@@ -262,7 +262,7 @@ build/plugins/gpu_driver/
 | S3 | Phase 1 | ✅ 完成 | 2026-04-28 |
 | S3.5 | Phase 1.5 | ✅ 已完成 (2026-05-13) | fence_id 返回机制已实现 |
 | S4 | Phase 1 | ⏳ 进行中 | - |
-| S5 | Phase 2 | ⏳ 待发起 | - |
+| S5 | Phase 1.5 架构基础 | ✅ 已完成 (2026-06-19) | IGpuDriver 抽象 + 2 实现 + DI + Mock + CLI 修复 (UsrLinuxEmu commit c64301c) |
 
 ### 7.2 UsrLinuxEmu 侧完成率
 

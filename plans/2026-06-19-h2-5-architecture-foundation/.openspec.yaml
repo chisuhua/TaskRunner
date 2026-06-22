@@ -1,6 +1,0 @@
-schema: spec-driven
-created: 2026-06-19
-status: DRAFT
-supersedes_history: plans/2026-06-19-h2-phase2-openspec-skeleton/  # 原 H-2 已被拆分（Path D 重构优先）
-successor: plans/2026-06-19-h3-phase2-openspec-skeleton/  # H-3 依赖本 change
-goal: "构建统一 GPU 驱动抽象层 IGpuDriver，让 GpuDriverClient（真实 ioctl）和 CudaStub（mock）都实现同一接口，CudaScheduler 通过 IGpuDriver* 注入解耦，修复 CLI 死调用，为 H-3 Phase 2 生命周期管理 API 铺路"

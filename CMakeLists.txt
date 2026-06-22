@@ -57,6 +57,19 @@ target_link_libraries(test_gpu_architecture doctest::doctest)
 set_target_properties(test_gpu_architecture PROPERTIES OUTPUT_NAME "test_gpu_architecture")
 add_test(NAME test_gpu_architecture COMMAND test_gpu_architecture)
 
+# H-3: Phase 2 methods integration test (5 success + 4 mock-behavior + 1 R2 mapping + 2 R2 bonus)
+add_executable(test_gpu_phase2
+    tests/test_gpu_phase2.cpp
+    src/cuda_scheduler.cpp
+    src/sync_primitives.cpp
+    src/memory_manager.cpp
+    src/cuda_stub.cpp
+    ${GPU_CLIENT_SOURCES}
+)
+target_link_libraries(test_gpu_phase2 doctest::doctest)
+set_target_properties(test_gpu_phase2 PROPERTIES OUTPUT_NAME "test_gpu_phase2")
+add_test(NAME test_gpu_phase2 COMMAND test_gpu_phase2)
+
 if(BUILD_CLI)
     add_executable(taskrunner
         src/cli_main.cpp

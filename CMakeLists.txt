@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 option(BUILD_CLI "Build CLI mode (default: OFF for test mode)" OFF)
 
+enable_testing()
+
 add_subdirectory(doctest)
 
 include_directories(${CMAKE_CURRENT_SOURCE_DIR})
@@ -41,6 +43,19 @@ add_executable(test_cuda_scheduler
 )
 target_link_libraries(test_cuda_scheduler doctest::doctest)
 set_target_properties(test_cuda_scheduler PROPERTIES OUTPUT_NAME "test_cuda_scheduler")
+
+# H-2.5: GPU architecture foundation tests (IGpuDriver + DI + Mock)
+add_executable(test_gpu_architecture
+    tests/test_gpu_architecture.cpp
+    src/cuda_scheduler.cpp
+    src/sync_primitives.cpp
+    src/memory_manager.cpp
+    src/cuda_stub.cpp
+    ${GPU_CLIENT_SOURCES}
+)
+target_link_libraries(test_gpu_architecture doctest::doctest)
+set_target_properties(test_gpu_architecture PROPERTIES OUTPUT_NAME "test_gpu_architecture")
+add_test(NAME test_gpu_architecture COMMAND test_gpu_architecture)
 
 if(BUILD_CLI)
     add_executable(taskrunner

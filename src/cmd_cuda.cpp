@@ -6,6 +6,10 @@
  * 2. cuda_memcpy <h2d|d2h> <ptr> <offset> <size> - 内存拷贝
  * 3. cuda_launch <kernel_name> <grid_x> <grid_y> <grid_z> <block_x> <block_y> <block_z> - Kernel 启动
  * 4. cuda_wait <fence_id> - 等待 Fence
+ *
+ * H-2.5 (D6/D7/D8): BO 方法签名变更
+ *  - alloc_bo_vram(size, flags) -> u64 (替代旧 alloc_bo_vram(size, &handle, &gpu_va))
+ *  - map_bo() 不需要 (本 CLI 不映射 BO, 仅分配 handle)
  */
 
 #include <iostream>
@@ -56,21 +60,21 @@ int cmd_cuda_alloc(int argc, char* argv[]) {
     if (!::async_task::gpu::g_gpu_client || !::async_task::gpu::g_gpu_client->is_open()) {
         std::cout << "[STUB MODE] Simulating cuda_alloc\n";
         std::cout << "Allocated " << size << " bytes\n";
-        std::cout << "  device_ptr: 0x10000 (simulated)\n";
+        std::cout << "  bo_handle: 1 (simulated)\n";
         std::cout << "  fence_id: 1 (simulated)\n";
         return 0;
     }
 
-    uint32_t handle;
-    uint64_t gpu_va;
-    if (::async_task::gpu::g_gpu_client->alloc_bo_vram(size, &handle, &gpu_va) < 0) {
+    // D6: alloc_bo_vram(size, flags) -> u64 bo_handle
+    uint64_t bo_handle = ::async_task::gpu::g_gpu_client->alloc_bo_vram(size, 0);
+    if (bo_handle == 0) {
         std::cerr << "Error: GPU_IOCTL_ALLOC_BO failed\n";
         return 1;
     }
 
     std::cout << "Allocated " << size << " bytes\n";
-    std::cout << "  handle: " << handle << "\n";
-    std::cout << "  gpu_va: 0x" << std::hex << gpu_va << std::dec << "\n";
+    std::cout << "  bo_handle: " << bo_handle << "\n";
+    std::cout << "  (use map_bo via IGpuDriver to get CPU pointer)\n";
 
     return 0;
 }

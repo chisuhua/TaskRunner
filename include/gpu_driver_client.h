@@ -4,10 +4,16 @@
  * 提供 TaskRunner 到 UsrLinuxEmu GPU 驱动的客户端接口。
  * 基于 ADR-015 和同步点 S0-S3 确认的接口。
  *
+ * H-2.5: GpuDriverClient 实现统一抽象接口 IGpuDriver (28 个方法)
+ *  - 4 个 BO 方法按 D6/D7/D8 对齐 (alloc_bo, alloc_bo_vram, free_bo, map_bo)
+ *  - H-1 既有 setCurrentVASpace()/getCurrentVASpace() 保留作 deprecated alias
+ *  - 5 个 H-3 占位方法 (create_va_space 等) 抛 std::runtime_error
+ *
  * 符号链接: TaskRunner/UsrLinuxEmu → ../UsrLinuxEmu/
  * 接口定义: UsrLinuxEmu/plugins/gpu_driver/shared/gpu_ioctl.h
  *
  * 创建日期: 2026-04-29
+ * H-2.5 重构: 2026-06-22
  */
 
 #pragma once
@@ -16,6 +22,7 @@
 #include <cstddef>
 #include <cstring>
 #include <cstdio>
+#include <stdexcept>
 #include <string>
 #include <fcntl.h>
 #include <unistd.h>
@@ -28,16 +35,18 @@
 #include "UsrLinuxEmu/plugins/gpu_driver/shared/gpu_ioctl.h"
 #include "UsrLinuxEmu/plugins/gpu_driver/shared/gpu_types.h"
 
+// 统一抽象接口
+#include "igpu_driver.hpp"
+
 namespace async_task {
 namespace gpu {
 
 /**
  * GPU 设备客户端封装类
  *
- * 提供所有 GPU 操作的高层接口，封装 ioctl 调用细节。
- * 支持 System C (GPU_IOCTL_*) 接口。
+ * 实现 IGpuDriver 接口，对应 System C (GPU_IOCTL_*) 后端。
  */
-class GpuDriverClient {
+class GpuDriverClient : public IGpuDriver {
 public:
     /**
      * 构造函数
@@ -49,7 +58,7 @@ public:
     /**
      * 析构函数 - 关闭设备文件描述符
      */
-    ~GpuDriverClient() {
+    ~GpuDriverClient() override {
         close();
     }
 
@@ -57,11 +66,15 @@ public:
     GpuDriverClient(const GpuDriverClient&) = delete;
     GpuDriverClient& operator=(const GpuDriverClient&) = delete;
 
+    // ============================================================
+    // 核心生命周期 (3) - IGpuDriver
+    // ============================================================
+
     /**
      * 打开 GPU 设备
      * @return 0 成功，-1 失败
      */
-    int open() {
+    int open() override {
         if (fd_ >= 0) {
             return 0;  // 已经打开
         }
@@ -78,35 +91,33 @@ public:
     /**
      * 关闭 GPU 设备
      */
-    void close() {
+    int close() override {
         if (fd_ >= 0) {
             ::close(fd_);
             fd_ = -1;
         }
+        return 0;
     }
 
     /**
      * 检查设备是否已打开
      */
-    bool is_open() const { return fd_ >= 0; }
-
-    /**
-     * 获取设备文件描述符
-     */
-    int fd() const { return fd_; }
+    bool is_open() const override { return fd_ >= 0; }
 
     // ============================================================
-    // GPU_IOCTL_GET_DEVICE_INFO
+    // FD 访问 (1) - IGpuDriver
     // ============================================================
 
-    /**
-     * 获取设备信息
-     * @param info 输出参数，设备信息结构体
-     * @return 0 成功，-1 失败
-     */
-    int get_device_info(struct gpu_device_info* info) {
+    int fd() const override { return fd_; }
+
+    // ============================================================
+    // 设备信息 (8) - IGpuDriver
+    // ============================================================
+
+    int get_device_info(struct gpu_device_info* out) override {
+        if (!out) return -1;
         if (!is_open()) return -1;
-        if (ioctl(fd_, GPU_IOCTL_GET_DEVICE_INFO, info) < 0) {
+        if (ioctl(fd_, GPU_IOCTL_GET_DEVICE_INFO, out) < 0) {
             std::cerr << "GpuDriverClient: GPU_IOCTL_GET_DEVICE_INFO failed"
                       << " (errno=" << errno << ")\n";
             return -1;
@@ -114,57 +125,32 @@ public:
         return 0;
     }
 
-    // ============================================================
-    // Phase 1.5 便捷方法
-    // ============================================================
-
-    /**
-     * 获取 Warp 大小
-     * @return Warp 大小 (NVIDIA=32, AMD CDNA=64, AMD RDNA=32)
-     */
-    u32 get_warp_size() {
+    uint32_t get_warp_size() override {
         struct gpu_device_info info{};
         if (get_device_info(&info) == 0) return info.warp_size;
         return 0;
     }
 
-    /**
-     * 获取 SIMD 单元数量
-     * @return SIMD 数量 (AMD CU 或 NVIDIA SM)
-     */
-    u32 get_simd_count() {
+    uint32_t get_simd_count() override {
         struct gpu_device_info info{};
         if (get_device_info(&info) == 0) return info.simd_count;
         return 0;
     }
 
-    /**
-     * 获取峰值 FP32 性能
-     * @return 峰值 FP32 GFLOPS
-     */
-    u32 get_peak_fp32_gflops() {
+    uint32_t get_peak_fp32_gflops() override {
         struct gpu_device_info info{};
         if (get_device_info(&info) == 0) return info.peak_fp32_gflops;
         return 0;
     }
 
-    /**
-     * 获取最大引擎时钟频率
-     * @return 最大时钟频率 (MHz)
-     */
-    u32 get_max_clock_frequency() {
+    uint32_t get_max_clock_frequency() override {
         struct gpu_device_info info{};
         if (get_device_info(&info) == 0) return info.max_clock_frequency;
         return 0;
     }
 
-    /**
-     * 获取驱动版本字符串
-     * @param out 输出缓冲区
-     * @param size 缓冲区大小
-     * @return 0 成功，-1 失败
-     */
-    int get_driver_version_string(char* out, size_t size) {
+    int get_driver_version_string(char* out, size_t size) override {
+        if (!out || size == 0) return -1;
         struct gpu_device_info info{};
         if (get_device_info(&info) != 0) return -1;
         // 版本格式: 主.次.修订 (0x000500 = v0.5.0)
@@ -175,13 +161,8 @@ public:
         return 0;
     }
 
-    /**
-     * 获取市场营销名称
-     * @param out 输出缓冲区
-     * @param size 缓冲区大小
-     * @return 0 成功，-1 失败
-     */
-    int get_marketing_name(char* out, size_t size) {
+    int get_marketing_name(char* out, size_t size) override {
+        if (!out || size == 0) return -1;
         struct gpu_device_info info{};
         if (get_device_info(&info) != 0) return -1;
         strncpy(out, info.marketing_name, size - 1);
@@ -189,11 +170,7 @@ public:
         return 0;
     }
 
-    /**
-     * 打印完整设备信息 (调试用)
-     * @param os 输出流
-     */
-    void print_device_info(std::ostream& os = std::cout) {
+    void print_device_info(std::ostream& os = std::cout) override {
         struct gpu_device_info info{};
         if (get_device_info(&info) != 0) {
             os << "Failed to get device info\n";
@@ -225,64 +202,57 @@ public:
     }
 
     // ============================================================
-    // GPU_IOCTL_ALLOC_BO
+    // 缓冲区对象 (4) - IGpuDriver (D6/D7/D8 对齐)
     // ============================================================
 
     /**
-     * 分配 GPU 缓冲区对象
+     * 分配 GPU 缓冲区对象 (D6)
      * @param size 分配大小（字节）
-     * @param domain 内存域 (VRAM/GTT/CPU)
-     * @param flags 分配标志 (DEVICE_LOCAL/HOST_VISIBLE)
-     * @param handle 输出参数，返回的 GEM handle
-     * @param gpu_va 输出参数，返回的 GPU 虚拟地址
-     * @return 0 成功，-1 失败
+     * @param flags 分配标志 + domain 折入 flags (GPU_BO_DEVICE_LOCAL | GPU_MEM_DOMAIN_VRAM 等)
+     * @return bo_handle (>=1) 成功，0 失败
      */
-    int alloc_bo(uint64_t size, uint32_t domain, uint32_t flags,
-                  uint32_t* handle, uint64_t* gpu_va) {
-        if (!is_open()) return -1;
-        if (size == 0) return -1;
+    uint64_t alloc_bo(uint64_t size, uint32_t flags) override {
+        if (!is_open()) return 0;
+        if (size == 0) return 0;
 
         struct gpu_alloc_bo_args args = {};
         args.size = size;
-        args.domain = domain;
+        args.domain = 0;       // domain 折入 flags (IGpuDriver 简化 API)
         args.flags = flags;
 
         if (ioctl(fd_, GPU_IOCTL_ALLOC_BO, &args) < 0) {
             std::cerr << "GpuDriverClient: GPU_IOCTL_ALLOC_BO failed"
                       << " (errno=" << errno << ")\n";
-            return -1;
+            return 0;
         }
-
-        *handle = args.handle;
-        *gpu_va = args.gpu_va;
-        return 0;
+        return static_cast<uint64_t>(args.handle);
     }
 
     /**
-     * 简化版分配 - 使用 VRAM + DEVICE_LOCAL
+     * 分配 VRAM + DEVICE_LOCAL 缓冲区对象 (D6 一致)
+     * @param size 分配大小（字节）
+     * @param flags 额外 flags（VRAM + DEVICE_LOCAL 强制开启）
+     * @return bo_handle (>=1) 成功，0 失败
      */
-    int alloc_bo_vram(uint64_t size, uint32_t* handle, uint64_t* gpu_va) {
-        return alloc_bo(size, GPU_MEM_DOMAIN_VRAM, GPU_BO_DEVICE_LOCAL,
-                        handle, gpu_va);
+    uint64_t alloc_bo_vram(uint64_t size, uint32_t flags) override {
+        return alloc_bo(size, GPU_MEM_DOMAIN_VRAM | GPU_BO_DEVICE_LOCAL | flags);
     }
 
-    // ============================================================
-    // GPU_IOCTL_FREE_BO
-    // ============================================================
-
     /**
-     * 释放 GPU 缓冲区对象
-     * @param handle 要释放的 GEM handle
+     * 释放 GPU 缓冲区对象 (D7: u32 → u64 拓宽)
+     * @param bo_handle 要释放的 BO handle
      * @return 0 成功，-1 失败
      */
-    int free_bo(uint32_t handle) {
+    int free_bo(uint64_t bo_handle) override {
         if (!is_open()) return -1;
-        if (handle == 0) {
-            std::cerr << "GpuDriverClient: free_bo called with handle=0\n";
+        if (bo_handle == 0) {
+            std::cerr << "GpuDriverClient: free_bo called with bo_handle=0\n";
             return -1;
         }
 
-        if (ioctl(fd_, GPU_IOCTL_FREE_BO, &handle) < 0) {
+        // ioctl 数据仍是 u32 (gpu_ioctl.h 未升级)
+        uint32_t handle32 = static_cast<uint32_t>(bo_handle);
+        if (ioctl(fd_, GPU_IOCTL_FREE_BO, &handle32) < 0) {
             std::cerr << "GpuDriverClient: GPU_IOCTL_FREE_BO failed"
                       << " (errno=" << errno << ")\n";
             return -1;
@@ -290,49 +260,35 @@ public:
         return 0;
     }
 
-    // ============================================================
-    // GPU_IOCTL_MAP_BO
-    // ============================================================
-
     /**
-     * 映射 GPU 缓冲区对象
-     * @param handle GEM handle
-     * @param flags 映射标志
-     * @param gpu_va 输出参数，返回的 GPU 虚拟地址
-     * @return 0 成功，-1 失败
+     * 映射 GPU 缓冲区对象 (D8: 返回 CPU 指针 + 移除 flags)
+     * @param bo_handle BO handle
+     * @param size 映射大小（字节）
+     * @return CPU 虚拟地址，失败返回 nullptr
      */
-    int map_bo(uint32_t handle, uint32_t flags, uint64_t* gpu_va) {
-        if (!is_open()) return -1;
-        if (handle == 0) return -1;
+    void* map_bo(uint64_t bo_handle, uint64_t size) override {
+        if (!is_open()) return nullptr;
+        if (bo_handle == 0 || size == 0) return nullptr;
 
         struct gpu_map_bo_args args = {};
-        args.handle = handle;
-        args.flags = flags;
+        args.handle = static_cast<uint32_t>(bo_handle);
+        args.flags = 0;
 
         if (ioctl(fd_, GPU_IOCTL_MAP_BO, &args) < 0) {
             std::cerr << "GpuDriverClient: GPU_IOCTL_MAP_BO failed"
                       << " (errno=" << errno << ")\n";
-            return -1;
+            return nullptr;
         }
-
-        *gpu_va = args.gpu_va;
-        return 0;
+        // D8: 返回 CPU 虚拟地址 (gpu_va 在 System C 中是统一虚拟地址空间)
+        return reinterpret_cast<void*>(static_cast<uintptr_t>(args.gpu_va));
     }
 
     // ============================================================
-    // GPU_IOCTL_PUSHBUFFER_SUBMIT_BATCH
+    // 提交 (3, 返回 fence_id) - IGpuDriver
     // ============================================================
 
-    /**
-     * 提交 GPFIFO 命令批次
-     * @param stream_id 流/队列 ID
-     * @param entries GPFIFO 条目数组
-     * @param count 条目数量
-     * @param flags 提交标志 (GPU_SUBMIT_FENCE 等)
-     * @return fence_id (>=1) 如果包含 FENCE 操作，0 表示成功但无 fence，-1 表示错误
-     */
     int64_t submit_batch(uint32_t stream_id, const struct gpu_gpfifo_entry* entries,
-                          uint32_t count, uint32_t flags) {
+                         uint32_t count, uint32_t flags) override {
         if (!is_open()) return -1;
         if (!entries || count == 0) return -1;
 
@@ -349,20 +305,11 @@ public:
                       << " (errno=" << errno << ")\n";
             return -1;
         }
-        return static_cast<int64_t>(args.fence_id);  // 返回 fence_id (可能是0)
+        return static_cast<int64_t>(args.fence_id);
     }
 
-    /**
-     * 提交单个 MEMCPY 命令 (h2d 或 d2h)
-     * @param stream_id 流 ID
-     * @param src_addr 源地址
-     * @param dst_addr 目的地址
-     * @param size 拷贝大小
-     * @param is_h2d true 表示 h2d，false 表示 d2h
-     * @return fence_id (>=1)，0 表示成功但无 fence，-1 表示错误
-     */
     int64_t submit_memcpy(uint32_t stream_id, uint64_t src_addr, uint64_t dst_addr,
-                           uint64_t size, bool is_h2d) {
+                          uint64_t size, bool is_h2d) override {
         if (size == 0) return -1;
 
         struct gpu_gpfifo_entry entry = {};
@@ -371,8 +318,6 @@ public:
         entry.method = GPU_OP_MEMCPY;  // 0x102
         entry.subchannel = 0;
 
-        // h2d: payload[0]=host_ptr, payload[1]=gpu_ptr
-        // d2h: payload[0]=gpu_ptr, payload[1]=host_ptr
         entry.payload[0] = src_addr;
         entry.payload[1] = dst_addr;
         entry.payload[2] = size;
@@ -388,17 +333,10 @@ public:
         return submit_batch(stream_id, &entry, 1, GPU_SUBMIT_FENCE);
     }
 
-    /**
-     * 提交单个 KERNEL LAUNCH 命令
-     * @param stream_id 流 ID
-     * @param kernel_index 内核表索引
-     * @param grid_x/y/z Grid 维度
-     * @param block_x/y/z Block 维度
-     * @return fence_id (>=1)，0 表示成功但无 fence，-1 表示错误
-     */
     int64_t submit_launch(uint32_t stream_id, uint32_t kernel_index,
-                      uint32_t grid_x, uint32_t grid_y, uint32_t grid_z,
-                      uint32_t block_x, uint32_t block_y, uint32_t block_z) {
+                          uint32_t grid_x, uint32_t grid_y, uint32_t grid_z,
+                          uint32_t block_x, uint32_t block_y,
+                          uint32_t block_z) override {
         if (grid_x == 0 || grid_y == 0 || grid_z == 0) return -1;
         if (block_x == 0 || block_y == 0 || block_z == 0) return -1;
 
@@ -408,15 +346,9 @@ public:
         entry.method = GPU_OP_LAUNCH_KERNEL;  // 0x100
         entry.subchannel = 0;
 
-        // payload[0] = kernel_table_index
         entry.payload[0] = kernel_index;
-
-        // payload[1] = grid_dim (压缩: grid_x | (grid_y << 16) | (grid_z << 24))
         entry.payload[1] = grid_x | (grid_y << 16) | (static_cast<uint64_t>(grid_z) << 24);
-
-        // payload[2] = block_dim (压缩: block_x | (block_y << 8) | (block_z << 16))
         entry.payload[2] = block_x | (block_y << 8) | (static_cast<uint64_t>(block_z) << 16);
-
         entry.payload[3] = 0;
         entry.payload[4] = 0;
         entry.payload[5] = 0;
@@ -430,19 +362,13 @@ public:
     }
 
     // ============================================================
-    // GPU_IOCTL_WAIT_FENCE
+    // Fence 等待 (2 重载) - IGpuDriver
     // ============================================================
 
-    /**
-     * 等待 Fence
-     * @param fence_id 要等待的 Fence ID
-     * @param timeout_ms 超时时间（毫秒），0 = 无限等待
-     * @param status 输出参数，1=signaled, 0=timeout, -1=error
-     * @return 0 成功，-1 失败
-     */
-    int wait_fence(uint64_t fence_id, uint32_t timeout_ms, uint32_t* status) {
+    int wait_fence(uint64_t fence_id, uint32_t timeout_ms, uint32_t* status_out) override {
         if (!is_open()) return -1;
         if (fence_id == 0) return -1;
+        if (!status_out) return -1;
 
         struct gpu_wait_fence_args args = {};
         args.fence_id = fence_id;
@@ -454,40 +380,79 @@ public:
             return -1;
         }
 
-        *status = args.status;
+        *status_out = args.status;
         return 0;
     }
 
-    /**
-     * 无限等待 Fence
-     */
-    int wait_fence(uint64_t fence_id) {
-        uint32_t status;
+    int wait_fence(uint64_t fence_id) override {
+        uint32_t status = 0;
         return wait_fence(fence_id, 0, &status);
     }
 
     // ============================================================
-    // VA Space 透传 (H-1 closeout)
+    // VA Space 透传 (H-1 snake_case 迁移) - IGpuDriver
     // ============================================================
 
-    /**
-     * 设置当前 VA Space handle
-     *
-     * 透传给后续 submit_batch() 调用。设为 0 时，H-1 校验
-     * (validate VA Space exists + validate Queue belongs to VA Space)
-     * 将被跳过（向后兼容 sentinel）。调用方应在创建 VA Space 后立即设置。
-     *
-     * @param va_space_handle VA Space handle (0 = 跳过校验)
-     */
-    void setCurrentVASpace(uint64_t va_space_handle) {
+    void set_current_va_space(uint64_t va_space_handle) override {
         current_va_space_handle_ = va_space_handle;
     }
 
+    uint64_t get_current_va_space() const override {
+        return current_va_space_handle_;
+    }
+
+    // ------------------------------------------------------------
+    // Deprecated CamelCase alias (H-1 既有 API, 1 release 过渡)
+    // 内部调用 snake_case 版本; 调用方零修改
+    // ------------------------------------------------------------
+
     /**
-     * 获取当前 VA Space handle
+     * @deprecated H-2.5: 请使用 set_current_va_space()
+     */
+    void setCurrentVASpace(uint64_t va_space_handle) {
+        set_current_va_space(va_space_handle);
+    }
+
+    /**
+     * @deprecated H-2.5: 请使用 get_current_va_space()
      */
     uint64_t getCurrentVASpace() const {
-        return current_va_space_handle_;
+        return get_current_va_space();
+    }
+
+    // ============================================================
+    // H-3 Phase 2 占位 (5) - 抛异常保持纯虚覆盖合约
+    // ============================================================
+
+    uint64_t create_va_space(uint32_t flags) override {
+        (void)flags;
+        throw std::runtime_error("H-2.5: create_va_space not implemented; see H-3");
+    }
+
+    int destroy_va_space(uint64_t va_space_handle) override {
+        (void)va_space_handle;
+        throw std::runtime_error("H-2.5: destroy_va_space not implemented; see H-3");
+    }
+
+    int register_gpu(uint64_t va_space_handle, uint32_t gpu_id, uint32_t flags) override {
+        (void)va_space_handle;
+        (void)gpu_id;
+        (void)flags;
+        throw std::runtime_error("H-2.5: register_gpu not implemented; see H-3");
+    }
+
+    uint64_t create_queue(uint64_t va_space_handle, uint32_t queue_type,
+                          uint32_t priority, uint64_t ring_buffer_size) override {
+        (void)va_space_handle;
+        (void)queue_type;
+        (void)priority;
+        (void)ring_buffer_size;
+        throw std::runtime_error("H-2.5: create_queue not implemented; see H-3");
+    }
+
+    int destroy_queue(uint64_t queue_handle) override {
+        (void)queue_handle;
+        throw std::runtime_error("H-2.5: destroy_queue not implemented; see H-3");
     }
 
 private:

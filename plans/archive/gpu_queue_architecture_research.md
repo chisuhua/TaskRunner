@@ -1,6 +1,8 @@
 # GPU Command Submission Queue Architecture: AMD vs NVIDIA
 ## Technical Deep-Dive — Kernel Dispatch Performance Analysis
 
+> ⚠️ **DEPRECATED-SUPERSEDED-BY-ADR-024**: 此研究文档最后验证于 2026-04-29。content 仍有技术参考价值（AMD CDNA2 MI200 vs NVIDIA HyperQ/Channel 架构对比），但其驱动的架构决策已被 ADR-024（user-mode-queue-submission）取代。新决策请参考 ADR-024 + ADR-033（H-3 Phase 2 lifecycle）。
+
 **Author**: Research Compilation
 **Date**: 2026-04-29
 **Scope**: AMD CDNA2 MI200 (ROCm) · NVIDIA HyperQ/Channel (Ampere+, Hopper)

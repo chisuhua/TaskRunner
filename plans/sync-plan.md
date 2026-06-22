@@ -1,13 +1,13 @@
-# TaskRunner-UsrLinuxEmu 接口统一实施计划
+# TaskRunner-UsrLinuxEmu 接口统一同步计划
 
-**版本**: v1.1
-**日期**: 2026-04-29
-**状态**: Phase 1 同步完成，UsrLinuxEmu 实现完成
-**维护者**: UsrLinuxEmu Architecture Team + TaskRunner Team
+**版本**: v2.0（H-4 governance cleanup 后精简版）
+**日期**: 2026-06-23
+**维护者**: UsrLinuxEmu Architecture Team + TaskRunner owner
+**前置**: H-2.5 ✅ + H-3 ✅ shippable（2026-06-23）
 
 ---
 
-## 一、协调工作流总结
+## 一、协调工作流
 
 ### 1.1 核心原则
 
@@ -20,46 +20,22 @@
    └── 在定义的同步点等待对方输入，其他时间并行开发
 
 3. 契约优先 (Contract-First)
-   └── ADR-015 已定义接口契约，双方独立实现
+   └── ADR-015 定义 System C 接口契约
    └── 通过 headless 测试验证契约一致性
 ```
 
-### 1.2 同步门限法 (Sync-Gate Workflow) - 执行结果
+### 1.2 当前架构状态
 
 ```
-UsrLinuxEmu 团队                          TaskRunner 团队
-─────────────                            ──────────────
-
-[Phase 0]                                 [Phase 0]
-    │                                         │
-    ├── 废弃 cuda_compat_ioctl.cpp ──────────▶│ ✅ S0 完成
-    │                                         │
-[Phase 1.1: GPU_IOCTL 实现]                 [Phase 1.2: GpuDriverClient 实现]
-    │  (并行，无依赖)                           │  (使用 mock/stub，暂不调用真驱动)
-    │                                         │
-    ▼                                         ▼
-[S1: GET_DEVICE_INFO]◀───────────────│ ✅ S1 完成
-    │                                         │
-    ▼                                         ▼
-[ALLOC_BO/FREE_BO]                      [实现 cuda_alloc/cuda_free]
-    │                                         │
-    ▼                                         ▼
-[S2: ALLOC_BO 签名确认]◀──────────────│ ✅ S2 完成
-    │                                         │
-    ▼                                         ▼
-[MAP_BO/PUSHBUFFER_SUBMIT_BATCH]        [实现 cuda_memcpy/cuda_launch]
-    │                                         │
-    ▼                                         ▼
-[S3: PUSHBUFFER_SUBMIT_BATCH 格式]◀──│ ✅ S3 完成
-    │                                         │
-    ▼                                         ▼
-[WAIT_FENCE]                            [实现 cuda_wait]
-    │                                         │
-    ▼                                         ▼
-[✅ S4: 端到端集成验证]◀──────────────────│ ⏳ 等待 UsrLinuxEmu 完成
-    │  (UsrLinuxEmu 全部实现完成)            │  TaskRunner 准备联调
-    │                                         │
-[Phase 2]                                 [Phase 2]
+┌────────────────────────────────────────────────────────────┐
+│ H-3 (2026-06-23): 5 Phase 2 ioctl wrapper 实现完成           │
+│   - create_va_space / destroy_va_space / register_gpu        │
+│   - create_queue / destroy_queue                            │
+│   - GpuDriverClient 真实实现 + CudaStub mock                 │
+│   - 12 doctest cases (test_gpu_phase2.cpp)                   │
+│   - 2 CLI subcommand (cuda_va_space / cuda_queue)            │
+│   - 9 commits (241f3ed..8625b82), 双仓 sync 完成            │
+└────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -68,218 +44,136 @@ UsrLinuxEmu 团队                          TaskRunner 团队
 
 ### 2.1 TaskRunner 仓库 Issues
 
-| Issue | 主题 | 状态 | 仓库 |
-|-------|------|------|------|
-| #3 | S2: ALLOC_BO 参数确认 | ✅ 已回复 | TaskRunner |
-| #4 | S3: PUSHBUFFER 格式确认 | ✅ 已回复 | TaskRunner |
-| #5 | Phase 1 实现清单 | ✅ UsrLinuxEmu 已完成 | TaskRunner |
+| Issue | 主题 | 状态 |
+|-------|------|------|
+| #5 | Phase 1 实现清单 | ✅ UsrLinuxEmu 已完成 + TaskRunner H-3 完成 |
 
 ### 2.2 UsrLinuxEmu 仓库 Issues
 
-| Issue | 主题 | 状态 | 仓库 |
-|-------|------|------|------|
-| #8 | S0: 符号链接确认 | ✅ 已回复 | UsrLinuxEmu |
-| #9 | S1: GET_DEVICE_INFO 确认 | ✅ 已回复 | UsrLinuxEmu |
+| Issue | 主题 | 状态 |
+|-------|------|------|
+| #11 | VFS 单例问题 | ✅ 已修复 |
+| #12 | Phase 1.5 fence_id 扩展（S3.5）| ✅ 已完成（2026-05-13）|
+| #13 | Teardown SIGSEGV | ✅ 已修复（2026-05-09, commit dd81e5c）|
 
 ---
 
-## 三、Phase 0-1 同步点完成状态
+## 三、Phase 1.5 和 Phase 2 已完成
 
-### 3.1 S0: 符号链接方向确认 ✅
+### 3.1 Phase 1.5 (S3.5 fence_id 扩展)
 
-**Issue**: UsrLinuxEmu #8
-**日期**: 2026-04-28
-**结论**: 符号链接方向正确
-
-| 确认项 | 结果 |
-|--------|------|
-| 符号链接方向 | ✅ `TaskRunner/UsrLinuxEmu → ../UsrLinuxEmu/plugins/gpu_driver/shared/` |
-| 废弃清单 | ⚠️ `ioctl_gpgpu.h` 暂缓删除 (10 个文件依赖) |
-
-### 3.2 S1: GET_DEVICE_INFO 实现确认 ✅
-
-**Issue**: UsrLinuxEmu #9
-**日期**: 2026-04-28
-
-**确认的字段**:
-
-| 字段 | TaskRunner 需求 | UsrLinuxEmu 实现 |
-|------|-----------------|------------------|
-| vendor_id | ✅ 需要 | ✅ 0x1000 |
-| device_id | ✅ 需要 | ✅ 0x1001 |
-| vram_size | ✅ 需要 | ✅ 8GB |
-| bar0_size | ❌ 不需要 | ⚠️ 占位 16MB |
-| max_channels | ✅ 需要 | ✅ 32 |
-| compute_units | ✅ 需要 | ✅ 64 |
-| gpfifo_capacity | ✅ 需要 | ✅ 1024 |
-| cache_line_size | ⚠️ 可选 | ✅ 64 |
-
-**Phase 1.5 已完成字段** (2026-05-13):
-
-| 字段 | 类型 | 值 |
-|------|------|-----|
-| warp_size | u32 | 32 (NVIDIA 风格) |
-| max_clock_frequency | u32 | 1500 MHz |
-| driver_version | u32 | 0x000500 (v0.5.0) |
-| firmware_version | u32 | 0x000100 (v0.1.0) |
-| simd_count | u32 | 64 |
-| max_memory_clock_frequency | u32 | 2000 MHz |
-| memory_bus_width | u32 | 256-bit |
-| peak_fp32_gflops | u32 | 17000 |
-| pcie_bandwidth | u32 | 16000 Mbps |
-| architecture_id | u32 | 0x1001 |
-| marketing_name | char[64] | "UsrLinuxEmu Simulator v1" |
-
-**struct 总大小**: 144 字节
-
-### 3.3 S2: ALLOC_BO 参数确认 ✅
-
-**Issue**: TaskRunner #3
-**日期**: 2026-04-28
-
-**确认的参数**:
-
-| 参数 | 确认值 |
-|------|--------|
-| domain | VRAM(0x1)/GTT(0x2)/CPU(0x4)/多选组合 ✅ |
-| handle | u32, 从 1 开始, 0-65535 ✅ |
-| flags | DEVICE_LOCAL/HOST_VISIBLE ✅, CXL_SHARED 占位 |
-| gpu_va | ✅ Phase 1 返回有效值 |
-
-### 3.4 S3: PUSHBUFFER_SUBMIT_BATCH 格式确认 ✅
-
-**Issue**: TaskRunner #4
-**日期**: 2026-04-28
-
-**S3.1 va_space_handle 透传**（2026-06-17, change `h1-pushbuffer-validation-closeout`）：✅ 已加 `setCurrentVASpace()` API（opt-in，默认 0 走 H-1 sentinel 跳过校验）。`GpuDriverClient::submit_batch()` 在 ioctl 前自动透传 `current_va_space_handle_` 到 `args.va_space_handle`。ABI 兼容（旧调用方零行为变化）。
-
-**确认的 GPFIFO Entry 填充**:
-
-**MEMCPY (h2d/d2h)**:
-```c
-entries[0].method = GPU_OP_MEMCPY;  // 0x102
-entries[0].payload[0] = src_addr;
-entries[0].payload[1] = dst_addr;
-entries[0].payload[2] = size;
-// semaphore 填 0 (Phase 1 忽略)
-```
-
-**LAUNCH_KERNEL**:
-```c
-entries[0].method = GPU_OP_LAUNCH_KERNEL;  // 0x100
-entries[0].payload[0] = kernel_table_index;
-entries[0].payload[1] = grid_x | (grid_y << 16) | (grid_z << 24);
-entries[0].payload[2] = block_x | (block_y << 8) | (block_z << 16);
-```
-
-**fence 返回机制**: ⚠️ Phase 1.5 扩展 gpu_pushbuffer_args 增加 fence_id 字段
-
-**entry_count=1**: ✅ 确认正确
-
-### 3.5 S4: 端到端集成验证 ⏳
-
-**状态**: UsrLinuxEmu Phase 1 实现已完成，TaskRunner 准备联调
-
----
-
-## 四、UsrLinuxEmu Phase 1 实现状态 ✅
-
-**Issue**: TaskRunner #5 回复
-**日期**: 2026-04-29
-
-### 4.1 已完成的 6 个 ioctl 实现
-
-| 命令 | 状态 | 实现详情 |
+| 任务 | 状态 | 完成日期 |
 |------|------|----------|
-| `GPU_IOCTL_GET_DEVICE_INFO` | ✅ 完成 | vendor_id=0x1000, device_id=0x1001, vram_size=8GB |
-| `GPU_IOCTL_ALLOC_BO` | ✅ 完成 | Buddy Allocator, handle 1-65535 |
-| `GPU_IOCTL_FREE_BO` | ✅ 完成 | handle 释放 |
-| `GPU_IOCTL_MAP_BO` | ✅ 完成 | gpu_va 返回 |
-| `GPU_IOCTL_PUSHBUFFER_SUBMIT_BATCH` | ✅ 完成 | 支持 GPU_OP_LAUNCH_KERNEL/MEMCPY/MEMSET/FENCE |
-| `GPU_IOCTL_WAIT_FENCE` | ✅ 完成 | Phase 1 简化实现 (返回 status=1) |
+| `gpu_pushbuffer_args.fence_id` 字段 | ✅ 已定义 | 2026-05-08 |
+| `gpu_device_info` 增加 warp_size 等字段 | ✅ 已完成（struct 144 字节，11 新字段）| 2026-05-13 |
+| Issue #13: Teardown SIGSEGV 修复 | ✅ 已修复（commit dd81e5c）| 2026-05-09 |
 
-### 4.2 实现位置
+### 3.2 Phase 2 (S5 + H-3)
+
+| 任务 | 状态 | 提交链 |
+|------|------|--------|
+| VA Space/Queue 抽象设计（S5）| ✅ 完成 | UsrLinuxEmu commit c64301c（2026-06-19）|
+| `GPU_IOCTL_CREATE_VA_SPACE` | ✅ 完成 | TaskRunner 241f3ed..8625b82（2026-06-23）|
+| `GPU_IOCTL_DESTROY_VA_SPACE` | ✅ 完成 | 同上 |
+| `GPU_IOCTL_REGISTER_GPU` | ✅ 完成 | 同上 |
+| `GPU_IOCTL_CREATE_QUEUE` | ✅ 完成 | 同上 |
+| `GPU_IOCTL_DESTROY_QUEUE` | ✅ 完成 | 同上 |
+| CLI `cuda_va_space` / `cuda_queue` subcommands | ✅ 完成 | 同上 |
+
+### 3.3 跨仓 sync 历史
+
+| Change | 状态 | commit |
+|--------|------|--------|
+| H-1 (h1-pushbuffer-validation-closeout) | ✅ archived | 2026-06-17 |
+| H-2.5 (h2-5-architecture-foundation) | ✅ archived | 2026-06-19 |
+| H-3 (h3-phase2-management) | ✅ archived | 2026-06-22 |
+| H-4 (h4-architecture-governance-cleanup) | 🔵 active | TBD |
+
+---
+
+## 四、当前架构
+
+### 4.1 IGpuDriver 抽象层（H-2.5）
 
 ```
-build/plugins/gpu_driver/
+┌─────────────────────────────────────────────────────────────┐
+│ IGpuDriver (28 methods)                                       │
+│   ├── get_device_info / alloc_bo / submit_batch / wait_fence  │
+│   ├── create_va_space / destroy_va_space / register_gpu        │
+│   ├── create_queue / destroy_queue                            │
+│   └── 详细规格见 ADR-032                                       │
+└─────────────────────────────────────────────────────────────┘
+            ▲                       ▲                   ▲
+            │ DI 注入              │ DI 注入           │ 测试夹具
+┌────────────┴──────────┐ ┌─────────┴──────────┐ ┌───────┴──────────┐
+│ GpuDriverClient       │ │ CudaStub          │ │ MockGpuDriver   │
+│ (真实 ioctl 实现)     │ │ (in-memory mock)  │ │ (测试夹具)      │
+│ 通过 /dev/gpgpu0       │ │ monotonic handle  │ │ history()       │
+│                      │ │ atomic + map 跟踪  │ │ inject_error()  │
+└──────────────────────┘ └────────────────────┘ └──────────────────┘
+```
+
+### 4.2 Phase 2 lifecycle（D1-D5 决策）
+
+详细决策见 ADR-033，关键点：
+- **D1 caller owns**：`create_va_space()` 返回 u64 handle，**不**自动 set `current_va_space_handle_`
+- **D2 explicit create-destroy**：`create_queue()` 返回 u64 queue_handle，caller 显式管理
+- **D3 snake_case**：5 方法全部 snake_case（`create_va_space` 等）
+- **D4 return only**：driver 不维护 handle metadata map（仅 mock 有 existence tracking）
+- **D5 opt-in default**：构造时不自动 `create_va_space()`
+
+### 4.3 R2 mapping contract
+
+```
+caller:                          driver:
+  create_queue(...)              
+    ↓                             ↑ monotonic from 1
+  queue_handle (u64)             
+    ↓                            
+  (u32) stream_id = LOW32(handle)
+    ↓                            
+  submit_batch(stream_id, ...)    
+    ↓                            
+  driver 校验 static_cast<u64>(stream_id) 在 attached_queues 中
 ```
 
 ---
 
-## 五、TaskRunner 侧下一步任务
+## 五、汇总
 
-### 5.1 Phase 1 联调准备
+### 5.1 同步点完成率
 
-| 任务 | 状态 | 说明 |
+| 同步点 | 状态 | 完成日期 |
+|--------|------|----------|
+| S0 | ✅ 完成 | 2026-04-28 |
+| S1 | ✅ 完成 | 2026-04-28 |
+| S2 | ✅ 完成 | 2026-04-28 |
+| S3 | ✅ 完成 | 2026-04-28 |
+| S3.5 | ✅ 完成 | 2026-05-13 |
+| S5 | ✅ 完成 | 2026-06-19 |
+
+### 5.2 测试基线
+
+| 测试 | 状态 | 备注 |
 |------|------|------|
-| 重构 `cmd_cuda.cpp` 使用 GPU_IOCTL_* | ⏳ 待开始 | 替代 CUDA_IOCTL_* |
-| 实现 GpuDriverClient 封装层 | ⏳ 待开始 | 4-5 个 System C 调用 |
-| 符号链接验证 | ⏳ 待验证 | TaskRunner → UsrLinuxEmu/plugins/gpu_driver/shared |
-| CMake 检查 symlink 断裂 | ⏳ 待添加 | FATAL_ERROR |
+| test_cuda_scheduler | ✅ 8/8 | H-1 baseline preserved |
+| test_gpu_phase2 | ✅ 12/12 | H-3 新增 |
+| test_gpu_architecture | ⚠️ 10/11 | H-2.5 Bonus 预存在 baseline |
+| UsrLinuxEmu docs-audit | ✅ 36/36 | pre-commit hook |
 
-### 5.2 CUDA 命令映射 (待实现)
+### 5.3 下一波 change 候选
 
-| 命令 | System C 调用 | 状态 |
-|------|--------------|------|
-| `cuda_alloc` | `GPU_IOCTL_ALLOC_BO` | ⏳ 待实现 |
-| `cuda_free` | `GPU_IOCTL_FREE_BO` | ⏳ 待实现 |
-| `cuda_memcpy h2d` | `GPU_IOCTL_PUSHBUFFER_SUBMIT_BATCH` | ⏳ 待实现 |
-| `cuda_memcpy d2h` | `GPU_IOCTL_PUSHBUFFER_SUBMIT_BATCH` | ⏳ 待实现 |
-| `cuda_launch` | `GPU_IOCTL_PUSHBUFFER_SUBMIT_BATCH` | ⏳ 待实现 |
-| `cuda_wait` | `GPU_IOCTL_WAIT_FENCE` | ⏳ 待实现 |
+| 候选 | 来源 | 工时 |
+|------|------|---:|
+| **H-3.5** | CudaStub guard verification（关闭 H-3 T6-T9 mock-behavior deviation）| 0.5 天 |
+| **H-7 ADR** | 修复 3 个 owner-flagged upstream issue（stream_id u32 / ioctl 绕过 / attached_queues 弱校验）| 1-2 周 |
+| **Phase 3** | Multi-GPU / P2P（需要先完成 H-7 ADR）| 3-4 周 |
 
 ---
 
-## 六、Phase 1.5 和 Phase 2 待办
+## 六、沟通机制
 
-### 6.1 Phase 1.5
-
-| 任务 | 状态 | 说明 |
-|------|------|------|
-| `gpu_pushbuffer_args.fence_id` 字段 | ✅ 已定义 (UsrLinuxEmu 2026-05-08) | S3.5 同步点已完成 |
-| `gpu_device_info` 增加 warp_size 等字段 | ✅ 已完成 (2026-05-13) | struct 扩展到 144 字节，11 个新字段 |
-| Issue #13: Teardown SIGSEGV 修复 | ✅ 已修复 (2026-05-09, commit dd81e5c) | plugin_fini 销毁顺序修复 |
-
-### 6.2 Phase 2 (S5 已完成, 待 H-3 实施)
-
-| 任务 | 状态 |
-|------|------|
-| `GPU_IOCTL_CREATE_VA_SPACE` | ✅ H-3 完成 (2026-06-23, commits 241f3ed..8625b82) |
-| `GPU_IOCTL_CREATE_QUEUE` | ✅ H-3 完成 (2026-06-23, commits 241f3ed..8625b82) |
-| VA Space/Queue 抽象设计 | ✅ S5 完成 (2026-06-19, commit c64301c) |
-
----
-
-## 七、汇总统计
-
-### 7.1 同步点完成率
-
-| 同步点 | 阶段 | 状态 | 完成日期 |
-|--------|------|------|----------|
-| S0 | Phase 0 | ✅ 完成 | 2026-04-28 |
-| S1 | Phase 1 | ✅ 完成 | 2026-04-28 |
-| S2 | Phase 1 | ✅ 完成 | 2026-04-28 |
-| S3 | Phase 1 | ✅ 完成 | 2026-04-28 |
-| S3.5 | Phase 1.5 | ✅ 已完成 (2026-05-13) | fence_id 返回机制已实现 |
-| S4 | Phase 1 | ⏳ 进行中 | - |
-| S5 | Phase 1.5 架构基础 | ✅ 已完成 (2026-06-19) | IGpuDriver 抽象 + 2 实现 + DI + Mock + CLI 修复 (UsrLinuxEmu commit c64301c) |
-
-### 7.2 UsrLinuxEmu 侧完成率
-
-| Phase | 总任务数 | 已完成 | 待处理 |
-|-------|----------|--------|--------|
-| Phase 0 | 7 | 5 | 2 |
-| Phase 1 (定义) | 6 | 6 | 0 |
-| Phase 1 (实现) | 6 | 6 | 0 |
-| Phase 1.5 | 3 | 3 | 0 |
-| Phase 2 | 5 | 0 | 5 |
-| **总计** | **27** | **19** | **8** |
-
----
-
-## 八、沟通机制
-
-### 8.1 同步点触发流程
+### 6.1 同步点触发流程
 
 ```
 1. 触发方提前 3 天发送 "同步点预警"
@@ -292,29 +186,24 @@ build/plugins/gpu_driver/
    └── 回复: "已收到，开始执行"
 ```
 
-### 8.2 Issue 跟踪
+### 6.2 治理规则
 
-| 同步点 | GitHub Issue | 状态 |
-|--------|-------------|------|
-| S0 | UsrLinuxEmu #8 | ✅ 已完成 |
-| S1 | UsrLinuxEmu #9 | ✅ 已完成 |
-| S2 | TaskRunner #3 | ✅ 已完成 |
-| S3 | TaskRunner #4 | ✅ 已完成 |
-| S3.5 | 待创建 | ⏳ 待发起 |
-| S4 | TaskRunner #5 | ✅ UsrLinuxEmu 已完成 |
-| S5 | 待创建 | ⏳ Phase 2 前发起 |
+ADR 治理政策见 ADR-035。openspec change 流程：
+- 提案（🔵 PROPOSED）→ 实施（🟢 ACTIVE）→ 归档（📦 ARCHIVED）
+- 每个 change 含 5 文件（proposal.md / design.md / tasks.md / spec.md / .openspec.yaml）
+- archive policy 详见 ADR-035
 
 ---
 
-## 九、风险与缓解
+## 七、风险与缓解
 
-| 风险 | 影响 | 缓解措施 |
-|------|------|----------|
-| TaskRunner 联调延迟 | UsrLinuxEmu 等待 | 并行开发，3 天超时 |
-| fence_id 扩展协调 | 需双方同步修改 | Phase 1.5 统一实施 |
-| Phase 2 需求变更 | VA Space/Queue 抽象不合适 | S5 充分讨论 |
+| 风险 | 影响 | 缓解 |
+|------|------|------|
+| H-3 已 shippable 但 MockGpuDriver guard 不实现 | 测试覆盖偏差 | H-3.5 follow-up（CudaStub guard tests）|
+| H-7 ADR 3 个 upstream issue | 静默 -EINVAL / 类型溢出 / 行为分歧 | ADR-034 已注册，推迟到 Phase 3 owner 触发 |
+| 跨仓 sync 失败 | submodule 指针错位 | 遵循 TaskRunner 先 push → UsrLinuxEmu combined commit 流程 |
 
 ---
 
-**最后更新**: 2026-04-29
-**下次审查**: TaskRunner 联调开始前
+**最后更新**: 2026-06-23（H-4 governance cleanup, v2.0 精简版）
+**下次审查**: H-3.5 启动时

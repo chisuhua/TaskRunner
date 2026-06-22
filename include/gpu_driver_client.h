@@ -528,8 +528,8 @@ public:
                       << " (errno=" << errno << ")\n";
             return 0;
         }
+        // doorbell_pgoff 由 ioctl 路径不需要（H-3 走 ioctl，非 mmap）
         return args.queue_handle;  // u64, monotonic from 1 per R2
-        // 注：args.doorbell_pgoff 由 ioctl 路径不需要（H-3 走 ioctl，非 mmap）
     }
 
     /**

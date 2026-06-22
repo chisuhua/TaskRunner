@@ -23,6 +23,7 @@
 #include <map>
 #include <mutex>
 #include <atomic>
+#include <unordered_map>
 #include <iostream>
 #include <stdexcept>
 
@@ -173,33 +174,13 @@ public:
         return current_va_space_handle_;
     }
 
-    // H-3 Phase 2 占位 (5) - mock 返回 0 (容错，不抛异常)
-    uint64_t create_va_space(uint32_t flags) override {
-        (void)flags;
-        return 0;  // mock 总是失败 (无 H-3 支持)
-    }
-    int destroy_va_space(uint64_t va_space_handle) override {
-        (void)va_space_handle;
-        return 0;
-    }
-    int register_gpu(uint64_t va_space_handle, uint32_t gpu_id, uint32_t flags) override {
-        (void)va_space_handle;
-        (void)gpu_id;
-        (void)flags;
-        return 0;
-    }
+    // H-3 Phase 2 (5) - mock 语义 (monotonic handle + in-memory resource tracking)
+    uint64_t create_va_space(uint32_t flags) override;
+    int destroy_va_space(uint64_t va_space_handle) override;
+    int register_gpu(uint64_t va_space_handle, uint32_t gpu_id, uint32_t flags) override;
     uint64_t create_queue(uint64_t va_space_handle, uint32_t queue_type,
-                          uint32_t priority, uint64_t ring_buffer_size) override {
-        (void)va_space_handle;
-        (void)queue_type;
-        (void)priority;
-        (void)ring_buffer_size;
-        return 0;
-    }
-    int destroy_queue(uint64_t queue_handle) override {
-        (void)queue_handle;
-        return 0;
-    }
+                          uint32_t priority, uint64_t ring_buffer_size) override;
+    int destroy_queue(uint64_t queue_handle) override;
 
 private:
     bool initialized_{false};
@@ -217,6 +198,13 @@ private:
     std::atomic<uint64_t> next_bo_handle_{1};
     std::atomic<uint64_t> next_fence_id_{1};
     uint64_t current_va_space_handle_{0};
+
+    // H-3: Phase 2 mock 状态 (monotonic handle + resource tracking)
+    std::atomic<uint64_t> next_va_space_handle_{1};  // monotonic from 1 (R2 spec)
+    std::atomic<uint64_t> next_queue_handle_{1};      // monotonic from 1 (R2 spec)
+    std::unordered_map<uint64_t, bool> va_space_map_;  // mock 资源跟踪
+    std::unordered_map<uint64_t, bool> queue_map_;     // mock 资源跟踪
+    mutable std::mutex mock_state_mutex_;              // 保护 map 操作
 };
 
 } // namespace gpu

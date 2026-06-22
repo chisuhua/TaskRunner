@@ -410,5 +410,95 @@ int CudaStub::wait_fence(uint64_t fence_id) {
     return 0;
 }
 
+// ============================================================
+// H-3 Phase 2 (5) - mock 语义 (pure in-memory state machine)
+// ============================================================
+
+uint64_t CudaStub::create_va_space(uint32_t flags) {
+    // mock: is_open() 永远 true（CudaStub 是 in-process mock）
+    // 递增 handle（monotonic from 1 per R2 spec）
+    uint64_t handle = next_va_space_handle_.fetch_add(1, std::memory_order_relaxed);
+    {
+        std::lock_guard<std::mutex> lock(mock_state_mutex_);
+        va_space_map_[handle] = true;  // mock 资源登记
+    }
+    std::cerr << "[CudaStub] create_va_space(flags=" << flags << ") → handle=" << handle
+              << std::endl;
+    return handle;
+}
+
+int CudaStub::destroy_va_space(uint64_t va_space_handle) {
+    if (va_space_handle == 0) {
+        // H-1 sentinel guard - 按 spec R2 一致性**不**打 log
+        return -1;
+    }
+    std::lock_guard<std::mutex> lock(mock_state_mutex_);
+    auto it = va_space_map_.find(va_space_handle);
+    if (it == va_space_map_.end()) {
+        std::cerr << "[CudaStub] destroy_va_space: handle " << va_space_handle
+                  << " not found (mock 资源未登记)" << std::endl;
+        return -1;  // mock: 资源不存在
+    }
+    va_space_map_.erase(it);
+    std::cerr << "[CudaStub] destroy_va_space(handle=" << va_space_handle
+              << ") → success (mock)" << std::endl;
+    return 0;
+}
+
+int CudaStub::register_gpu(uint64_t va_space_handle, uint32_t gpu_id, uint32_t flags) {
+    // mock: 仅记录调用，不维护 GPU 绑定状态（Phase 2 mock 不追踪 GPU metadata）
+    std::cerr << "[CudaStub] register_gpu(va_space=" << va_space_handle
+              << ", gpu_id=" << gpu_id << ", flags=" << flags << ") → mock success"
+              << std::endl;
+    (void)flags;
+    return 0;
+}
+
+uint64_t CudaStub::create_queue(uint64_t va_space_handle, uint32_t queue_type,
+                                uint32_t priority, uint64_t ring_buffer_size) {
+    if (va_space_handle == 0) {
+        // H-1 sentinel guard - 按 spec R2 一致性**不**打 log
+        return 0;
+    }
+    if (priority > 100) {
+        std::cerr << "[CudaStub] create_queue: invalid priority " << priority
+                  << " (valid range: 0-100)" << std::endl;
+        return 0;
+    }
+    if (ring_buffer_size == 0) {
+        std::cerr << "[CudaStub] create_queue: invalid ring_buffer_size 0"
+                  << std::endl;
+        return 0;
+    }
+    uint64_t handle = next_queue_handle_.fetch_add(1, std::memory_order_relaxed);
+    {
+        std::lock_guard<std::mutex> lock(mock_state_mutex_);
+        queue_map_[handle] = true;  // mock 资源登记
+    }
+    std::cerr << "[CudaStub] create_queue(va_space=" << va_space_handle
+              << ", type=" << queue_type << ", priority=" << priority
+              << ", ring_size=" << ring_buffer_size << ") → handle=" << handle
+              << std::endl;
+    return handle;
+}
+
+int CudaStub::destroy_queue(uint64_t queue_handle) {
+    if (queue_handle == 0) {
+        // H-1 sentinel guard - 按 spec R2 一致性**不**打 log
+        return -1;
+    }
+    std::lock_guard<std::mutex> lock(mock_state_mutex_);
+    auto it = queue_map_.find(queue_handle);
+    if (it == queue_map_.end()) {
+        std::cerr << "[CudaStub] destroy_queue: handle " << queue_handle
+                  << " not found (mock 资源未登记)" << std::endl;
+        return -1;
+    }
+    queue_map_.erase(it);
+    std::cerr << "[CudaStub] destroy_queue(handle=" << queue_handle
+              << ") → success (mock)" << std::endl;
+    return 0;
+}
+
 } // namespace gpu
 } // namespace async_task

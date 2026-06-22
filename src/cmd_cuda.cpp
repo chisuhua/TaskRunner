@@ -346,7 +346,10 @@ int cmd_cuda_queue(int argc, char* argv[]) {
         }
 
         std::cout << "queue_handle=" << queue_handle << "\n";
-        std::cout << "  (R2 mapping: stream_id=" << (uint32_t)queue_handle << " = LOW32(queue_handle))\n";
+        // R2 mapping: caller must save full u64 handle; submit_batch uses LOW32 as stream_id
+        // (explicit & 0xFFFFFFFFULL to make truncation obvious, matches gpgpu_device.cpp:262)
+        std::cout << "  (R2 mapping: stream_id=" << static_cast<uint32_t>(queue_handle & 0xFFFFFFFFULL)
+                  << " = LOW32(queue_handle))\n";
         return 0;
 
     } else if (subcommand == "destroy") {

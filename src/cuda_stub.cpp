@@ -446,11 +446,13 @@ int CudaStub::destroy_va_space(uint64_t va_space_handle) {
 }
 
 int CudaStub::register_gpu(uint64_t va_space_handle, uint32_t gpu_id, uint32_t flags) {
-    // mock: 仅记录调用，不维护 GPU 绑定状态（Phase 2 mock 不追踪 GPU metadata）
+    if (va_space_handle == 0) {
+        // H-1 sentinel guard - 按 spec R3 一致性**不**打 log
+        return -1;
+    }
     std::cerr << "[CudaStub] register_gpu(va_space=" << va_space_handle
               << ", gpu_id=" << gpu_id << ", flags=" << flags << ") → mock success"
               << std::endl;
-    (void)flags;
     return 0;
 }
 

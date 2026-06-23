@@ -1,6 +1,6 @@
 # TaskRunner-UsrLinuxEmu 接口统一同步计划
 
-**版本**: v2.0（H-4 governance cleanup 后精简版）
+**版本**: v2.1（H-4.5 docs governance cleanup 后新增 TADR 引用）
 **日期**: 2026-06-23
 **维护者**: UsrLinuxEmu Architecture Team + TaskRunner owner
 **前置**: H-2.5 ✅ + H-3 ✅ shippable（2026-06-23）
@@ -163,11 +163,11 @@ caller:                          driver:
 
 ### 5.3 下一波 change 候选
 
-| 候选 | 来源 | 工时 |
-|------|------|---:|
-| **H-3.5** | CudaStub guard verification（关闭 H-3 T6-T9 mock-behavior deviation）| 0.5 天 |
-| **H-7 ADR** | 修复 3 个 owner-flagged upstream issue（stream_id u32 / ioctl 绕过 / attached_queues 弱校验）| 1-2 周 |
-| **Phase 3** | Multi-GPU / P2P（需要先完成 H-7 ADR）| 3-4 周 |
+| 候选 | 来源 | 工时 | 前置 TADR |
+|------|------|---:|----------|
+| **H-3.5** | CudaStub guard verification（关闭 H-3 T6-T9 mock-behavior deviation）| 0.5 天 | TADR-006 |
+| **H-7 ADR** | 修复 3 个 owner-flagged upstream issue（stream_id u32 / ioctl 绕过 / attached_queues 弱校验）| 1-2 周 | TADR-008 |
+| **Phase 3** | Multi-GPU / P2P（需要先完成 H-7 ADR）| 3-4 周 | TADR-005~008 |
 
 ---
 
@@ -205,5 +205,5 @@ ADR 治理政策见 ADR-035。openspec change 流程：
 
 ---
 
-**最后更新**: 2026-06-23（H-4 governance cleanup, v2.0 精简版）
+**最后更新**: 2026-06-23（H-4.5 docs governance cleanup, v2.1 新增 TADR 引用）
 **下次审查**: H-3.5 启动时

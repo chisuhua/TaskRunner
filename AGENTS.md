@@ -95,3 +95,65 @@ cd UsrLinuxEmu
   - ✅ S3.1 va_space_handle 透传 (2026-06-17, PR #6)
   - ✅ S5 Architecture foundation (2026-06-19, UsrLinuxEmu commit c64301c) — IGpuDriver 抽象 + GpuDriverClient/CudaStub 实现 + CudaScheduler DI + MockGpuDriver + CLI 死调用修复
   - ✅ H-3 (Phase 2 VA Space/Queue 真实实现，2026-06-23，commits 241f3ed..8625b82) — IGpuDriver 5 Phase 2 方法完整实现 (GpuDriverClient + CudaStub + tests/test_gpu_phase2.cpp 12 cases + CLI cuda_va_space/cuda_queue)
+
+## 跨仓工作原则
+
+TaskRunner 是 UsrLinuxEmu 的 git submodule (`external/TaskRunner`)。当 session 启动在本目录 (`/workspace/project/UsrLinuxEmu/external/TaskRunner`) 时，**默认启用跨仓工作模式**。
+
+### 同步检查
+
+每次改动后必须同步检查 UsrLinuxEmu 仓是否需要更新：
+
+```bash
+# 1. 检查 submodule 指针变更
+cd /workspace/project/UsrLinuxEmu && git status -s external/TaskRunner
+
+# 2. 检查 ADR-035 INDEX 是否需新增 TaskRunner TADR mirror
+grep -A 15 "TaskRunner TADR" /workspace/project/UsrLinuxEmu/docs/00_adr/README.md
+
+# 3. 检查 openspec/ changes 是否有跨仓关联
+cd /workspace/project/UsrLinuxEmu && git diff main HEAD --stat | grep external/TaskRunner
+```
+
+### 同步协议 (ADR-035 §Rule 5.1 4 步)
+
+1. **TaskRunner 仓** (`/workspace/project/UsrLinuxEmu/external/TaskRunner`)：
+   ```bash
+   git add + commit + git push origin main
+   ```
+
+2. **UsrLinuxEmu 仓** (`/workspace/project/UsrLinuxEmu`)：
+   ```bash
+   cd /workspace/project/UsrLinuxEmu
+   git add external/TaskRunner                   # 更新 submodule 指针
+   git commit -m "chore(submodule): bump TaskRunner to <hash>"
+   git push origin main
+   ```
+
+3. **如新增 TADR-NNN**：
+   ```bash
+   cd /workspace/project/UsrLinuxEmu
+   # 更新 docs/00_adr/README.md "TaskRunner TADR mirror" 段
+   git add docs/00_adr/README.md
+   git commit -m "docs(adr): update TaskRunner TADR mirror (TADR-NNN)"
+   git push origin main
+   ```
+
+### 跨仓文档引用规范
+
+| 从 → 到 | 路径深度 | 示例 |
+|--------|--------|------|
+| TaskRunner docs/adr/ → UsrLinuxEmu docs/00_adr/ | `../../../../` (4 dots) | `../../../../docs/00_adr/adr-032-...md` |
+| TaskRunner docs/archive/ → UsrLinuxEmu docs/00_adr/ | `../../../../` (4 dots) | `../../../../docs/00_adr/adr-032-...md` |
+| TaskRunner docs/adr/ → TaskRunner src/ | `../../` (2 dots) | `../../src/cuda_stub.cpp` |
+| UsrLinuxEmu docs/ → TaskRunner docs/ | `../external/TaskRunner/` | `../external/TaskRunner/docs/adr/README.md` |
+
+### 工作计划考虑
+
+制定计划时需考虑跨仓更新的影响范围：
+
+- **改动 TADR-NNN**：需更新 UsrLinuxEmu `docs/00_adr/README.md` mirror 表
+- **改动 Phase 文档**：可能需更新 UsrLinuxEmu `openspec/changes/<related-change>/`
+- **改动 submodule pointer**：需协调 UsrLinuxEmu owner 的 PR 流程（ADR-035 R5.1）
+- **新增归档文件**：TaskRunner 端 `git mv` + UsrLinuxEmu 端无需变动
+- **新增 roadmap phase**：TaskRunner 端 + UsrLinuxEmu sync-plan.md 同步

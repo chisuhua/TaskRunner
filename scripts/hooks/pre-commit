@@ -1,0 +1,41 @@
+#!/bin/sh
+# TaskRunner pre-commit hook
+#
+# Auto-runs tools/docs-audit.sh --strict when docs/ or AGENTS.md is staged.
+# Skips if SKIP_DOCS_AUDIT=1.
+#
+# Install: scripts/install-hooks.sh
+
+set -e
+
+# Skip switch
+if [ "${SKIP_DOCS_AUDIT}" = "1" ]; then
+    echo "[pre-commit] SKIP_DOCS_AUDIT=1, skipping docs-audit"
+    exit 0
+fi
+
+# Locate repo root
+HOOK_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_ROOT="$(cd "${HOOK_DIR}/../.." && pwd)"
+
+AUDIT_SCRIPT="${REPO_ROOT}/tools/docs-audit.sh"
+
+if [ ! -f "${AUDIT_SCRIPT}" ]; then
+    # No audit script, nothing to do
+    exit 0
+fi
+
+# Check if any docs-related files are staged
+STAGED_DOCS=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '^(docs/|AGENTS\.md|tools/docs-audit\.sh)' || true)
+
+if [ -z "${STAGED_DOCS}" ]; then
+    # No docs-related files staged, skip audit
+    exit 0
+fi
+
+echo "[pre-commit] docs-related files staged, running docs-audit --strict"
+echo "[pre-commit] staged files:"
+echo "${STAGED_DOCS}" | sed 's/^/  /'
+echo ""
+
+bash "${AUDIT_SCRIPT}" --strict

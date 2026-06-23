@@ -1,3 +1,18 @@
+> **⚠️ DEPRECATED 2026-06-23（H-4.5 docs governance cleanup）**
+>
+> 本文件为 v1.2 详细设计规范（688 行），被 H-2.5/H-3 超越：
+> - 描述的 UnifiedScheduler + CommandTranslator 类未实施
+> - 实际通过 IGpuDriver 抽象 + ioctl 编号扩展实施
+>
+> **取代关系**:
+> - 当前架构 → [architecture/current.md](../architecture/current.md)
+> - H-2.5 决策 → [TADR-005](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md) + UsrLinuxEmu [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md)
+> - H-3 决策 → [TADR-006](../adr/tadr-006-h3-phase2-consumer-lens.md) + UsrLinuxEmu [ADR-033](../../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md)
+>
+> 本文件保留作历史快照，部分 API 映射表仍有参考价值。
+
+---
+
 # DDS: CUDA/Vulkan Runtime 架构 v1.2-final
 
 > **项目名称**: TaskRunner CUDA/Vulkan Runtime Compatibility Layer  

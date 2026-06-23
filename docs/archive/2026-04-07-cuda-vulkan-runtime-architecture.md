@@ -1,3 +1,16 @@
+> **⚠️ DEPRECATED 2026-06-23（H-4.5 docs governance cleanup）**
+>
+> 本文件为 v0.1 提案（680 行），从未作为类实施：
+> - 推荐的 UnifiedScheduler B 方案未实施
+> - 实际架构：IGpuDriver 抽象 + 3 实现 DI 模式
+>
+> **取代关系**:
+> - 当前架构 → [architecture/current.md](../architecture/current.md)
+> - 实施路径 → [roadmap/retrospective.md](../roadmap/retrospective.md)
+> - 关键决策 → [TADR-001~004](../adr/README.md#索引)
+
+---
+
 # CUDA/Vulkan API 兼容层架构设计提案
 
 > **项目名称**: TaskRunner CUDA/Vulkan Runtime Compatibility Layer  

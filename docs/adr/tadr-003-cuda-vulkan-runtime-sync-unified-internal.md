@@ -6,7 +6,7 @@
 **评审者**: 老板 (CTO)
 **关联 ADR (UsrLinuxEmu)**: —
 **关联 Change**: —
-**关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../decision-frame-cuda-vulkan-runtime.md) §D3 (lines 123-198)
+**关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md) §D3 (lines 123-198)
 
 ---
 
@@ -72,7 +72,7 @@ public:
 ## 跨引用
 
 - **关联 TADR**: TADR-001 (D1 统一调度器), TADR-006 (H-3 `fence_id` 实施), TADR-007 (R2 mapping)
-- **关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../decision-frame-cuda-vulkan-runtime.md):123-198
+- **关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md):123-198
 
 ---
 

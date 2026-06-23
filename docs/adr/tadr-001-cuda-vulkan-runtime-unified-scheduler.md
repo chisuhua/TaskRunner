@@ -6,7 +6,7 @@
 **评审者**: 老板 (CTO)
 **关联 ADR (UsrLinuxEmu)**: —
 **关联 Change**: —
-**关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../decision-frame-cuda-vulkan-runtime.md) §D1 (lines 21-58)
+**关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md) §D1 (lines 21-58)
 
 ---
 
@@ -56,9 +56,9 @@ TaskRunner + UsrLinuxEmu 基座之上构建 CUDA/Vulkan API 兼容层。三种�
 ## 跨引用
 
 - **关联 TADR**: TADR-002 (D2 分层设计), TADR-003 (D3 同步), TADR-004 (D4 Stub 追踪)
-- **后续替代/演进**: TADR-005 (IGpuDriver 抽象层), UsrLinuxEmu [ADR-032](../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md) (H-2.5)
-- **关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../decision-frame-cuda-vulkan-runtime.md):21-58
-- **关联设计提案**: [`docs/cuda-vulkan-runtime-architecture.md`](../../cuda-vulkan-runtime-architecture.md) §4.2 (方案 B 详细)
+- **后续替代/演进**: TADR-005 (IGpuDriver 抽象层), UsrLinuxEmu [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md) (H-2.5)
+- **关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md):21-58
+- **关联设计提案**: [`docs/cuda-vulkan-runtime-architecture.md`](../../archive/2026-04-07-cuda-vulkan-runtime-architecture.md) §4.2 (方案 B 详细)
 
 ---
 

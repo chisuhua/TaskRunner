@@ -6,7 +6,7 @@
 **评审者**: 老板 (CTO)
 **关联 ADR (UsrLinuxEmu)**: —
 **关联 Change**: —
-**关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../decision-frame-cuda-vulkan-runtime.md) §D4 (lines 199-262)
+**关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md) §D4 (lines 199-262)
 
 ---
 
@@ -68,7 +68,7 @@ private:
 
 ### 实施路径备注
 
-H-2.5 引入的 `CudaStub` mock 实现（见 [`src/cuda_stub.cpp`](../../../src/cuda_stub.cpp)）使用 atomic handle + `unordered_map` 跟踪 VA Space 和 Queue（与原决策示例的 `CudaMemoryTracker` 模式一致）。VA Space 生命周期管理由 `CudaStub` 独立维护，符合本 TADR 决策。
+H-2.5 引入的 `CudaStub` mock 实现（见 [`src/cuda_stub.cpp`](../../src/cuda_stub.cpp)）使用 atomic handle + `unordered_map` 跟踪 VA Space 和 Queue（与原决策示例的 `CudaMemoryTracker` 模式一致）。VA Space 生命周期管理由 `CudaStub` 独立维护，符合本 TADR 决策。
 
 **关键一致性证据**（H-3 实施后）：
 - `next_va_space_handle_` atomic 单调 from 1
@@ -79,7 +79,7 @@ H-2.5 引入的 `CudaStub` mock 实现（见 [`src/cuda_stub.cpp`](../../../src/
 ## 跨引用
 
 - **关联 TADR**: TADR-001 (D1 统一调度器), TADR-006 (H-3 Phase 2 lifecycle)
-- **关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../decision-frame-cuda-vulkan-runtime.md):199-262
+- **关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md):199-262
 
 ---
 

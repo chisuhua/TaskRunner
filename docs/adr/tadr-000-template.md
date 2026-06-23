@@ -4,7 +4,7 @@
 **日期**: YYYY-MM-DD (创建) / YYYY-MM-DD (retroactive) / YYYY-MM-DD (最后更新)
 **提案人**: <name>
 **评审者**: <name(s)>
-**关联 ADR (UsrLinuxEmu)**: [ADR-NNN](../../../docs/00_adr/<path>) (canonical, if applicable)
+**关联 ADR (UsrLinuxEmu)**: [ADR-NNN](../../../../docs/00_adr/<path>) (canonical, if applicable)
 **关联 Change**: `openspec/changes/archive/<change-name>/` (if applicable)
 **关联 Source**: <decision file path + line range>
 

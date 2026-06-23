@@ -2,7 +2,7 @@
 
 > **范围**: TaskRunner 用户态 CUDA/Vulkan API 兼容层 + Runtime Stub
 > **最后更新**: 2026-06-23（H-4.5 docs governance cleanup）
-> **关联治理**: UsrLinuxEmu [ADR-035 governance-policy](../../../docs/00_adr/adr-035-governance-policy.md)
+> **关联治理**: UsrLinuxEmu [ADR-035 governance-policy](../../../../docs/00_adr/adr-035-governance-policy.md)
 
 TaskRunner 持有**独立 ADR 体系**，编号前缀 `TADR-`，与 UsrLinuxEmu 内核侧决策的 `ADR-` 区分。两者主题不同：
 
@@ -21,7 +21,7 @@ TaskRunner 持有**独立 ADR 体系**，编号前缀 `TADR-`，与 UsrLinuxEmu 
 
 ## 状态语义
 
-复用 UsrLinuxEmu [ADR-035 §Rule 2](../../../docs/00_adr/adr-035-governance-policy.md) 四状态：
+复用 UsrLinuxEmu [ADR-035 §Rule 2](../../../../docs/00_adr/adr-035-governance-policy.md) 四状态：
 
 | 状态 | 含义 |
 |------|------|
@@ -39,14 +39,14 @@ TaskRunner 持有**独立 ADR 体系**，编号前缀 `TADR-`，与 UsrLinuxEmu 
 | TADR-002 | ✅ Accepted | CUDA/Vulkan Runtime 分层设计 | — |
 | TADR-003 | ✅ Accepted | CUDA/Vulkan Runtime 同步统一内部表示 | — |
 | TADR-004 | ✅ Accepted | CUDA/Vulkan Runtime Stub 独立追踪 | — |
-| TADR-005 | ✅ Accepted | IGpuDriver consumer-lens (H-2.5) | [ADR-032](../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md) |
-| TADR-006 | ✅ Accepted | Phase 2 5 方法 consumer-lens (H-3) | [ADR-033](../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md) |
-| TADR-007 | ✅ Accepted | R2 mapping contract (LOW32 truncation 显式化) | [ADR-033 §R2](../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md) |
-| TADR-008 | ⏸️ Deferred | H-7 上游 issue TaskRunner 侧注册点 | [ADR-034](../../../docs/00_adr/adr-034-h7-deferred-registry.md) |
+| TADR-005 | ✅ Accepted | IGpuDriver consumer-lens (H-2.5) | [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md) |
+| TADR-006 | ✅ Accepted | Phase 2 5 方法 consumer-lens (H-3) | [ADR-033](../../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md) |
+| TADR-007 | ✅ Accepted | R2 mapping contract (LOW32 truncation 显式化) | [ADR-033 §R2](../../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md) |
+| TADR-008 | ⏸️ Deferred | H-7 上游 issue TaskRunner 侧注册点 | [ADR-034](../../../../docs/00_adr/adr-034-h7-deferred-registry.md) |
 
 ## 跨仓同步协议
 
-TADR 改动必须遵循 UsrLinuxEmu [ADR-035 §Rule 5.1](../../../docs/00_adr/adr-035-governance-policy.md) 4 步流程（TaskRunner 是 UsrLinuxEmu 的 submodule）：
+TADR 改动必须遵循 UsrLinuxEmu [ADR-035 §Rule 5.1](../../../../docs/00_adr/adr-035-governance-policy.md) 4 步流程（TaskRunner 是 UsrLinuxEmu 的 submodule）：
 
 1. **TaskRunner 仓**：`git add docs/adr/ && git commit && git push`
 2. **UsrLinuxEmu 仓**：`git add external/TaskRunner`（submodule 指针）`&& git commit`

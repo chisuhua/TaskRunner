@@ -4,7 +4,7 @@
 **日期**: 2026-06-23
 **提案人**: TaskRunner owner 协同 (H-3 review 阶段识别)
 **评审者**: 待 Phase 3 owner 触发后由 owner 认领
-**关联 ADR (UsrLinuxEmu)**: [ADR-034](../../../docs/00_adr/adr-034-h7-deferred-registry.md) (canonical)
+**关联 ADR (UsrLinuxEmu)**: [ADR-034](../../../../docs/00_adr/adr-034-h7-deferred-registry.md) (canonical)
 **关联 Source**: `openspec/changes/archive/2026-06-22-h3-phase2-management/design.md` §R4 + §R5 + tasks.md §7
 
 ---

@@ -4,7 +4,7 @@
 **日期**: 2026-06-23
 **提案人**: TaskRunner owner (H-3 review 阶段识别)
 **评审者**: UsrLinuxEmu Architecture Team + TaskRunner owner
-**关联 ADR (UsrLinuxEmu)**: [ADR-033 §R2 Mapping Contract](../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md) (canonical)
+**关联 ADR (UsrLinuxEmu)**: [ADR-033 §R2 Mapping Contract](../../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md) (canonical)
 **关联 Change**: `openspec/changes/archive/2026-06-22-h3-phase2-management/`
 **关联 Source**: H-3 design.md §R2
 

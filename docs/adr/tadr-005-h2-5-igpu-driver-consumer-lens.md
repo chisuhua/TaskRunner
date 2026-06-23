@@ -4,7 +4,7 @@
 **日期**: 2026-06-23
 **提案人**: TaskRunner owner 协同 (Sisyphus session)
 **评审者**: UsrLinuxEmu Architecture Team + TaskRunner owner
-**关联 ADR (UsrLinuxEmu)**: [ADR-032](../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md) (canonical)
+**关联 ADR (UsrLinuxEmu)**: [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md) (canonical)
 **关联 Change**: `openspec/changes/archive/2026-06-19-h2-5-architecture-foundation/`
 **关联 Source**: `openspec/changes/archive/2026-06-19-h2-5-architecture-foundation/design.md` §D6-D11
 

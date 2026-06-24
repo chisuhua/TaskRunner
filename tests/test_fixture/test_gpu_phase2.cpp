@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * test_gpu_phase2.cpp - H-3 Phase 2 methods 集成测试 (12 cases)
  *

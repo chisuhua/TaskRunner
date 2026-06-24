@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * cli_main.cpp - TaskRunner CLI 入口
  *

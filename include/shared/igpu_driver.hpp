@@ -1,3 +1,4 @@
+// SCOPE: SHARED
 /**
  * igpu_driver.hpp - 统一 GPU 驱动抽象接口 (H-2.5)
  *

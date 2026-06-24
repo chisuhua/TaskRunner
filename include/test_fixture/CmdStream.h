@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 #ifndef CMD_STREAM_H
 #define CMD_STREAM_H
 

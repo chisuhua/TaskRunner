@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * memory_manager.cpp - GPU 内存管理器实现
  */

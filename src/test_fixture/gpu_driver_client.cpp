@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * gpu_driver_client.cpp - System C 封装层实现
  */

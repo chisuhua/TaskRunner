@@ -1,3 +1,4 @@
+// SCOPE: SHARED
 // include/error_handling.hpp - H-5 Phase B placeholder
 // Scope: shared (minimal implementation to satisfy spec-shared-infrastructure L49-55)
 #pragma once

@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * cmd_cuda.h - CUDA CLI 命令接口
  * 

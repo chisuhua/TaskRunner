@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * cmd_cuda.cpp - CUDA CLI 命令实现 (System C)
  *

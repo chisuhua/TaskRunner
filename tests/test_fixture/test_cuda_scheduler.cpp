@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * test_cuda_scheduler.cpp - CudaScheduler 端到端测试
  * 

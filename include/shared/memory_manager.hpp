@@ -1,3 +1,4 @@
+// SCOPE: SHARED
 /**
  * memory_manager.hpp - GPU 内存管理器
  * 

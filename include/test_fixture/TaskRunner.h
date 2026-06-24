@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 #ifndef TASK_RUNNER_H
 #define TASK_RUNNER_H
 

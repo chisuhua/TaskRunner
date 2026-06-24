@@ -1,3 +1,4 @@
+// SCOPE: SHARED
 /**
  * sync_primitives.hpp - 分层同步原语
  * 

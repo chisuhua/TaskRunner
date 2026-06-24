@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * cuda_stub.hpp - CUDA Driver API 封装
  *

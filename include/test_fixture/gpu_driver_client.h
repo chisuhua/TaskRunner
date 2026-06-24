@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * gpu_driver_client.h - System C (GPU_IOCTL_*) 封装层
  *

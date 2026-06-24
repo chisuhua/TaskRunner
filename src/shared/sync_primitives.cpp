@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * sync_primitives.cpp - 分层同步原语实现
  */

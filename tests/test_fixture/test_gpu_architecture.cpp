@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * test_gpu_architecture.cpp - H-2.5 架构基础测试
  *

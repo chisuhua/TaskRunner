@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * cuda_scheduler.cpp - CUDA 调度器实现
  *

@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 #ifndef CMD_BUFFER_H
 #define CMD_BUFFER_H
 

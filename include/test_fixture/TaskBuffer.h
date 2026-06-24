@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 #ifndef TASK_BUFFER_HPP
 #define TASK_BUFFER_HPP
 

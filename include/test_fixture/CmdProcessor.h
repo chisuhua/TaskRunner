@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 #ifndef CMD_PROCESSOR_H
 #define CMD_PROCESSOR_H
 

@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * mock_gpu_driver.hpp - MockGpuDriver 测试夹具 (H-2.5)
  *

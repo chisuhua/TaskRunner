@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 /**
  * cmd_buffer_v2.cpp - CLI 命令解析器 v2
  * 

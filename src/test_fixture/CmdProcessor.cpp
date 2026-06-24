@@ -1,3 +1,4 @@
+// SCOPE: TEST-FIXTURE
 #include "test_fixture/CmdProcessor.h"
 #include "test_fixture/TaskRunner.h"
 

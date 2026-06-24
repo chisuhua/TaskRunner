@@ -28,7 +28,7 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
-#include "gpu_driver_client.h"
+#include "test_fixture/gpu_driver_client.h"
 
 namespace async_task {
 namespace cmd {

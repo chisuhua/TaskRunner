@@ -16,10 +16,10 @@
 #ifndef TASKRUNNER_CUDA_SCHEDULER_HPP
 #define TASKRUNNER_CUDA_SCHEDULER_HPP
 
-#include "sync_primitives.hpp"
-#include "memory_manager.hpp"
+#include "shared/sync_primitives.hpp"
+#include "shared/memory_manager.hpp"
 #include "cuda_stub.hpp"
-#include "igpu_driver.hpp"
+#include "shared/igpu_driver.hpp"
 
 #include <map>
 #include <atomic>

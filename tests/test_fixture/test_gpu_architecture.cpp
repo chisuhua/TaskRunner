@@ -20,10 +20,10 @@
 #include <cstdint>
 #include <cstring>
 
-#include "igpu_driver.hpp"
-#include "cuda_stub.hpp"
-#include "cuda_scheduler.hpp"
-#include "gpu_driver_client.h"
+#include "shared/igpu_driver.hpp"
+#include "test_fixture/cuda_stub.hpp"
+#include "test_fixture/cuda_scheduler.hpp"
+#include "test_fixture/gpu_driver_client.h"
 #include "mock_gpu_driver.hpp"
 
 using namespace async_task::gpu;

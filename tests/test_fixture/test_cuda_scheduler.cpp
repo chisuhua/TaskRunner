@@ -9,7 +9,7 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
-#include "cuda_scheduler.hpp"
+#include "test_fixture/cuda_scheduler.hpp"
 #include <vector>
 #include <cstring>
 #include <iostream>

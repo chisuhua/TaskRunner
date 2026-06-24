@@ -18,7 +18,7 @@
 #ifndef TASKRUNNER_MOCK_GPU_DRIVER_HPP
 #define TASKRUNNER_MOCK_GPU_DRIVER_HPP
 
-#include "igpu_driver.hpp"
+#include "shared/igpu_driver.hpp"
 
 #include <atomic>
 #include <cstdint>

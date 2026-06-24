@@ -24,7 +24,7 @@
 #include <getopt.h>
 
 // CUDA 命令实现
-#include "cmd_cuda.h"
+#include "test_fixture/cmd_cuda.h"
 
 namespace async_task {
 namespace cmd {

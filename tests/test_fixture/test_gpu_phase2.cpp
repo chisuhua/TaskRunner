@@ -22,8 +22,8 @@
 #define DOCTEST_CONFIG_IMPLEMENT_WITH_MAIN
 #include "doctest.h"
 
-#include "igpu_driver.hpp"
-#include "cuda_scheduler.hpp"
+#include "shared/igpu_driver.hpp"
+#include "test_fixture/cuda_scheduler.hpp"
 #include "mock_gpu_driver.hpp"
 
 using async_task::gpu::MockGpuDriver;

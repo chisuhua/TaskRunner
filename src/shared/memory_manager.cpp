@@ -2,7 +2,7 @@
  * memory_manager.cpp - GPU 内存管理器实现
  */
 
-#include "memory_manager.hpp"
+#include "shared/memory_manager.hpp"
 #include <cstring>
 #include <stdexcept>
 

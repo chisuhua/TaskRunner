@@ -28,7 +28,7 @@
 #include <stdexcept>
 
 // 统一抽象接口 (H-2.5)
-#include "igpu_driver.hpp"
+#include "shared/igpu_driver.hpp"
 
 namespace async_task {
 namespace gpu {

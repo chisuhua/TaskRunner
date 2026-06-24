@@ -8,7 +8,7 @@
 #include <future>
 #include <map>
 #include <optional>
-#include "Barrier.h"  // Ensure Barrier is defined
+#include "test_fixture/Barrier.h"  // Ensure Barrier is defined
 
 // Forward declaration of Future (TaskRunner will be included at the end)
 namespace async_task {

@@ -19,7 +19,7 @@
 #include <cstring>
 #include <iostream>
 
-#include "gpu_driver_client.h"
+#include "test_fixture/gpu_driver_client.h"
 
 // 声明外部 main 函数
 extern int cmd_buffer_v2_main(int argc, char* argv[]);

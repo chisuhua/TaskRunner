@@ -2,7 +2,7 @@
  * gpu_driver_client.cpp - System C 封装层实现
  */
 
-#include "gpu_driver_client.h"
+#include "test_fixture/gpu_driver_client.h"
 
 namespace async_task {
 namespace gpu {

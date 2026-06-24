@@ -2,7 +2,7 @@
  * sync_primitives.cpp - 分层同步原语实现
  */
 
-#include "sync_primitives.hpp"
+#include "shared/sync_primitives.hpp"
 #include <cerrno>
 #include <thread>
 

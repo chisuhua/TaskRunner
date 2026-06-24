@@ -1,8 +1,8 @@
 #ifndef CMD_STREAM_H
 #define CMD_STREAM_H
 
-#include "CmdBuffer.h"
-#include "EventQueue.h"
+#include "test_fixture/CmdBuffer.h"
+#include "test_fixture/EventQueue.h"
 
 // Forward declaration to avoid circular dependency
 namespace async_task {

@@ -9,10 +9,10 @@
 #include <variant>
 #include <functional>
 #include <iostream>
-#include "TaskQueue.h"
-#include "EventQueue.h"
-#include "CmdBuffer.h"
-#include "Barrier.h"
+#include "test_fixture/TaskQueue.h"
+#include "test_fixture/EventQueue.h"
+#include "test_fixture/CmdBuffer.h"
+#include "test_fixture/Barrier.h"
 // Forward declare TaskRunner to break circular dependency
 // Full definition will be included in CmdProcessor.cpp
 namespace async_task {

@@ -10,7 +10,7 @@
  * stub_->xxx() 全部改为 driver_->xxx() (API 兼容)
  */
 
-#include "cuda_scheduler.hpp"
+#include "test_fixture/cuda_scheduler.hpp"
 #include <cerrno>
 #include <cstring>
 

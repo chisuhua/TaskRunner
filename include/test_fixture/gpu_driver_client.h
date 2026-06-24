@@ -36,7 +36,7 @@
 #include "UsrLinuxEmu/plugins/gpu_driver/shared/gpu_types.h"
 
 // 统一抽象接口
-#include "igpu_driver.hpp"
+#include "shared/igpu_driver.hpp"
 
 namespace async_task {
 namespace gpu {

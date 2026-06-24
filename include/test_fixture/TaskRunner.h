@@ -10,15 +10,15 @@ namespace async_task {
 }
 
 // Now include dependencies that don't depend on TaskRunner
-#include "Barrier.h"
-#include "EventQueue.h"  // Not a template
-#include "TaskQueue.h"   // Defines TaskBuffer as using alias
+#include "test_fixture/Barrier.h"
+#include "test_fixture/EventQueue.h"  // Not a template
+#include "test_fixture/TaskQueue.h"   // Defines TaskBuffer as using alias
 // TaskBuffer.h is obsolete - TaskBuffer is defined in TaskQueue.h
 
 // Include CmdBuffer after forward declarations
 // CmdBuffer methods that use TaskRunner will need the full definition which comes later in this file
-#include "CmdBuffer.h"
-#include "CmdStream.h"
+#include "test_fixture/CmdBuffer.h"
+#include "test_fixture/CmdStream.h"
 // Include CmdProcessor header ONLY for class declaration - implementations will come later
 // We forward-declare and include the header with implementations disabled
 
@@ -135,7 +135,7 @@ private:
 
 // Include CmdProcessor.h here - TaskRunner is fully defined, so CmdProcessor can use it
 // This must come BEFORE TaskRunner method implementations that use CmdProcessor
-#include "CmdProcessor.h"
+#include "test_fixture/CmdProcessor.h"
 
 // Implementations (inline to avoid multiple definition errors)
 

@@ -7,7 +7,7 @@
  * H-2.5 重构: 迁移到 namespace async_task::gpu + 实现 IGpuDriver 28 方法
  */
 
-#include "cuda_stub.hpp"
+#include "test_fixture/cuda_stub.hpp"
 #include <cstring>
 #include <cstdlib>
 #include <map>

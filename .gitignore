@@ -23,3 +23,6 @@ Thumbs.db
 
 # External projects (should be in gitmodules)
 UsrLinuxEmu/
+
+# OpenCode runtime artifacts (session continuations, todo state)
+.omo/

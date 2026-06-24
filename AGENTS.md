@@ -157,3 +157,41 @@ cd /workspace/project/UsrLinuxEmu && git diff main HEAD --stat | grep external/T
 - **改动 submodule pointer**：需协调 UsrLinuxEmu owner 的 PR 流程（ADR-035 R5.1）
 - **新增归档文件**：TaskRunner 端 `git mv` + UsrLinuxEmu 端无需变动
 - **新增 roadmap phase**：TaskRunner 端 + UsrLinuxEmu sync-plan.md 同步
+
+## Scope Classification (H-5)
+
+All TaskRunner content MUST be classified into one of three scopes:
+
+- **test-fixture** (`docs/test-fixture/`, `include/test_fixture/`, `src/test_fixture/`, `tests/test_fixture/`):
+  Currently-shippable state. STATUS: ACCEPTED. Code is in main branch.
+- **umd-evolution** (`docs/umd-evolution/`, `include/umd/`, `src/umd/`, `tests/umd/`):
+  Experimental vision + skeleton. STATUS: PROPOSED/DRAFT only. Code compiles only under `TASKRUNNER_BUILD_MODE=umd-evolution`.
+- **shared** (`docs/shared/`, `include/shared/`, `src/shared/`, `tests/shared/`):
+  Cross-cutting abstractions. STATUS: ACCEPTED. Dual review required for changes.
+
+### Required Metadata
+
+Every document header MUST include:
+
+```markdown
+---
+SCOPE: <test-fixture|umd-evolution|shared>
+STATUS: <ACCEPTED|PROPOSED|DRAFT|DEPRECATED>
+---
+```
+
+Every `.hpp`/`.cpp`/`.h` file MUST have `// SCOPE: <scope>` as first line.
+
+### Cross-Scope References
+
+When test-fixture docs reference umd-evolution content, use relative path `../umd-evolution/...` and tag inline as `[UMD-EVOLUTION SCOPE]`.
+
+### Build Mode Selection
+
+```bash
+# Default (test-fixture only)
+cmake -B build
+
+# UMD-evolution (experimental)
+cmake -B build -DTASKRUNNER_BUILD_MODE=umd-evolution
+```

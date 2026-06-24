@@ -1,3 +1,9 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+REPLACES: tadr-004
+---
+
 # TADR-004: 资源管理器层级 — Runtime Stub 层独立追踪 (B 方案)
 
 **状态**: ✅ Accepted (retroactive)

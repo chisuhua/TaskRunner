@@ -1,3 +1,9 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+REPLACES: tadr-005
+---
+
 # TADR-005: IGpuDriver 抽象层 Consumer-Lens (H-2.5)
 
 **状态**: ✅ Accepted

@@ -1,3 +1,9 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+REPLACES: tadr-008
+---
+
 # TADR-008: H-7 Deferred Registry TaskRunner 侧注册点
 
 **状态**: ⏸️ Deferred (待 Phase 3 owner 触发)

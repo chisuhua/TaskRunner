@@ -1,3 +1,9 @@
+---
+SCOPE: UMD-EVOLUTION
+STATUS: PROPOSED
+REPLACES: tadr-001
+---
+
 # TADR-001: CUDA/Vulkan Runtime 集成路径 — 统一调度器 (B 方案)
 
 **状态**: ✅ Accepted (retroactive)

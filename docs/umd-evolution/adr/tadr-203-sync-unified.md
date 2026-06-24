@@ -1,3 +1,9 @@
+---
+SCOPE: UMD-EVOLUTION
+STATUS: PROPOSED
+REPLACES: tadr-003
+---
+
 # TADR-003: Barrier/Event 同步模型 — 统一内部表示 (A 方案)
 
 **状态**: ✅ Accepted (retroactive)

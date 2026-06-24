@@ -1,3 +1,9 @@
+---
+SCOPE: UMD-EVOLUTION
+STATUS: PROPOSED
+REPLACES: tadr-002
+---
+
 # TADR-002: UsrLinuxEmu 接口扩展策略 — 分层设计 (C 方案)
 
 **状态**: ✅ Accepted (retroactive)

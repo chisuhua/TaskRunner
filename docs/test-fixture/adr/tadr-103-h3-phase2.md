@@ -1,3 +1,9 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+REPLACES: tadr-006
+---
+
 # TADR-006: H-3 Phase 2 Lifecycle Consumer-Lens
 
 **状态**: ✅ Accepted

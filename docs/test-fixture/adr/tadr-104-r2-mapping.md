@@ -1,3 +1,9 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+REPLACES: tadr-007
+---
+
 # TADR-007: R2 Mapping Contract — LOW32 Truncation 显式化
 
 **状态**: ✅ Accepted

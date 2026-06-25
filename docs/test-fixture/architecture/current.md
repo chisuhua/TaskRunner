@@ -6,9 +6,9 @@ STATUS: ACCEPTED
 # TaskRunner Current Architecture (Consumer-Lens)
 
 > **最后更新**: 2026-06-23（H-4.5 docs governance cleanup）
-> **关联**: [TADR-005 IGpuDriver 抽象层](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md) + UsrLinuxEmu [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md)
+> **关联**: [TADR-005 IGpuDriver 抽象层](../adr/tadr-102-igpu-driver.md) + UsrLinuxEmu [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md)
 
-TaskRunner 当前架构基于 **IGpuDriver 抽象 + 依赖注入** 模式，与 2026-04-07 v0.1 提案的 "UnifiedScheduler" 路径有偏差（详见 [TADR-001 实施路径备注](../adr/tadr-001-cuda-vulkan-runtime-unified-scheduler.md#实施路径备注) + [roadmap/retrospective.md](../roadmap/retrospective.md)）。
+TaskRunner 当前架构基于 **IGpuDriver 抽象 + 依赖注入** 模式，与 2026-04-07 v0.1 提案的 "UnifiedScheduler" 路径有偏差（详见 [TADR-001 实施路径备注](../adr/tadr-201-unified-scheduler.md#实施路径备注) + [roadmap/retrospective.md](../roadmap/retrospective.md)）。
 
 ## 核心组件架构图
 
@@ -64,13 +64,13 @@ TaskRunner 当前架构基于 **IGpuDriver 抽象 + 依赖注入** 模式，与 
 
 | 决策 | TADR | 上游 ADR |
 |------|------|---------|
-| IGpuDriver 抽象层 + 3 实现 | [TADR-005](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md) | UsrLinuxEmu [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md) |
-| 依赖注入 (CudaScheduler 接受 IGpuDriver*) | [TADR-005 §Consumer-Lens](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md#consumer-lens) | UsrLinuxEmu ADR-032 §D10 |
-| CLI 死调用修复 (init_gpu_client 显式调用) | [TADR-005 §Consumer-Lens](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md#consumer-lens) | UsrLinuxEmu ADR-032 §D11 |
-| 命名空间迁移 taskrunner:: → async_task::gpu:: | [TADR-005 §Consumer-Lens](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md#consumer-lens) | UsrLinuxEmu ADR-032 §D9 |
-| Phase 2 5 方法 (create_va_space 等) | [TADR-006](../adr/tadr-006-h3-phase2-consumer-lens.md) | UsrLinuxEmu [ADR-033](../../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md) |
-| R2 mapping (LOW32 truncation) | [TADR-007](../adr/tadr-007-r2-mapping-contract.md) | UsrLinuxEmu ADR-033 §R2 |
-| H-7 上游 issue 注册 | [TADR-008](../adr/tadr-008-h7-deferred-mirror.md) | UsrLinuxEmu [ADR-034](../../../../docs/00_adr/adr-034-h7-deferred-registry.md) |
+| IGpuDriver 抽象层 + 3 实现 | [TADR-005](../adr/tadr-102-igpu-driver.md) | UsrLinuxEmu [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md) |
+| 依赖注入 (CudaScheduler 接受 IGpuDriver*) | [TADR-005 §Consumer-Lens](../adr/tadr-102-igpu-driver.md#consumer-lens) | UsrLinuxEmu ADR-032 §D10 |
+| CLI 死调用修复 (init_gpu_client 显式调用) | [TADR-005 §Consumer-Lens](../adr/tadr-102-igpu-driver.md#consumer-lens) | UsrLinuxEmu ADR-032 §D11 |
+| 命名空间迁移 taskrunner:: → async_task::gpu:: | [TADR-005 §Consumer-Lens](../adr/tadr-102-igpu-driver.md#consumer-lens) | UsrLinuxEmu ADR-032 §D9 |
+| Phase 2 5 方法 (create_va_space 等) | [TADR-006](../adr/tadr-103-h3-phase2.md) | UsrLinuxEmu [ADR-033](../../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md) |
+| R2 mapping (LOW32 truncation) | [TADR-007](../adr/tadr-104-r2-mapping.md) | UsrLinuxEmu ADR-033 §R2 |
+| H-7 上游 issue 注册 | [TADR-008](../adr/tadr-105-h7-deferred.md) | UsrLinuxEmu [ADR-034](../../../../docs/00_adr/adr-034-h7-deferred-registry.md) |
 
 ## 实施期路径 deviation
 

@@ -11,8 +11,8 @@ STATUS: DEPRECATED
 >
 > **取代关系**:
 > - 当前架构 → [architecture/current.md](../architecture/current.md)
-> - H-2.5 决策 → [TADR-005](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md) + UsrLinuxEmu [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md)
-> - H-3 决策 → [TADR-006](../adr/tadr-006-h3-phase2-consumer-lens.md) + UsrLinuxEmu [ADR-033](../../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md)
+> - H-2.5 决策 → [TADR-005](../adr/tadr-102-igpu-driver.md) + UsrLinuxEmu [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md)
+> - H-3 决策 → [TADR-006](../adr/tadr-103-h3-phase2.md) + UsrLinuxEmu [ADR-033](../../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md)
 >
 > 本文件保留作历史快照，部分 API 映射表仍有参考价值。
 

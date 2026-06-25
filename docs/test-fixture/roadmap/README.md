@@ -41,7 +41,7 @@ TaskRunner 实施路径分 4 个 phase。每个 phase 文档含：
 | H-2.5 (IGpuDriver 抽象层) | ✅ | 2026-06-22 | TaskRunner commit `1684fa1` |
 | H-3 (Phase 2 lifecycle) | ✅ | 2026-06-23 | TaskRunner commits `241f3ed..8625b82` |
 | H-3.5 (CudaStub guard verification) | 🔵 下一波 | TBD | [phase-3.md](./phase-3.md) |
-| H-7 (3 owner-flagged upstream issues) | ⏸️ Deferred | 待 Phase 3 触发 | [TADR-008](../adr/tadr-008-h7-deferred-mirror.md) |
+| H-7 (3 owner-flagged upstream issues) | ⏸️ Deferred | 待 Phase 3 触发 | [TADR-008](../adr/tadr-105-h7-deferred.md) |
 | Phase 3 (Multi-GPU / P2P) | ⏸️ Deferred | 待 H-7 | [phase-3.md](./phase-3.md) |
 
 ## 测试基线（截至 2026-06-23）

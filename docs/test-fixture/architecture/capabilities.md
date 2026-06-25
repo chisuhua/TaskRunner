@@ -14,8 +14,8 @@ TaskRunner capabilities 镜像 UsrLinuxEmu 端分组（canonical 在 UsrLinuxEmu
 
 | Capability | TADR | 主题 |
 |------------|------|------|
-| **gpu-driver-architecture** | [TADR-001](../adr/tadr-001-cuda-vulkan-runtime-unified-scheduler.md), [TADR-002](../adr/tadr-002-cuda-vulkan-runtime-layered-design.md), [TADR-003](../adr/tadr-003-cuda-vulkan-runtime-sync-unified-internal.md), [TADR-004](../adr/tadr-004-cuda-vulkan-runtime-stub-tracker.md), [TADR-005](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md) | IGpuDriver 抽象 + 3 实现 + DI (+ TADR-001~004 historical runtime decisions, see [roadmap/retrospective.md](../roadmap/retrospective.md)) |
-| **gpu-phase2-management** | [TADR-006](../adr/tadr-006-h3-phase2-consumer-lens.md), [TADR-007](../adr/tadr-007-r2-mapping-contract.md), [TADR-008](../adr/tadr-008-h7-deferred-mirror.md) | Phase 2 5 方法 + R2 mapping + H-7 deferred |
+| **gpu-driver-architecture** | [TADR-001](../adr/tadr-201-unified-scheduler.md), [TADR-002](../adr/tadr-202-layered-design.md), [TADR-003](../adr/tadr-203-sync-unified.md), [TADR-004](../adr/tadr-101-stub-tracker.md), [TADR-005](../adr/tadr-102-igpu-driver.md) | IGpuDriver 抽象 + 3 实现 + DI (+ TADR-001~004 historical runtime decisions, see [roadmap/retrospective.md](../roadmap/retrospective.md)) |
+| **gpu-phase2-management** | [TADR-006](../adr/tadr-103-h3-phase2.md), [TADR-007](../adr/tadr-104-r2-mapping.md), [TADR-008](../adr/tadr-105-h7-deferred.md) | Phase 2 5 方法 + R2 mapping + H-7 deferred |
 | **architecture-governance** | [TADR-000](../adr/tadr-000-template.md) + [docs/adr/](../adr/) | TaskRunner 独立 ADR 体系 |
 
 ## 与 UsrLinuxEmu capabilities 的关系

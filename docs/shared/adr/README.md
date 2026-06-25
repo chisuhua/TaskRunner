@@ -3,83 +3,66 @@ SCOPE: SHARED
 STATUS: ACCEPTED
 ---
 
-# TaskRunner Architecture Decision Records (TADR)
+# TaskRunner TADR Index
 
-> **范围**: TaskRunner 用户态 CUDA/Vulkan API 兼容层 + Runtime Stub
-> **最后更新**: 2026-06-23（H-4.5 docs governance cleanup）
-> **关联治理**: UsrLinuxEmu [ADR-035 governance-policy](../../../../docs/00_adr/adr-035-governance-policy.md)
+TaskRunner 仓内 TADR 索引。本文件是 **canonical** source，
+UsrLinuxEmu 端 `docs/00_adr/README.md` "TaskRunner TADR mirror" 段是 mirror。
 
-TaskRunner 持有**独立 ADR 体系**，编号前缀 `TADR-`，与 UsrLinuxEmu 内核侧决策的 `ADR-` 区分。两者主题不同：
+## 范畴（Scopes）
 
-| 维度 | TaskRunner TADR | UsrLinuxEmu ADR |
-|------|----------------|----------------|
-| 运行空间 | 用户态驱动 + Runtime | 内核驱动模拟环境 |
-| 决策范围 | CUDA Stub / CudaScheduler / GpuDriverClient / IGpuDriver 28 方法 | 内核设备驱动 / VA Space / Ring Buffer / HAL |
-| 跨引用 | `external/TaskRunner/docs/adr/` | `docs/00_adr/` |
+TaskRunner TADR 分为 3 个 scope：
 
-## 命名规范
+- **test-fixture**（默认主线）: `docs/test-fixture/adr/`
+- **umd-evolution**（实验性愿景）: `docs/umd-evolution/adr/`
+- **shared**（跨切面契约）: `docs/shared/adr/`
 
-文件命名：`tadr-NNN-short-title.md`（小写，与 UsrLinuxEmu `adr-NNN-*.md` 风格一致）
+## test-fixture scope (1xx)
 
-- `tadr-000-template.md` — MADR 模板
-- `tadr-001` ~ `tadr-008` — 实际 ADR
+| TADR | 主题 | 状态 | 关联 ADR |
+|------|------|------|----------|
+| tadr-101 | Stub Tracker | ACCEPTED | — |
+| tadr-102 | H-2.5 IGpuDriver consumer-lens | ACCEPTED | ADR-032 |
+| tadr-103 | H-3 Phase 2 consumer-lens | ACCEPTED | ADR-033 |
+| tadr-104 | R2 mapping contract | ACCEPTED | ADR-033 §R2 |
+| tadr-105 | H-7 deferred mirror | ACCEPTED | ADR-034 |
+| tadr-106 | test-fixture scope 明确化 | ACCEPTED | ADR-036 |
+| tadr-109 | IGpuDriver 31 方法扩展 | ACCEPTED | ADR-033 |
 
-## 状态语义
+## umd-evolution scope (2xx)
 
-复用 UsrLinuxEmu [ADR-035 §Rule 2](../../../../docs/00_adr/adr-035-governance-policy.md) 四状态：
+| TADR | 主题 | 状态 | 关联 ADR |
+|------|------|------|----------|
+| tadr-201 | 统一调度器（原 tadr-001）| PROPOSED | — |
+| tadr-202 | 分层设计（原 tadr-002）| PROPOSED | — |
+| tadr-203 | 同步统一（原 tadr-003）| PROPOSED | — |
+| tadr-204 | umd-evolution scope 明确化 | PROPOSED | ADR-036 |
+| tadr-205 | UMD PoC 路线图（deferred）| PROPOSED | — |
 
-| 状态 | 含义 |
-|------|------|
-| ✅ Accepted | 已批准并实施 |
-| 🔄 Proposed | 待评审 |
-| ⏸️ Deferred | 已知问题但推迟 |
-| 🚫 Rejected | 已否决 |
+## shared scope (107 + 108 + 3xx)
 
-## 索引
+| TADR | 主题 | 状态 | 关联 ADR |
+|------|------|------|----------|
+| tadr-107 | shared 边界规则 | ACCEPTED | ADR-036 |
+| tadr-108 | build mode selection | ACCEPTED | ADR-035, ADR-036 |
+| tadr-301 | IGpuDriver 28→31 方法契约 | ACCEPTED | ADR-032, tadr-109 |
+| tadr-302 | Sync Primitives 抽象 | ACCEPTED | — |
+| tadr-303 | Error Handling 基础（Result\<T\>）| ACCEPTED | — |
+| tadr-304 | Error Handling 策略层 | ACCEPTED | tadr-303 |
 
-| TADR | 状态 | 主题 | 关联 UsrLinuxEmu ADR |
-|------|------|------|---------------------|
-| TADR-000 | 📝 Template | MADR 模板 | — |
-| TADR-001 | ✅ Accepted | CUDA/Vulkan Runtime 统一调度器 B 方案 | — |
-| TADR-002 | ✅ Accepted | CUDA/Vulkan Runtime 分层设计 | — |
-| TADR-003 | ✅ Accepted | CUDA/Vulkan Runtime 同步统一内部表示 | — |
-| TADR-004 | ✅ Accepted | CUDA/Vulkan Runtime Stub 独立追踪 | — |
-| TADR-005 | ✅ Accepted | IGpuDriver consumer-lens (H-2.5) | [ADR-032](../../../../docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md) |
-| TADR-006 | ✅ Accepted | Phase 2 5 方法 consumer-lens (H-3) | [ADR-033](../../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md) |
-| TADR-007 | ✅ Accepted | R2 mapping contract (LOW32 truncation 显式化) | [ADR-033 §R2](../../../../docs/00_adr/adr-033-h3-phase2-lifecycle.md) |
-| TADR-008 | ⏸️ Deferred | H-7 上游 issue TaskRunner 侧注册点 | [ADR-034](../../../../docs/00_adr/adr-034-h7-deferred-registry.md) |
+## 维护政策
 
-## 跨仓同步协议
+本表是 canonical，UsrLinuxEmu 端 `docs/00_adr/README.md` 是 mirror。
+新增 TADR 时：
 
-TADR 改动必须遵循 UsrLinuxEmu [ADR-035 §Rule 5.1](../../../../docs/00_adr/adr-035-governance-policy.md) 4 步流程（TaskRunner 是 UsrLinuxEmu 的 submodule）：
+1. 选择 scope（test-fixture / umd-evolution / shared）
+2. 分配编号（1xx / 2xx / 3xx）
+3. 写入本表
+4. 按 ADR-035 §Rule 5.1 4 步同步到 UsrLinuxEmu
 
-1. **TaskRunner 仓**：`git add docs/adr/ && git commit && git push`
-2. **UsrLinuxEmu 仓**：`git add external/TaskRunner`（submodule 指针）`&& git commit`
-3. **UsrLinuxEmu 仓**（仅新增 cross-ref 段时）：更新 `docs/00_adr/README.md` 末尾的 "TaskRunner TADR mirror" 子表 `&& git commit`
-4. **UsrLinuxEmu 仓**：`git push`
+## 跨仓引用
 
-## 模板
+- UsrLinuxEmu 端 mirror: `../../../../docs/00_adr/README.md`
+- 跨仓同步协议: `../../../../docs/00_adr/adr-035-governance-policy.md`
+- AGENTS.md §Scope Classification: `../../../AGENTS.md`
 
-见 [`tadr-000-template.md`](./tadr-000-template.md)
-
-## 维护指南
-
-### 添加新 TADR
-
-1. 文件命名：`tadr-NNN-short-title.md`（NNN = 当前最大编号 + 1，零填充 3 位）
-2. 使用 TADR-000 模板
-3. 更新本 README 的索引表
-4. 在相关 TADR 中添加跨引用
-5. 关联上游 UsrLinuxEmu ADR（若为 consumer-lens mirror）
-6. 关联 openspec change 路径（若有）
-
-### 更新现有 TADR
-
-1. 修改对应文件
-2. 更新"最后更新"日期
-3. 如状态变更，在索引表中同步更新
-
----
-
-**维护者**: TaskRunner owner
-**最后更新**: 2026-06-23（H-4.5 docs governance cleanup 建立 TADR 体系）
+最后更新: 2026-06-25 (H-5.1 scope clarification cleanup)

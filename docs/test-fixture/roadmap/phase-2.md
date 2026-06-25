@@ -32,7 +32,7 @@ H-2.5 + H-3 联合交付：
 - `c64301c` (S5 architecture foundation)
 
 ### 关键决策
-[TADR-005 IGpuDriver 抽象层 Consumer-Lens](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md)
+[TADR-005 IGpuDriver 抽象层 Consumer-Lens](../adr/tadr-102-igpu-driver.md)
 
 ### 测试
 - `test_gpu_architecture`: ⚠️ 10/11 (H-2.5 Bonus 预存在 baseline)
@@ -59,10 +59,10 @@ e292831 feat(cli): add cuda_va_space + cuda_queue subcommands
 ```
 
 ### 关键决策 (TADR)
-- [TADR-005](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md) — IGpuDriver 抽象层
-- [TADR-006](../adr/tadr-006-h3-phase2-consumer-lens.md) — Phase 2 5 方法
-- [TADR-007](../adr/tadr-007-r2-mapping-contract.md) — R2 mapping
-- [TADR-008](../adr/tadr-008-h7-deferred-mirror.md) — H-7 deferred mirror
+- [TADR-005](../adr/tadr-102-igpu-driver.md) — IGpuDriver 抽象层
+- [TADR-006](../adr/tadr-103-h3-phase2.md) — Phase 2 5 方法
+- [TADR-007](../adr/tadr-104-r2-mapping.md) — R2 mapping
+- [TADR-008](../adr/tadr-105-h7-deferred.md) — H-7 deferred mirror
 
 ### 测试
 - `test_gpu_phase2`: ✅ 12/12

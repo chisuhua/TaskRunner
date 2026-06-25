@@ -6,12 +6,12 @@ STATUS: DEPRECATED
 > **⚠️ DEPRECATED 2026-06-23（H-4.5 docs governance cleanup）**
 >
 > 本决策框架的 D1-D4 已 capture 到独立 TADR：
-> - D1 → [TADR-001](../adr/tadr-001-cuda-vulkan-runtime-unified-scheduler.md)
-> - D2 → [TADR-002](../adr/tadr-002-cuda-vulkan-runtime-layered-design.md)
-> - D3 → [TADR-003](../adr/tadr-003-cuda-vulkan-runtime-sync-unified-internal.md)
-> - D4 → [TADR-004](../adr/tadr-004-cuda-vulkan-runtime-stub-tracker.md)
+> - D1 → [TADR-001](../adr/tadr-201-unified-scheduler.md)
+> - D2 → [TADR-002](../adr/tadr-202-layered-design.md)
+> - D3 → [TADR-003](../adr/tadr-203-sync-unified.md)
+> - D4 → [TADR-004](../adr/tadr-101-stub-tracker.md)
 >
-> 本文件保留作历史快照（CTO 2026-04-07 批准时点）。后续架构演进未走原"统一调度器"路径，请参考 [TADR-001 实施路径备注](../adr/tadr-001-cuda-vulkan-runtime-unified-scheduler.md#实施路径备注)。
+> 本文件保留作历史快照（CTO 2026-04-07 批准时点）。后续架构演进未走原"统一调度器"路径，请参考 [TADR-001 实施路径备注](../adr/tadr-201-unified-scheduler.md#实施路径备注)。
 >
 > L300 版本号已修复：v1.1 → v1.2（DDS 实际文件名是 v1.2-final.md）。
 

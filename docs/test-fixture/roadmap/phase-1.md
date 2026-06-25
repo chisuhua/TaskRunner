@@ -41,9 +41,9 @@ STATUS: ACCEPTED
 
 | 决策 | TADR | 状态 |
 |------|------|------|
-| 集成路径选择（B 统一调度器）| [TADR-001](../adr/tadr-001-cuda-vulkan-runtime-unified-scheduler.md) | ✅ Accepted (retroactive) |
-| 接口扩展策略（C 分层设计）| [TADR-002](../adr/tadr-002-cuda-vulkan-runtime-layered-design.md) | ✅ Accepted (retroactive) |
-| Stub 独立追踪（B 方案）| [TADR-004](../adr/tadr-004-cuda-vulkan-runtime-stub-tracker.md) | ✅ Accepted (retroactive) |
+| 集成路径选择（B 统一调度器）| [TADR-001](../adr/tadr-201-unified-scheduler.md) | ✅ Accepted (retroactive) |
+| 接口扩展策略（C 分层设计）| [TADR-002](../adr/tadr-202-layered-design.md) | ✅ Accepted (retroactive) |
+| Stub 独立追踪（B 方案）| [TADR-004](../adr/tadr-101-stub-tracker.md) | ✅ Accepted (retroactive) |
 
 ## 测试基线
 

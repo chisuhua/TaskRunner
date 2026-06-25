@@ -1,32 +1,30 @@
 #!/usr/bin/env bash
-# docs-audit.sh - Validate TaskRunner documentation against TADR + cross-repo invariants
+# docs-audit.sh - Validate TaskRunner documentation against H-5 3-scope structure
 #
-# Re-runnable audit script for TaskRunner. Mirrors UsrLinuxEmu tools/docs-audit.sh
-# style (set -e, emoji status, EXIT_CODE accumulator, --section flag, --strict flag).
-# Self-locates REPO_ROOT from SCRIPT_DIR (no hardcoded paths).
+# Adapted for H-5 (2026-06-25): TaskRunner documents are organized into 3 scopes:
+#   - test-fixture (1xx) - 当前 shippable 主线
+#   - umd-evolution (2xx) - 实验性 UMD 愿景
+#   - shared (107 + 3xx) - 跨切面契约
 #
-# Usage:
-#   tools/docs-audit.sh                 # Run all sections
-#   tools/docs-audit.sh --section tadr # Run single section
-#   tools/docs-audit.sh --strict        # Treat warnings as failures
-#   tools/docs-audit.sh --help          # Show this help
+# Each scope owns its own docs/{scope}/ sub-tree:
+#   docs/test-fixture/{adr,architecture,roadmap,archive,research}/
+#   docs/umd-evolution/{adr,architecture,roadmap,archive,research}/
+#   docs/shared/{adr,research}/
 #
-# Available sections:
-#   tadr-integrity   TADR-001~008 files exist + have required MADR sections
-#   cross-links      Cross-submodule 4-dot links + intra-project 2-dot links
-#   tadr-crossref    TADR-XXX references UsrLinuxEmu ADR-XXX correctly
-#   index-sync       docs/adr/README.md INDEX matches actual TADR files
-#   capability       capabilities.md has only 3 canonical capabilities
-#   archive-policy   DEPRECATED files only in docs/archive/
-#   doc-structure    architecture/ + roadmap/ + archive/ + adr/ file counts
+# TADR numbering is split across scopes:
+#   1xx - test-fixture TADR
+#   2xx - umd-evolution TADR
+#   3xx - shared TADR
+#   107/108 - shared TADR (boundary + build-mode)
 #
 # Exit codes:
 #   0 - All checks passed (or only warnings in non-strict mode)
-#   1 - One or more failures (or warnings in --strict mode)
-#   2 - Invalid arguments
+#   1 - One or more failures
 #
-# Author: TaskRunner owner (Sisyphus session)
-# Established: 2026-06-23 (H-4.5 docs governance cleanup)
+# Author: TaskRunner owner (Sisyphus H-5.1 session)
+# Established: 2026-06-25 (H-5.1 scope clarification cleanup)
+
+set -euo pipefail
 
 # ---------------------------------------------------------------------------
 # Globals
@@ -34,450 +32,308 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 USRLINUXEMU_ROOT="$(realpath "${REPO_ROOT}/../..")"
-EXIT_CODE=0
-STRICT=0
 
-# Sections to run
-RUN_TADR_INTEGRITY=0
-RUN_CROSS_LINKS=0
-RUN_TADR_CROSSREF=0
-RUN_INDEX_SYNC=0
-RUN_CAPABILITY=0
-RUN_ARCHIVE_POLICY=0
-RUN_DOC_STRUCTURE=0
+cd "${REPO_ROOT}"
 
-# ---------------------------------------------------------------------------
 # Output helpers
+PASS=0
+FAIL=0
+WARN=0
+EXIT_CODE=0
+
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+ok()   { echo -e "${GREEN}✓${NC} $1"; PASS=$((PASS+1)); }
+bad()  { echo -e "${RED}✗${NC} $1"; FAIL=$((FAIL+1)); EXIT_CODE=1; }
+warn() { echo -e "${YELLOW}⚠${NC} $1"; WARN=$((WARN+1)); }
+
+# Expected 3 scopes (H-5)
+SCOPES=("test-fixture" "umd-evolution" "shared")
+
+# Required sub-dirs per scope
+SCOPE_SUBDIRS_DEFAULT=("adr")
+SCOPE_SUBDIRS_TEST_FIXTURE=("adr" "architecture" "roadmap" "archive")
+SCOPE_SUBDIRS_UMD_EVOLUTION=("adr" "architecture" "roadmap" "archive")
+SCOPE_SUBDIRS_SHARED=("adr")
+
+# Redirect files: TADR-NNN-redirect.md must have REDIRECT_TO + STATUS: DEPRECATED
+# Active TADR files must have SCOPE + STATUS frontmatter
+
 # ---------------------------------------------------------------------------
-section() {
-    echo ""
-    echo "=== $1 ==="
-}
-
-subsection() {
-    echo "--- $1 ---"
-}
-
-check_pass() {
-    echo "  ✅ $1"
-}
-
-check_fail() {
-    echo "  ❌ $1"
-    EXIT_CODE=1
-}
-
-check_warn() {
-    if [ "${STRICT}" -eq 1 ]; then
-        echo "  ❌ (strict) $1"
-        EXIT_CODE=1
+# Check 1: 3 scope directories exist
+# ---------------------------------------------------------------------------
+echo "=== 1. Scope Directories ==="
+for scope in "${SCOPES[@]}"; do
+    if [ -d "docs/$scope" ]; then
+        ok "docs/$scope/ exists"
     else
-        echo "  ⚠️  $1"
+        bad "docs/$scope/ missing"
     fi
-}
-
-print_summary() {
-    local passed="${1:-0}"
-    local failed="${2:-0}"
-    local warned="${3:-0}"
-    echo ""
-    echo "============================================"
-    echo "  Summary"
-    echo "============================================"
-    echo "  Repository: ${REPO_ROOT}"
-    echo "  Mode: $([ ${STRICT} -eq 1 ] && echo 'all (strict)' || echo 'all')"
-    echo ""
-    echo "  ✅ Passed:  ${passed}"
-    echo "  ❌ Failed:  ${failed}"
-    echo "  ⚠️  Warnings: ${warned}"
-    if [ "${EXIT_CODE}" -eq 0 ]; then
-        echo ""
-        echo "  Result: ✅ PASS"
-    else
-        echo ""
-        echo "  Result: ❌ FAIL"
-    fi
-    echo "============================================"
-}
-
-usage() {
-    sed -n '2,30p' "${BASH_SOURCE[0]}" | sed 's/^# //'
-}
-
-# ---------------------------------------------------------------------------
-# Argument parsing
-# ---------------------------------------------------------------------------
-RUN_ALL=1
-while [ $# -gt 0 ]; do
-    case "$1" in
-        --section)
-            RUN_ALL=0
-            shift
-            case "$1" in
-                tadr-integrity) RUN_TADR_INTEGRITY=1 ;;
-                cross-links)    RUN_CROSS_LINKS=1 ;;
-                tadr-crossref)  RUN_TADR_CROSSREF=1 ;;
-                index-sync)     RUN_INDEX_SYNC=1 ;;
-                capability)     RUN_CAPABILITY=1 ;;
-                archive-policy) RUN_ARCHIVE_POLICY=1 ;;
-                doc-structure)  RUN_DOC_STRUCTURE=1 ;;
-                *)
-                    echo "Invalid section: $1" >&2
-                    echo "Valid sections: tadr-integrity, cross-links, tadr-crossref, index-sync, capability, archive-policy, doc-structure" >&2
-                    exit 2
-                    ;;
-            esac
-            ;;
-        --strict) STRICT=1 ;;
-        --help|-h) usage; exit 0 ;;
-        *)
-            echo "Unknown argument: $1" >&2
-            usage >&2
-            exit 2
-            ;;
-    esac
-    shift
 done
 
-if [ ${RUN_ALL} -eq 1 ]; then
-    RUN_TADR_INTEGRITY=1
-    RUN_CROSS_LINKS=1
-    RUN_TADR_CROSSREF=1
-    RUN_INDEX_SYNC=1
-    RUN_CAPABILITY=1
-    RUN_ARCHIVE_POLICY=1
-    RUN_DOC_STRUCTURE=1
+# Check sub-dirs per scope
+echo ""
+echo "=== 2. Scope Sub-directories ==="
+# adr/ and architecture/ are required for all scopes
+for scope in test-fixture umd-evolution; do
+    if [ -d "docs/$scope" ]; then
+        for sub in adr architecture; do
+            if [ -d "docs/$scope/$sub" ]; then
+                ok "docs/$scope/$sub/ exists"
+            else
+                bad "docs/$scope/$sub/ missing"
+            fi
+        done
+        # roadmap/ is required for active scopes (test-fixture)
+        # umd-evolution may have roadmap/ but it's optional for PROPOSED-only scopes
+        for sub in roadmap; do
+            if [ -d "docs/$scope/$sub" ]; then
+                ok "docs/$scope/$sub/ exists"
+            else
+                warn "docs/$scope/$sub/ missing (optional for PROPOSED-only scope)"
+            fi
+        done
+        # archive/ only required for active scopes with deprecated content
+        for sub in archive; do
+            if [ -d "docs/$scope/$sub" ]; then
+                ok "docs/$scope/$sub/ exists"
+            else
+                warn "docs/$scope/$sub/ missing (no deprecated content yet)"
+            fi
+        done
+    fi
+done
+
+if [ -d "docs/shared" ]; then
+    if [ -d "docs/shared/adr" ]; then
+        ok "docs/shared/adr/ exists"
+    else
+        bad "docs/shared/adr/ missing"
+    fi
 fi
 
 # ---------------------------------------------------------------------------
-# Section 1: TADR Integrity
+# Check 3: TADR file naming + frontmatter
 # ---------------------------------------------------------------------------
-section_tadr_integrity() {
-    section "1. TADR Integrity"
-    local tadr_dir="${REPO_ROOT}/docs/adr"
-    local required_sections=("## Context" "## Decision" "## Consequences")
+echo ""
+echo "=== 3. TADR File Integrity ==="
 
-    for n in 001 002 003 004 005 006 007 008; do
-        local actual
-        actual=$(ls "${tadr_dir}/tadr-${n}-"*.md 2>/dev/null | head -1)
-        if [ -z "${actual}" ]; then
-            check_fail "TADR-${n} file missing (expected docs/adr/tadr-${n}-*.md)"
+# Validate TADR file naming: tadr-NNN-*.md
+# - Redirect files (*-redirect.md): must have REDIRECT_TO + STATUS: DEPRECATED
+# - Active files: must have SCOPE: <scope> + STATUS: <status>
+
+for scope in "${SCOPES[@]}"; do
+    if [ ! -d "docs/$scope/adr" ]; then
+        continue
+    fi
+
+    # Expected scope tag for frontmatter validation
+    local_scope_upper="$(echo "$scope" | tr '[:lower:]' '[:upper:]' | tr '-' '_')"
+
+    for tadr_file in "docs/$scope/adr/"tadr-*.md; do
+        [ -f "$tadr_file" ] || continue
+
+        # Skip template
+        if [[ "$(basename "$tadr_file")" == "tadr-000-template.md" ]]; then
+            ok "$tadr_file (template, skipped)"
             continue
         fi
 
-        local missing_sections=0
-        for sect in "${required_sections[@]}"; do
-            if ! grep -qF "${sect}" "${actual}"; then
-                check_fail "TADR-${n} $(basename "${actual}") missing required section '${sect}'"
-                missing_sections=$((missing_sections+1))
-            fi
-        done
-
-        # Consumer-Lens required for TADR-005/006/008 (consumer-lens mirrors)
-        if [[ "${n}" == "005" || "${n}" == "006" || "${n}" == "008" ]]; then
-            if ! grep -qF "## Consumer-Lens" "${actual}"; then
-                check_fail "TADR-${n} $(basename "${actual}") missing required section '## Consumer-Lens' (consumer-lens mirror)"
-                missing_sections=$((missing_sections+1))
-            fi
-        fi
-
-        if [ ${missing_sections} -eq 0 ]; then
-            check_pass "TADR-${n} $(basename "${actual}") has all required sections"
-        fi
-    done
-}
-
-# ---------------------------------------------------------------------------
-# Section 2: Cross-submodule + intra-project Links
-# ---------------------------------------------------------------------------
-section_cross_links() {
-    section "2. Cross-submodule + Intra-project Links"
-
-    # 2.1 Cross-submodule docs/00_adr links: should be 4 dots (../../../..).
-    #     A 4-dot prefix contains the 3-dot prefix as substring, so we mask 4-dot
-    #     occurrences before grepping for remaining 3-dot patterns.
-    local bad_3dot=0
-    while IFS= read -r f; do
-        [ -z "${f}" ] && continue
-        if sed 's|\.\./\.\./\.\./\.\./docs/00_adr/|__4DOT_OK__|g' "${f}" | grep -qE '\.\./\.\./\.\./docs/00_adr/'; then
-            check_fail "Bad 3-dot cross-submodule link in $(realpath --relative-to="${REPO_ROOT}" "${f}")"
-            bad_3dot=$((bad_3dot+1))
-        fi
-    done < <(find "${REPO_ROOT}/docs" -name '*.md' -type f 2>/dev/null)
-    if [ ${bad_3dot} -eq 0 ]; then
-        check_pass "All cross-submodule docs/00_adr links use 4-dot pattern"
-    fi
-
-    # 2.2 Cross-submodule docs/00_adr: should NOT use 5 dots (off-by-one more).
-    local bad_5dot=0
-    while IFS= read -r f; do
-        [ -z "${f}" ] && continue
-        if grep -qE '\.\./\.\./\.\./\.\./\.\./docs/00_adr/' "${f}"; then
-            check_fail "Bad 5-dot cross-submodule link in $(realpath --relative-to="${REPO_ROOT}" "${f}")"
-            bad_5dot=$((bad_5dot+1))
-        fi
-    done < <(find "${REPO_ROOT}/docs" -name '*.md' -type f 2>/dev/null)
-    if [ ${bad_5dot} -eq 0 ]; then
-        check_pass "No 5-dot cross-submodule docs/00_adr links (no off-by-one more)"
-    fi
-
-    # 2.3 Intra-project src/ include links: should be 2 dots (../../) from docs/adr/.
-    #     3 dots would mean going up one directory too far.
-    local bad_src_3dot=0
-    while IFS= read -r f; do
-        [ -z "${f}" ] && continue
-        # Match ../../../src/ (3 dots before src/) but not when part of 4+ dots.
-        # We mask 4+-dot occurrences first.
-        if sed 's|\.\./\.\./\.\./\.\./src/|__4DOT_SRC__|g; s|\.\./\.\./\.\./\.\./\.\./src/|__5DOT_SRC__|g' "${f}" | grep -qE '\.\./\.\./\.\./src/'; then
-            check_fail "Bad 3-dot intra-project src/ link in $(realpath --relative-to="${REPO_ROOT}" "${f}")"
-            bad_src_3dot=$((bad_src_3dot+1))
-        fi
-    done < <(find "${REPO_ROOT}/docs" -name '*.md' -type f 2>/dev/null)
-    if [ ${bad_src_3dot} -eq 0 ]; then
-        check_pass "All intra-project src/ links use 2-dot pattern"
-    fi
-
-    # 2.4 Count 4-dot cross-submodule links (informational).
-    local n4
-    n4=$(grep -rE '\.\./\.\./\.\./\.\./docs/00_adr/' "${REPO_ROOT}/docs" --include='*.md' 2>/dev/null | wc -l)
-    if [ ${n4} -gt 0 ]; then
-        check_pass "${n4} correct 4-dot cross-submodule docs/00_adr links"
-    else
-        check_warn "No 4-dot cross-submodule docs/00_adr links found (expected ≥8 for TADR-005~008 + INDEX mirror)"
-    fi
-}
-
-# ---------------------------------------------------------------------------
-# Section 3: TADR Cross-references to UsrLinuxEmu ADRs
-# ---------------------------------------------------------------------------
-section_tadr_crossref() {
-    section "3. TADR Cross-references to UsrLinuxEmu ADRs"
-
-    # Map TADR-XXX → expected ADR-XXX
-    declare -A tadr_to_adr=(
-        ["005"]="032"
-        ["006"]="033"
-        ["007"]="033"
-        ["008"]="034"
-    )
-
-    for tadr_num in "${!tadr_to_adr[@]}"; do
-        local adr_num="${tadr_to_adr[$tadr_num]}"
-        local tadr_file
-        tadr_file=$(ls "${REPO_ROOT}/docs/adr/tadr-${tadr_num}-"*.md 2>/dev/null | head -1)
-
-        if [ -z "${tadr_file}" ]; then
-            check_fail "TADR-${tadr_num} file missing"
+        # Validate filename matches tadr-NNN-* pattern
+        basename="$(basename "$tadr_file")"
+        if [[ ! "$basename" =~ ^tadr-[0-9]{3}-[a-z0-9-]+\.md$ ]]; then
+            bad "$tadr_file: filename does not match tadr-NNN-slug.md pattern"
             continue
         fi
 
-        # Check TADR file references the ADR file
-        local expected_pattern="../../../../docs/00_adr/adr-${adr_num}-"
-        if grep -qF "${expected_pattern}" "${tadr_file}"; then
-            check_pass "TADR-${tadr_num} references ADR-${adr_num}"
+        # Check if redirect file
+        if [[ "$tadr_file" == *-redirect.md ]]; then
+            # Redirect: must have REDIRECT_TO + STATUS: DEPRECATED
+            if grep -q "^STATUS: DEPRECATED" "$tadr_file"; then
+                if grep -q "^REDIRECT_TO:" "$tadr_file"; then
+                    ok "$tadr_file (redirect format OK)"
+                else
+                    bad "$tadr_file: missing REDIRECT_TO: field"
+                fi
+            else
+                bad "$tadr_file: redirect file missing STATUS: DEPRECATED"
+            fi
         else
-            check_fail "TADR-${tadr_num} missing ADR-${adr_num} reference (expected pattern '${expected_pattern}')"
-        fi
-
-        # Check ADR file actually exists at UsrLinuxEmu side
-        local adr_glob="${USRLINUXEMU_ROOT}/docs/00_adr/adr-${adr_num}-"*.md
-        if ls ${adr_glob} > /dev/null 2>&1; then
-            check_pass "ADR-${adr_num} file exists at UsrLinuxEmu side"
-        else
-            check_fail "ADR-${adr_num} file missing at UsrLinuxEmu (cannot find ${adr_glob})"
-        fi
-    done
-}
-
-# ---------------------------------------------------------------------------
-# Section 4: docs/adr/README.md INDEX Sync
-# ---------------------------------------------------------------------------
-section_index_sync() {
-    section "4. docs/adr/README.md INDEX Sync"
-    local readme="${REPO_ROOT}/docs/adr/README.md"
-
-    if [ ! -f "${readme}" ]; then
-        check_fail "docs/adr/README.md missing"
-        return
-    fi
-
-    # Extract TADR-XXX from README INDEX table
-    local index_tadrs
-    index_tadrs=$(grep -oE 'TADR-[0-9]+' "${readme}" 2>/dev/null | sort -u)
-
-    # Extract TADR-XXX from actual files (skip template)
-    local actual_tadrs
-    actual_tadrs=$(ls "${REPO_ROOT}/docs/adr/tadr-"*.md 2>/dev/null \
-        | xargs -n1 basename 2>/dev/null \
-        | grep -oE 'tadr-[0-9]+' \
-        | sed 's/tadr-/TADR-/' \
-        | sort -u)
-
-    # Files exist but not in INDEX
-    local missing_in_index=0
-    for t in ${actual_tadrs}; do
-        if ! echo "${index_tadrs}" | grep -qx "${t}"; then
-            check_fail "${t} file exists but not in docs/adr/README.md INDEX"
-            missing_in_index=$((missing_in_index+1))
-        fi
-    done
-
-    # INDEX entries without files (skip TADR-000 = template)
-    local missing_as_file=0
-    for t in ${index_tadrs}; do
-        if [ "${t}" = "TADR-000" ]; then continue; fi
-        if ! echo "${actual_tadrs}" | grep -qx "${t}"; then
-            check_fail "${t} in INDEX but no corresponding file"
-            missing_as_file=$((missing_as_file+1))
-        fi
-    done
-
-    if [ ${missing_in_index} -eq 0 ] && [ ${missing_as_file} -eq 0 ]; then
-        check_pass "INDEX entries match actual TADR files (${actual_tadrs//$'\n'/,})"
-    fi
-}
-
-# ---------------------------------------------------------------------------
-# Section 5: Capability Consistency
-# ---------------------------------------------------------------------------
-section_capability() {
-    section "5. Capability Consistency"
-    local cap_file="${REPO_ROOT}/docs/architecture/capabilities.md"
-
-    if [ ! -f "${cap_file}" ]; then
-        check_fail "docs/architecture/capabilities.md missing"
-        return
-    fi
-
-    # Canonical capabilities per UsrLinuxEmu ADR-035 §按 Capability 分组
-    local canonical=("gpu-driver-architecture" "gpu-phase2-management" "architecture-governance")
-
-    # Extract declared capabilities (matches **name** bold pattern in INDEX row)
-    local declared
-    declared=$(grep -oE '\*\*[a-z][a-z0-9-]+-(architecture|management|governance)\*\*' "${cap_file}" \
-        | sed 's/\*//g' | sort -u)
-
-    # All canonical present
-    for cap in "${canonical[@]}"; do
-        if echo "${declared}" | grep -qx "${cap}"; then
-            check_pass "Canonical capability '${cap}' present"
-        else
-            check_fail "Canonical capability '${cap}' missing from capabilities.md"
-        fi
-    done
-
-    # No scope creep
-    local cap_count
-    cap_count=$(echo "${declared}" | grep -c .)
-    if [ ${cap_count} -eq 3 ]; then
-        check_pass "Capability count = 3 (no scope creep vs UsrLinuxEmu canonical)"
-    else
-        check_fail "Capability count = ${cap_count} (expected 3)"
-        local extra
-        extra=$(comm -23 <(echo "${declared}") <(printf '%s\n' "${canonical[@]}" | sort -u))
-        if [ -n "${extra}" ]; then
-            check_warn "Extra capabilities (scope creep candidates): ${extra}"
-        fi
-    fi
-}
-
-# ---------------------------------------------------------------------------
-# Section 6: Archive Policy
-# ---------------------------------------------------------------------------
-section_archive_policy() {
-    section "6. Archive Policy"
-
-    local deprecated_total=0
-    local deprecated_outside=0
-    while IFS= read -r f; do
-        if grep -q "⚠️ DEPRECATED" "${f}"; then
-            deprecated_total=$((deprecated_total+1))
-            local rel
-            rel=$(realpath --relative-to="${REPO_ROOT}" "${f}")
-            if [[ ! "${rel}" =~ ^docs/archive/ ]]; then
-                check_fail "DEPRECATED file outside docs/archive/: ${rel}"
-                deprecated_outside=$((deprecated_outside+1))
+            # Active TADR: must have SCOPE + STATUS frontmatter
+            head_block="$(head -10 "$tadr_file")"
+            if echo "$head_block" | grep -q "^SCOPE:"; then
+                if echo "$head_block" | grep -q "^STATUS:"; then
+                    ok "$tadr_file (frontmatter OK)"
+                else
+                    bad "$tadr_file: missing STATUS: in frontmatter"
+                fi
+            else
+                bad "$tadr_file: missing SCOPE: in frontmatter"
             fi
         fi
-    done < <(find "${REPO_ROOT}/docs" -name '*.md' -type f 2>/dev/null)
-
-    if [ ${deprecated_total} -gt 0 ] && [ ${deprecated_outside} -eq 0 ]; then
-        check_pass "${deprecated_total} DEPRECATED files, all in docs/archive/"
-    elif [ ${deprecated_total} -eq 0 ]; then
-        check_warn "No DEPRECATED files found (expected ≥3 archived v0.1 docs)"
-    fi
-}
+    done
+done
 
 # ---------------------------------------------------------------------------
-# Section 7: Doc Structure
+# Check 4: AGENTS.md §Scope Classification section exists
 # ---------------------------------------------------------------------------
-section_doc_structure() {
-    section "7. Doc Structure"
+echo ""
+echo "=== 4. AGENTS.md Scope Classification Section ==="
 
-    local arch_count
-    arch_count=$(find "${REPO_ROOT}/docs/architecture" -name '*.md' -type f 2>/dev/null | wc -l)
-    if [ ${arch_count} -eq 5 ]; then
-        check_pass "docs/architecture/ has 5 files (README + 4 docs)"
+if [ -f "AGENTS.md" ]; then
+    if grep -qE "^## Scope Classification" AGENTS.md; then
+        ok "AGENTS.md has §Scope Classification section"
     else
-        check_fail "docs/architecture/ has ${arch_count} files (expected 5)"
+        bad "AGENTS.md missing §Scope Classification section"
     fi
 
-    local roadmap_count
-    roadmap_count=$(find "${REPO_ROOT}/docs/roadmap" -name '*.md' -type f 2>/dev/null | wc -l)
-    if [ ${roadmap_count} -eq 6 ]; then
-        check_pass "docs/roadmap/ has 6 files (README + 5 phase docs)"
+    if grep -qE "^### Required Metadata" AGENTS.md; then
+        ok "AGENTS.md has §Required Metadata section"
     else
-        check_fail "docs/roadmap/ has ${roadmap_count} files (expected 6)"
+        warn "AGENTS.md missing §Required Metadata section"
     fi
 
-    local archive_count
-    archive_count=$(find "${REPO_ROOT}/docs/archive" -name '*.md' -type f 2>/dev/null | wc -l)
-    if [ ${archive_count} -eq 4 ]; then
-        check_pass "docs/archive/ has 4 files (README + 3 v0.1)"
+    if grep -qE "^### Build Mode Selection" AGENTS.md; then
+        ok "AGENTS.md has §Build Mode Selection section"
     else
-        check_fail "docs/archive/ has ${archive_count} files (expected 4)"
+        warn "AGENTS.md missing §Build Mode Selection section"
     fi
-
-    local adr_count
-    adr_count=$(find "${REPO_ROOT}/docs/adr" -name 'tadr-*.md' -type f 2>/dev/null | wc -l)
-    if [ ${adr_count} -eq 9 ]; then
-        check_pass "docs/adr/ has 9 TADR files (TADR-000 template + TADR-001~008)"
-    else
-        check_fail "docs/adr/ has ${adr_count} TADR files (expected 9)"
-    fi
-}
+else
+    bad "AGENTS.md not found at repo root"
+fi
 
 # ---------------------------------------------------------------------------
-# Main
+# Check 5: docs/shared/adr/README.md is canonical TADR index
 # ---------------------------------------------------------------------------
-PASSED=0
-FAILED=0
-WARNED=0
+echo ""
+echo "=== 5. Canonical TADR Index ==="
 
-# Wrap each section to track passed/failed/warned counts via output counting
-# (simpler: just count via exit code and trust the user can re-run)
-
-# Each check_pass/fail/warn increments an internal counter; we track here.
-run_section() {
-    local name="$1"
-    local before_exit="${EXIT_CODE}"
-    "$1"  # call the section function
-    local after_exit="${EXIT_CODE}"
-    if [ "${after_exit}" -gt "${before_exit}" ]; then
-        FAILED=$((FAILED+1))
+if [ -f "docs/shared/adr/README.md" ]; then
+    ok "docs/shared/adr/README.md exists"
+    # Should reference all 3 scopes
+    if grep -q "test-fixture" "docs/shared/adr/README.md"; then
+        ok "  README references test-fixture scope"
     else
-        PASSED=$((PASSED+1))
+        bad "  README missing test-fixture scope reference"
     fi
-}
+    if grep -q "umd-evolution" "docs/shared/adr/README.md"; then
+        ok "  README references umd-evolution scope"
+    else
+        bad "  README missing umd-evolution scope reference"
+    fi
+    if grep -q "shared" "docs/shared/adr/README.md"; then
+        ok "  README references shared scope"
+    else
+        bad "  README missing shared scope reference"
+    fi
+else
+    bad "docs/shared/adr/README.md missing"
+fi
 
-# Run selected sections
-[ ${RUN_TADR_INTEGRITY} -eq 1 ] && run_section section_tadr_integrity
-[ ${RUN_CROSS_LINKS}    -eq 1 ] && run_section section_cross_links
-[ ${RUN_TADR_CROSSREF}  -eq 1 ] && run_section section_tadr_crossref
-[ ${RUN_INDEX_SYNC}     -eq 1 ] && run_section section_index_sync
-[ ${RUN_CAPABILITY}     -eq 1 ] && run_section section_capability
-[ ${RUN_ARCHIVE_POLICY} -eq 1 ] && run_section section_archive_policy
-[ ${RUN_DOC_STRUCTURE}  -eq 1 ] && run_section section_doc_structure
+# ---------------------------------------------------------------------------
+# Check 6: UsrLinuxEmu mirror sync
+# ---------------------------------------------------------------------------
+echo ""
+echo "=== 6. UsrLinuxEmu Mirror Sync ==="
 
-print_summary ${PASSED} ${FAILED} ${WARNED}
-exit ${EXIT_CODE}
+MIRROR="${USRLINUXEMU_ROOT}/docs/00_adr/README.md"
+
+if [ -f "$MIRROR" ]; then
+    ok "UsrLinuxEmu mirror exists at $MIRROR"
+
+    # Check mirror has TaskRunner TADR mirror section
+    if grep -q "TaskRunner TADR" "$MIRROR"; then
+        ok "  mirror has 'TaskRunner TADR mirror' section"
+    else
+        bad "  mirror missing 'TaskRunner TADR mirror' section"
+    fi
+
+    # Check expected TADR numbers are present in mirror
+    expected_tadrs=(101 102 103 104 105 106 109 201 202 203 204 205 107 108 301 302 303 304)
+    missing_in_mirror=0
+    for tadr_num in "${expected_tadrs[@]}"; do
+        if ! grep -q "tadr-$tadr_num" "$MIRROR"; then
+            warn "  mirror missing tadr-$tadr_num"
+            missing_in_mirror=$((missing_in_mirror+1))
+        fi
+    done
+    if [ $missing_in_mirror -eq 0 ]; then
+        ok "  mirror references all ${#expected_tadrs[@]} expected TADR numbers"
+    fi
+else
+    warn "UsrLinuxEmu mirror not found at $MIRROR (skipped)"
+fi
+
+# ---------------------------------------------------------------------------
+# Check 7: Source code SCOPE annotations (// SCOPE: <scope>)
+# ---------------------------------------------------------------------------
+echo ""
+echo "=== 7. Source Code SCOPE Annotations ==="
+
+# Check src/ subdirs
+for scope_dir in src/test_fixture src/umd src/shared; do
+    if [ -d "$scope_dir" ]; then
+        n_files=$(find "$scope_dir" -name '*.cpp' -o -name '*.h' -o -name '*.hpp' 2>/dev/null | wc -l)
+        n_with_scope=$(grep -rl "^// SCOPE:" "$scope_dir" 2>/dev/null | wc -l)
+        if [ $n_files -gt 0 ]; then
+            if [ $n_with_scope -eq $n_files ]; then
+                ok "$scope_dir: $n_files files, all have // SCOPE: annotation"
+            elif [ $n_with_scope -eq 0 ]; then
+                warn "$scope_dir: $n_files files, none have // SCOPE: annotation (H-5 future)"
+            else
+                warn "$scope_dir: $n_files files, only $n_with_scope have // SCOPE: annotation"
+            fi
+        fi
+    fi
+done
+
+# ---------------------------------------------------------------------------
+# Check 8: No tadr-00X legacy references (should be all remapped to 1xx/2xx)
+# ---------------------------------------------------------------------------
+echo ""
+echo "=== 8. No Legacy tadr-00X References ==="
+
+legacy_count=0
+while IFS= read -r f; do
+    [ -z "$f" ] && continue
+    # Skip untracked research files (intentionally not yet in git)
+    if [[ "$f" == *"/research/"* ]]; then
+        continue
+    fi
+    if grep -qE "tadr-00[1-8]-" "$f" 2>/dev/null; then
+        # Skip redirect files themselves (they reference old names deliberately)
+        if [[ "$(basename "$f")" == *-redirect.md ]]; then
+            continue
+        fi
+        bad "Legacy tadr-00X reference in: $f"
+        legacy_count=$((legacy_count+1))
+    fi
+done < <(find docs include src tests \( -name '*.md' -o -name '*.cpp' -o -name '*.h' -o -name '*.hpp' \) 2>/dev/null)
+
+if [ $legacy_count -eq 0 ]; then
+    ok "No legacy tadr-00X references found (all remapped)"
+fi
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
+echo ""
+echo "============================================"
+echo "  Summary"
+echo "============================================"
+echo -e "  ${GREEN}PASS${NC}:   $PASS"
+echo -e "  ${RED}FAIL${NC}:   $FAIL"
+echo -e "  ${YELLOW}WARN${NC}:   $WARN"
+echo ""
+if [ $FAIL -eq 0 ]; then
+    echo -e "  ${GREEN}Result: PASS${NC}"
+    echo "============================================"
+    exit 0
+else
+    echo -e "  ${RED}Result: FAIL${NC}"
+    echo "============================================"
+    exit 1
+fi

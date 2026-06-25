@@ -6,7 +6,7 @@ STATUS: ACCEPTED
 # Phase 3 - Multi-GPU / P2P (Deferred)
 
 > **状态**: Deferred (待 H-7 ADR 完成)
-> **关联**: [TADR-008 H-7 deferred mirror](../adr/tadr-008-h7-deferred-mirror.md), UsrLinuxEmu [ADR-034](../../../../docs/00_adr/adr-034-h7-deferred-registry.md)
+> **关联**: [TADR-008 H-7 deferred mirror](../adr/tadr-105-h7-deferred.md), UsrLinuxEmu [ADR-034](../../../../docs/00_adr/adr-034-h7-deferred-registry.md)
 
 ## 为什么 Deferred
 
@@ -16,7 +16,7 @@ Phase 3 需要先解决 H-7 ADR 注册的 3 个 UsrLinuxEmu 上游 issues：
 2. **Issue #2**: ioctl path 绕过 GpuQueueEmu 抽象层 (行为分歧风险)
 3. **Issue #3**: attached_queues 弱校验 (静默 -EINVAL 难诊断)
 
-详见 [TADR-008 §3 issues 与 TaskRunner 侧影响](../adr/tadr-008-h7-deferred-mirror.md#decision)。
+详见 [TADR-008 §3 issues 与 TaskRunner 侧影响](../adr/tadr-105-h7-deferred.md#decision)。
 
 ## Phase 3 目标（待 H-7 触发）
 

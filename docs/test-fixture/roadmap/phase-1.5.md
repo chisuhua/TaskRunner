@@ -53,7 +53,7 @@ Phase 1 MVP 之后的 2 个增量扩展：
 
 Phase 1.5 严格按 v0.1 提案实施，无偏差：
 - fence_id 通过 `gpu_pushbuffer_args.fence_id` 字段返回（与原设计一致）
-- va_space_handle 透传到 UsrLinuxEmu 校验（与 [TADR-001](../adr/tadr-001-cuda-vulkan-runtime-unified-scheduler.md) 提案一致）
+- va_space_handle 透传到 UsrLinuxEmu 校验（与 [TADR-001](../adr/tadr-201-unified-scheduler.md) 提案一致）
 
 ---
 

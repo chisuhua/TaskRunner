@@ -20,7 +20,7 @@ STATUS: ACCEPTED
 | 抽象层 | UnifiedScheduler 持有资源 | `IGpuDriver` 抽象 + 3 实现 DI | ✅ 测试隔离 + 跨仓治理需要 |
 | 同步原语 | `SyncSource` + `SyncManager` 完整设计 | `fence_id` 简化同步路径 | ✅ Phase 3+ 简化，coroutine await 推迟 |
 | 资源管理 | `ResourceManager` 统一追踪 | `CudaStub` 独立 + `GpuDriverClient` 透传 | ✅ Stub 独立追踪决策保留 |
-| 集成路径 | A/B/C 三方案对比 | B 方案的简化变体 | 见 [TADR-001 实施路径备注](../adr/tadr-001-cuda-vulkan-runtime-unified-scheduler.md#实施路径备注) |
+| 集成路径 | A/B/C 三方案对比 | B 方案的简化变体 | 见 [TADR-001 实施路径备注](../adr/tadr-201-unified-scheduler.md#实施路径备注) |
 
 ### 决策保留
 

@@ -24,7 +24,7 @@ STATUS: DEPRECATED
 |--------|---------|----:|---------|---------|
 | `2026-04-07-decision-frame-cuda-vulkan-runtime.md` | 2026-04-07 | 306 | D1-D4 决策已 capture 到独立 TADR | [TADR-001~004](../adr/README.md#索引) |
 | `2026-04-07-cuda-vulkan-runtime-architecture.md` | 2026-04-07 | 680 | v0.1 提案，从未作为类实施 | [architecture/current.md](../architecture/current.md) + [roadmap/retrospective.md](../roadmap/retrospective.md) |
-| `2026-04-07-DDS-CUDA-Vulkan-Runtime-v1.2-final.md` | 2026-04-07 | 688 | v1.2 详细设计规范，被 H-2.5/H-3 超越 | [TADR-005](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md) + [TADR-006](../adr/tadr-006-h3-phase2-consumer-lens.md) |
+| `2026-04-07-DDS-CUDA-Vulkan-Runtime-v1.2-final.md` | 2026-04-07 | 688 | v1.2 详细设计规范，被 H-2.5/H-3 超越 | [TADR-005](../adr/tadr-102-igpu-driver.md) + [TADR-006](../adr/tadr-103-h3-phase2.md) |
 
 ## 引用规范
 

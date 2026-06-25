@@ -1,20 +1,55 @@
 # TaskRunner - C++ Hybrid Development
 
-## 项目架构
+## 项目架构 (H-5 3-scope)
 
 ```
 TaskRunner/
-├── src/                    # 源代码
-│   ├── cuda_scheduler.cpp  # CUDA 调度器 (DDS v1.2)
-│   ├── cmd_cuda.cpp        # CLI CUDA 命令 (GPU_IOCTL_*)
-│   ├── gpu_driver_client.cpp  # System C 封装
-│   └── cuda_stub.cpp       # Stub 模式实现
-├── include/                # 头文件
-│   ├── gpu_driver_client.h  # GpuDriverClient 类
-│   └── cuda_scheduler.hpp    # CudaScheduler 类
-├── tests/
-│   └── test_cuda_scheduler.cpp  # E2E 测试 (doctest)
-├── UsrLinuxEmu → ../../  # 符号链接，GPU 接口定义（2026-06-19 PR #6 修复路径，原 ../UsrLinuxEmu/ 断链）
+├── src/                              # 源代码 (按 scope 分目录)
+│   ├── test_fixture/                 # test-fixture scope (default)
+│   │   ├── cuda_scheduler.cpp        # CUDA 调度器 (DDS v1.2)
+│   │   ├── cmd_cuda.cpp              # CLI CUDA 命令 (GPU_IOCTL_*)
+│   │   ├── gpu_driver_client.cpp     # System C 封装
+│   │   ├── cuda_stub.cpp             # Stub 模式实现
+│   │   ├── TaskRunner.cpp            # 单例调度器
+│   │   ├── CmdProcessor.cpp          # 工作线程
+│   │   ├── cmd_buffer_v2.cpp         # V2 命令缓冲
+│   │   └── cli_main.cpp              # CLI 入口
+│   ├── umd/                          # umd-evolution scope (experimental)
+│   │   ├── cuda_api.cpp              # CUDA API 兼容层
+│   │   ├── module_loader.cpp         # 插件加载器
+│   │   └── ring_buffer.cpp           # 环形缓冲
+│   └── shared/                       # shared scope (cross-cutting)
+│       ├── memory_manager.cpp        # 共享内存管理器
+│       └── sync_primitives.cpp       # 同步原语实现
+├── include/                          # 头文件 (按 scope 分目录)
+│   ├── test_fixture/                 # test-fixture 头文件
+│   │   ├── gpu_driver_client.h       # GpuDriverClient 类
+│   │   ├── cuda_scheduler.hpp        # CudaScheduler 类
+│   │   ├── cuda_stub.hpp             # Stub 模式头
+│   │   ├── TaskRunner.h              # 单例类
+│   │   ├── CmdProcessor.h            # 工作线程类
+│   │   ├── CmdStream.h / CmdBuffer.h / EventQueue.h / TaskQueue.h / TaskBuffer.h / Barrier.h
+│   │   └── cmd_cuda.h                # CLI 命令声明
+│   ├── umd/                          # umd-evolution 头文件
+│   │   ├── cuda_api.hpp
+│   │   ├── module_loader.hpp
+│   │   └── ring_buffer.hpp
+│   └── shared/                       # shared 头文件
+│       ├── igpu_driver.hpp           # IGpuDriver 接口 (28→31 方法)
+│       ├── sync_primitives.hpp       # 同步原语抽象
+│       ├── memory_manager.hpp        # 内存管理器
+│       └── error_handling.hpp        # Result<T> + ErrorCode
+├── tests/                            # 测试 (按 scope 分目录)
+│   ├── test_fixture/                 # test-fixture 测试 (doctest)
+│   ├── umd/                          # umd-evolution 测试
+│   └── shared/                       # shared 测试
+├── docs/                             # 文档 (按 scope 分目录)
+│   ├── test-fixture/{adr,architecture,roadmap,archive}/
+│   ├── umd-evolution/{adr,architecture,roadmap,archive}/
+│   └── shared/{adr,research}/
+├── tools/
+│   └── docs-audit.sh                 # 文档验证脚本
+├── UsrLinuxEmu → ../../              # 符号链接，GPU 接口定义（2026-06-19 PR #6 修复路径）
 └── CMakeLists.txt
 ```
 
@@ -139,14 +174,15 @@ cd /workspace/project/UsrLinuxEmu && git diff main HEAD --stat | grep external/T
    git push origin main
    ```
 
-### 跨仓文档引用规范
+### 跨仓文档引用规范 (H-5 3-scope)
 
 | 从 → 到 | 路径深度 | 示例 |
 |--------|--------|------|
-| TaskRunner docs/adr/ → UsrLinuxEmu docs/00_adr/ | `../../../../` (4 dots) | `../../../../docs/00_adr/adr-032-...md` |
-| TaskRunner docs/archive/ → UsrLinuxEmu docs/00_adr/ | `../../../../` (4 dots) | `../../../../docs/00_adr/adr-032-...md` |
-| TaskRunner docs/adr/ → TaskRunner src/ | `../../` (2 dots) | `../../src/cuda_stub.cpp` |
-| UsrLinuxEmu docs/ → TaskRunner docs/ | `../external/TaskRunner/` | `../external/TaskRunner/docs/adr/README.md` |
+| TaskRunner `docs/{test-fixture,umd-evolution,shared}/adr/` → UsrLinuxEmu `docs/00_adr/` | `../../../../` (4 dots) | `../../../../docs/00_adr/adr-032-...md` |
+| TaskRunner `docs/{test-fixture,umd-evolution}/archive/` → UsrLinuxEmu `docs/00_adr/` | `../../../../` (4 dots) | `../../../../docs/00_adr/adr-032-...md` |
+| TaskRunner `docs/{test-fixture,umd-evolution,shared}/adr/` → TaskRunner `src/{test_fixture,umd,shared}/` | `../../` (2 dots) | `../../src/test_fixture/cuda_stub.cpp` |
+| UsrLinuxEmu `docs/` → TaskRunner `docs/` | `../external/TaskRunner/` | `../external/TaskRunner/docs/shared/adr/README.md` |
+| TaskRunner 跨 scope 引用（如 test-fixture/adr → shared/adr） | `../../shared/adr/` | `../../shared/adr/tadr-301-igpu-driver-contract.md` |
 
 ### 工作计划考虑
 

@@ -6,7 +6,7 @@ STATUS: ACCEPTED
 # TaskRunner 数据流图
 
 > **最后更新**: 2026-06-23（H-4.5 docs governance cleanup）
-> **关联**: [current.md](./current.md), [TADR-005](../adr/tadr-005-h2-5-igpu-driver-consumer-lens.md)
+> **关联**: [current.md](./current.md), [TADR-005](../adr/tadr-102-igpu-driver.md)
 
 ## CUDA Kernel Launch 完整链路
 
@@ -137,7 +137,7 @@ gpgpu_device.cpp:260-262:
   }
 ```
 
-详见 [TADR-006](../adr/tadr-006-h3-phase2-consumer-lens.md) §Consumer-Lens 4 项实施细节。
+详见 [TADR-006](../adr/tadr-103-h3-phase2.md) §Consumer-Lens 4 项实施细节。
 
 ---
 

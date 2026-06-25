@@ -1,4 +1,5 @@
-// SCOPE: TEST-FIXTURE
+// SCOPE: SHARED
+// STATUS: ACCEPTED
 /**
  * memory_manager.cpp - GPU 内存管理器实现
  */

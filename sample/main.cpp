@@ -1,3 +1,6 @@
+// SCOPE: TEST-FIXTURE
+// STATUS: ACCEPTED
+// sample: doctest example
 #define DOCTEST_CONFIG_IMPLEMENT
 #include "test_fixture/TaskRunner.h"
 #include <iostream>

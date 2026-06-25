@@ -1,4 +1,5 @@
-// SCOPE: TEST-FIXTURE
+// SCOPE: SHARED
+// STATUS: ACCEPTED
 /**
  * sync_primitives.cpp - 分层同步原语实现
  */

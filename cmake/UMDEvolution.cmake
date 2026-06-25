@@ -7,6 +7,7 @@ add_library(taskrunner_umd_stub SHARED
     src/umd/ring_buffer.cpp
 )
 target_include_directories(taskrunner_umd_stub PUBLIC
+    ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
 )
 target_link_libraries(taskrunner_umd_stub PUBLIC taskrunner_shared)

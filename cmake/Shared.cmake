@@ -7,6 +7,7 @@ add_library(taskrunner_shared STATIC
     src/shared/sync_primitives.cpp
 )
 target_include_directories(taskrunner_shared PUBLIC
+    ${CMAKE_SOURCE_DIR}
     ${CMAKE_SOURCE_DIR}/include
 )
 target_link_libraries(taskrunner_shared PUBLIC doctest::doctest)

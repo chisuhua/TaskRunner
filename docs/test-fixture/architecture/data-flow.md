@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+---
+
 # TaskRunner 数据流图
 
 > **最后更新**: 2026-06-23（H-4.5 docs governance cleanup）

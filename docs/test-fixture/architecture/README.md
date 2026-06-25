@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+---
+
 # docs/architecture/ — TaskRunner 整体架构目录
 
 > **范围**: TaskRunner 用户态 CUDA/Vulkan API 兼容层 + Runtime Stub

@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+---
+
 # Phase 1.5 — S3.5 fence_id + S3.1 va_space_handle
 
 > **状态**: ✅ 完成 (2026-06-17)

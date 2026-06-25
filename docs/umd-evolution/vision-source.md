@@ -1,3 +1,8 @@
+---
+SCOPE: UMD-EVOLUTION
+STATUS: DEPRECATED
+---
+
  下面是本项目的架构文档，规划文档，请在docs/目录下创建对应内容的更清晰的文档，根据规划给出开发计划文档，我们讨论完开发计划文档后再进行一步一步实施。
 
 1. **双运行时兼容**：同时支持 CUDA Runtime 和 Vulkan Runtime API

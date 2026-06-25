@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: DEPRECATED
+---
+
 > **⚠️ DEPRECATED 2026-06-23（H-4.5 docs governance cleanup）**
 >
 > 本决策框架的 D1-D4 已 capture 到独立 TADR：

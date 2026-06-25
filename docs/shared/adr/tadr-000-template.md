@@ -1,3 +1,8 @@
+---
+SCOPE: SHARED
+STATUS: ACCEPTED
+---
+
 # TADR-NNN: <Title>
 
 **状态**: ✅ Accepted / 🔄 Proposed / ⏸️ Deferred / 🚫 Rejected

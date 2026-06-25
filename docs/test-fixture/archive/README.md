@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: DEPRECATED
+---
+
 # docs/archive/ — 历史快照与废弃文档
 
 > **最后更新**: 2026-06-23（H-4.5 docs governance cleanup 建立归档区）

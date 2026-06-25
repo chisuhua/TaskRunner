@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: DEPRECATED
+---
+
 # Phase 1 Week 1 实施计划
 
 **周期**: 2026-04-07 ~ 2026-04-14  

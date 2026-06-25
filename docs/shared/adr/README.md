@@ -1,3 +1,8 @@
+---
+SCOPE: SHARED
+STATUS: ACCEPTED
+---
+
 # TaskRunner Architecture Decision Records (TADR)
 
 > **范围**: TaskRunner 用户态 CUDA/Vulkan API 兼容层 + Runtime Stub

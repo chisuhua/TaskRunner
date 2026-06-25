@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: DEPRECATED
+---
+
 > **⚠️ DEPRECATED 2026-06-23（H-4.5 docs governance cleanup）**
 >
 > 本文件为 v0.1 提案（680 行），从未作为类实施：

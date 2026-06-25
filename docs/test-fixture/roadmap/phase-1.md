@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+---
+
 # Phase 1 — CUDA Runtime 兼容 MVP
 
 > **状态**: ✅ 完成 (2026-04-29)

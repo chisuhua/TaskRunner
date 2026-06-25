@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+---
+
 # Phase 2 — IGpuDriver 抽象 + Phase 2 Lifecycle
 
 > **状态**: ✅ 完成 (2026-06-23)

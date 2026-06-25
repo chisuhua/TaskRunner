@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+---
+
 # TaskRunner 实施路径图 (Implementation Roadmap)
 
 > **范围**: TaskRunner 用户态 CUDA/Vulkan API 兼容层 + Runtime Stub

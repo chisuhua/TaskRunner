@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: DEPRECATED
+---
+
 > **⚠️ DEPRECATED 2026-06-23（H-4.5 docs governance cleanup）**
 >
 > 本文件为 v1.2 详细设计规范（688 行），被 H-2.5/H-3 超越：

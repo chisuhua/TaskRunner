@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+---
+
 # Retrospective - 实际实施路径 vs v0.1 提案 Deviation
 
 > **最后更新**: 2026-06-23（H-4.5 docs governance cleanup）

@@ -1,3 +1,8 @@
+---
+SCOPE: TEST-FIXTURE
+STATUS: ACCEPTED
+---
+
 # Phase 3 - Multi-GPU / P2P (Deferred)
 
 > **状态**: Deferred (待 H-7 ADR 完成)

@@ -302,6 +302,41 @@ public:
      */
     virtual int destroy_queue(uint64_t queue_handle) = 0;
 
+    // ============================================================
+    // H-3.5 生命周期扩展 (3, 非纯虚, 默认 no-op/success)
+    // ============================================================
+    //
+    // 这 3 个方法从 CudaStub-specific 行为上移到 IGpuDriver 接口,
+    // 让 3 个实现 (GpuDriverClient / CudaStub / MockGpuDriver) 各自 override.
+    // 默认实现允许现有代码零修改 (向后兼容).
+    //
+    // 设计理由 (TADR-109 H-3.5 follow-up):
+    // - 之前 CudaScheduler 通过 dynamic_cast<CudaStub*> 调用 CudaStub-specific
+    //   set_stub_mode/initialize/shutdown (src/test_fixture/cuda_scheduler.cpp:45, 65)
+    // - 上移到 IGpuDriver 后, CudaScheduler 改用 driver_->set_stub_mode/initialize/shutdown
+    //   统一抽象调用 (删除 dynamic_cast 抽象泄漏)
+    //
+    // 4 个 legacy dynamic_cast (mem_alloc/memcpy_*/launch_kernel) 保留,
+    // 见 design.md Decision 1 理由 (这些是 CudaStub-only CUDA Driver API 路径,
+    // 不适合上移到 IGpuDriver 抽象).
+
+    /**
+     * @brief 设置 stub 模式 (仅 CudaStub 使用, GpuDriverClient/MockGpuDriver 默认 no-op)
+     * @param stub_mode true = stub 模式 (模拟, 不真实计算), false = 真实模式
+     */
+    virtual void set_stub_mode(bool stub_mode) {}
+
+    /**
+     * @brief 初始化 driver 内部状态
+     * @return 0 成功, -1 失败
+     */
+    virtual int initialize() { return 0; }
+
+    /**
+     * @brief 关闭 driver 释放资源
+     */
+    virtual void shutdown() {}
+
     /**
      * @brief 虚析构函数 (允许通过基类指针安全 delete)
      */

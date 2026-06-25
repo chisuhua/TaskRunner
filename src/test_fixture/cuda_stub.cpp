@@ -28,20 +28,16 @@ CudaStub::~CudaStub() {
     shutdown();
 }
 
-CudaResult CudaStub::initialize() {
+int CudaStub::initialize() {
     if (stub_mode_) {
-        // Stub 模式：无需真实初始化
         initialized_ = true;
-        return CudaResult::SUCCESS;
+        return 0;
     }
 
-    // Phase 2: 真实 CUDA 初始化
-    // CUresult cuInit(unsigned int Flags);
-    // CUresult cuCtxCreate(CUcontext *pctx, unsigned int flags, CUdevice dev);
-
-    // 暂时返回 SUCCESS（即使没有真实 GPU）
+    // Phase 2: 真实 CUDA 初始化 (CUresult cuInit + cuCtxCreate)
+    // 当前 stub 模式占位实现, 无真实 GPU 时也返回 success
     initialized_ = true;
-    return CudaResult::SUCCESS;
+    return 0;
 }
 
 void CudaStub::shutdown() {

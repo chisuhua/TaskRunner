@@ -105,8 +105,10 @@ public:
     CudaStub& operator=(const CudaStub&) = delete;
 
     // ========== 既有 CUDA Driver API 方法（保留，调用方零修改）==========
-    CudaResult initialize();
-    void shutdown();
+    // H-3.5: initialize() 和 shutdown() 现在 override IGpuDriver 接口方法
+    // 返回类型从 CudaResult 改为 int (与 IGpuDriver 接口签名一致)
+    int initialize();
+    void shutdown() override;
     bool is_initialized() const { return initialized_; }
 
     CudaResult mem_alloc(size_t size, uint64_t* device_ptr);
@@ -122,7 +124,8 @@ public:
     CudaResult query_event(uint64_t event_id, int* signaled);
     CudaResult destroy_event(uint64_t event_id);
 
-    void set_stub_mode(bool enable) { stub_mode_ = enable; }
+    // H-3.5: override IGpuDriver 接口方法 (上移到抽象层)
+    void set_stub_mode(bool enable) override { stub_mode_ = enable; }
     bool is_stub_mode() const { return stub_mode_; }
 
     // ============================================================

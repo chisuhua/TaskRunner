@@ -201,15 +201,34 @@ TEST_CASE("H-2.5 Bonus: MockGpuDriver error injection") {
 }
 
 // ============================================================================
-// Bonus: H-3 Phase 2 占位 GpuDriverClient 抛异常
+// H-3.5: GpuDriverClient guard verification (return 0/-1, no throw, no log)
 // ============================================================================
+//
+// Per H-3 spec (gpu-phase2-management capability L14-29, L52-57, L70-73, L93-96, L120-123):
+// - handle==0 is H-1 sentinel programming error
+// - Methods return 0/-1 (NOT throw, NOT log)
+// - guard rejected at semantic layer
 
-TEST_CASE("H-2.5 Bonus: GpuDriverClient H-3 placeholders throw") {
+TEST_CASE("H-3.5: GpuDriverClient guards return 0/-1, no throw") {
     GpuDriverClient client;
 
-    CHECK_THROWS(client.create_va_space(0));
-    CHECK_THROWS(client.destroy_va_space(0));
-    CHECK_THROWS(client.register_gpu(0, 0, 0));
-    CHECK_THROWS(client.create_queue(0, 0, 0, 0));
-    CHECK_THROWS(client.destroy_queue(0));
+    // create_va_space(0): no input guard (flags is the only param); test with valid flags
+    CHECK_NOTHROW(client.create_va_space(0));
+    CHECK(client.create_va_space(0) == 0);  // is_open() guard returns 0 (no device opened)
+
+    // destroy_va_space(0): handle==0 guard returns -1
+    CHECK_NOTHROW(client.destroy_va_space(0));
+    CHECK(client.destroy_va_space(0) == -1);
+
+    // register_gpu(0, ...): va_space_handle==0 guard returns -1
+    CHECK_NOTHROW(client.register_gpu(0, 0, 0));
+    CHECK(client.register_gpu(0, 0, 0) == -1);
+
+    // create_queue(0, ...): va_space_handle==0 guard returns 0
+    CHECK_NOTHROW(client.create_queue(0, 0, 0, 0));
+    CHECK(client.create_queue(0, 0, 0, 0) == 0);
+
+    // destroy_queue(0): handle==0 guard returns -1
+    CHECK_NOTHROW(client.destroy_queue(0));
+    CHECK(client.destroy_queue(0) == -1);
 }

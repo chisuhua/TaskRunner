@@ -121,9 +121,55 @@ e292831 feat(cli): add cuda_va_space + cuda_queue subcommands for H-3 Phase 2
 - `va_space_map_` + `queue_map_` existence tracking（用于 destroy 校验）
 - `mock_state_mutex_` 保护 map
 
-### H-3.5 Follow-up 提示
+## H-3.5 Completion（2026-06-25）
 
-⚠️ **Mock-behavior deviation T6-T9**：`MockGpuDriver` 在 H-2.5 frozen 占位不实现 guards，导致 4 个 guard test 实际验证 mock 行为而非 guard rejection。H-3.5 follow-up 应加 **CudaStub-based guard tests**（关闭偏差）。
+H-3.5 follow-up 闭环：3 项遗留问题已 shippable。
+
+### 1. test_gpu_architecture 回归修复
+
+`tests/test_fixture/test_gpu_architecture.cpp:207-214` 的 `CHECK_THROWS` 期望与 H-3 spec L14-29 + L52-57 + L70-73 + L93-96 + L120-123 矛盾（spec 明确 handle==0 返回 0/-1，**不**抛异常）。已更新为 `CHECK_NOTHROW + CHECK(result == 0/-1)`，测试名改为 `H-3.5: GpuDriverClient guards return 0/-1, no throw`。11/11 PASS。
+
+### 2. CudaScheduler 抽象泄漏修复
+
+`src/test_fixture/cuda_scheduler.cpp:45, 65` 共 2 处 `dynamic_cast<CudaStub*>(driver_)` 已删除。改用 IGpuDriver 抽象调用：
+- `driver_->set_stub_mode(stub_mode)` + `driver_->initialize()`
+- `driver_->shutdown()`
+
+4 处 legacy dynamic_cast（line 101, 147, 188, 227, 269，对应 `mem_alloc` / `memcpy_*` / `launch_kernel`）**保留**（这些是 CudaStub-only CUDA Driver API 路径，不适合上移到 IGpuDriver 抽象）。
+
+IGpuDriver 接口扩展 3 个 lifecycle 方法（28 → 31）：
+- `set_stub_mode(bool)` — 默认 no-op（CudaStub override，GpuDriverClient/MockGpuDriver 用默认）
+- `initialize()` — 默认返回 0（CudaStub override 返回真实初始化结果）
+- `shutdown()` — 默认 no-op（CudaStub override 清理 Event）
+
+### 3. MockGpuDriver guard 偏差修复
+
+`tests/test_fixture/mock_gpu_driver.hpp` 的 5 个 Phase 2 方法添加 guards（与 GpuDriverClient/CudaStub 行为一致）：
+- `create_va_space` → 检查 `is_open_`（新增状态跟踪）
+- `destroy_va_space(0)` → 返回 -1
+- `register_gpu(0, ...)` → 返回 -1
+- `create_queue(0, ...)` → 返回 0
+- `destroy_queue(0)` → 返回 -1
+
+`tests/test_fixture/test_gpu_phase2.cpp:115-195` 的 T6-T9 已更新，**真正**验证 guard rejection 而非 mock canned value。12/12 PASS。
+
+### 关联文件 / Commit 链
+
+- `include/shared/igpu_driver.hpp:305-338` — 3 lifecycle 方法
+- `include/test_fixture/cuda_stub.hpp` — `set_stub_mode/initialize/shutdown` 加 override
+- `include/test_fixture/cuda_stub.cpp:31-43` — `initialize()` 返回 int
+- `tests/test_fixture/mock_gpu_driver.hpp` — is_open_ tracking + 5 guards + 3 lifecycle
+- `src/test_fixture/cuda_scheduler.cpp:35-50, 62-65` — 删除 2 dynamic_cast
+- `tests/test_fixture/test_gpu_architecture.cpp:203-232` — 回归修复
+- `tests/test_fixture/test_gpu_phase2.cpp:112-167` — T6-T9 更新
+
+### 关联 Change
+
+`openspec/changes/archive/2026-06-25-h3-5-followup-test-fixture-cleanup/`
+
+### 关联 TADR
+
+`docs/test-fixture/adr/tadr-109-igpu-driver-uniform-scheduling.md`（跟踪 IGpuDriver 接口扩展 3 方法决策）
 
 ## Consequences
 
@@ -132,10 +178,13 @@ e292831 feat(cli): add cuda_va_space + cuda_queue subcommands for H-3 Phase 2
 - ✅ Phase 2 lifecycle API 完整（5 方法覆盖 VA Space + Queue）
 - ✅ Sentinel guard + errno 日志 + 业务校验 三重保护
 - ✅ 12/12 doctest cases pass + CLI smoke test 通过
+- ✅ test_gpu_architecture 回归修复 11/11 PASS
+- ✅ CudaScheduler 抽象泄漏修复（2/6 dynamic_cast 删除）
+- ✅ MockGpuDriver guard 与 GpuDriverClient/CudaStub 一致
 
 ### 负面 / 风险
 
-- ⚠️ MockGpuDriver 偏差（T6-T9），需 H-3.5 修正
+- ⚠️ 4 处 legacy dynamic_cast 保留（mem_alloc/memcpy_*/launch_kernel），待未来 H-3.6+ 决定是否上移到 IGpuDriver
 - ⚠️ CLI top-level `--help` 不更新（`cmd_buffer_v2.cpp` out of scope，`cuda_help` 子命令正常工作）
 
 ## 跨引用

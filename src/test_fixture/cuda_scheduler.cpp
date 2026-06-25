@@ -42,17 +42,16 @@ int CudaScheduler::initialize(bool stub_mode) {
         owns_driver_ = true;
     }
 
-    if (auto* stub = dynamic_cast<async_task::gpu::CudaStub*>(driver_)) {
-        stub->set_stub_mode(stub_mode);
-        auto result = stub->initialize();
-        if (result != async_task::gpu::CudaResult::SUCCESS) {
-            if (owns_driver_) {
-                delete driver_;
-                driver_ = nullptr;
-                owns_driver_ = false;
-            }
-            return -EIO;
+    // H-3.5: 通过 IGpuDriver 抽象调用 (删除 dynamic_cast 抽象泄漏)
+    driver_->set_stub_mode(stub_mode);
+    int result = driver_->initialize();
+    if (result != 0) {
+        if (owns_driver_) {
+            delete driver_;
+            driver_ = nullptr;
+            owns_driver_ = false;
         }
+        return -EIO;
     }
 
     initialized_ = true;
@@ -62,9 +61,8 @@ int CudaScheduler::initialize(bool stub_mode) {
 void CudaScheduler::shutdown() {
     if (!initialized_) return;
 
-    if (auto* stub = dynamic_cast<async_task::gpu::CudaStub*>(driver_)) {
-        stub->shutdown();
-    }
+    // H-3.5: 通过 IGpuDriver 抽象调用 (删除 dynamic_cast 抽象泄漏)
+    driver_->shutdown();
 
     if (owns_driver_ && driver_) {
         delete driver_;

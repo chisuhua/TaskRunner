@@ -4,18 +4,14 @@
  *
  * 测试 5 Phase 2 ioctl wrapper 方法 via IGpuDriver* DI 注入 (MockGpuDriver):
  *   T1-T5:    Success path (5)
- *   T6-T9:    Mock 行为验证 (4) — mock 在 closed / sentinel 输入下的实际行为
+ *   T6-T9:    Guard rejection verification (4) — MockGpuDriver guard 与 GpuDriverClient/CudaStub 一致 (H-3.5)
  *   T10:      R2 mapping contract (1) — stream_id = LOW32(queue_handle)
  *   T10b/c:   Bonus — R2 契约违反场景 (2)
  *
- * MockGpuDriver 已知 limitation (H-2.5 frozen, 见 tests/mock_gpu_driver.hpp:244-273):
- *   - 不模拟 GpuDriverClient::create_va_space 的 is_open() guard
- *   - 不模拟 GpuDriverClient/CudaStub 的 handle==0 / va_space==0 sentinel guard
- *   - 仅记录调用 + 返回 canned value
- *
- * 因此 T6-T9 验证的是 mock 的实际行为 (mock 会被调用, 返回 canned value),
- * 而非真实驱动的 guard 行为. 真实 guard 测试由 CudaStub 行为保证 (已通过
- * cuda_stub.cpp:417-503 实现). Mock 的 guard 覆盖属于后续 H-3.5+ 工作.
+ * H-3.5 change: T6-T9 之前验证 mock 的实际行为 (mock 会被调用, 返回 canned value).
+ * 现在改为验证 guard rejection (MockGpuDriver 5 个 Phase 2 方法添加 handle==0 / va_space==0
+ * guards, 行为与 GpuDriverClient/CudaStub 一致). 真实 guard 测试由 GpuDriverClient/CudaStub
+ * 实现保证 (已通过 H-3 spec L14-29, L52-57, L70-73, L93-96, L120-123).
  *
  * 使用 doctest 测试框架
  */
@@ -36,6 +32,7 @@ using taskrunner::CudaScheduler;
 
 TEST_CASE("create_va_space_returns_nonzero_handle") {
     MockGpuDriver mock;
+    mock.open();  // H-3.5: is_open guard requires open() first
     mock.set_canned_return("create_va_space", 1);
     CudaScheduler scheduler(&mock);
 
@@ -114,35 +111,29 @@ TEST_CASE("destroy_queue_succeeds_with_valid_handle") {
 }
 
 // ============================================================================
-// T6: create_va_space 在 is_open=false 注入时的 mock 行为
+// T6: create_va_space guard verification (H-3.5)
 // ============================================================================
 //
-// MockGpuDriver::create_va_space() (mock_gpu_driver.hpp:244-248) 不检查 is_open().
-// 真实 GpuDriverClient::create_va_space() (design.md §5) 会先检查 is_open() 并返回 0.
-// Mock 不模拟此 guard, 因此 mock 仍会被调用并返回 canned default (0).
-// 本测试记录 mock 实际行为; 真实 driver 的 guard 由 GpuDriverClient 实现保证.
+// MockGpuDriver should now check is_open_ state (consistent with GpuDriverClient).
+// When is_open_==false, create_va_space returns 0 without recording the call.
 
 TEST_CASE("create_va_space_guard_when_closed") {
     MockGpuDriver mock;
-    // 文档意图: 模拟 "is_open=false" 状态. 但 mock 实际不检查 is_open (mock_gpu_driver.hpp:244-248),
-    // 因此此 inject_error 在本测试路径中无观测效果, 仅记录 mock 实际行为.
-    mock.inject_error("is_open", true);
+    mock.inject_error("is_open", true);  // Simulate closed driver state
     CudaScheduler scheduler(&mock);
 
     uint64_t handle = scheduler.driver()->create_va_space(0);
 
-    CHECK(handle == 0);
-    CHECK(mock.call_count("create_va_space") == 1);
-    CHECK(mock.call_count("is_open") == 0);
+    CHECK(handle == 0);  // Guard returns 0 (not canned default)
+    CHECK(mock.call_count("is_open") == 1);  // is_open was checked
 }
 
 // ============================================================================
-// T7: destroy_va_space 在 handle==0 时的 mock 行为
+// T7: destroy_va_space guard verification (H-3.5)
 // ============================================================================
 //
-// MockGpuDriver::destroy_va_space() (mock_gpu_driver.hpp:250-254) 不检查 handle==0.
-// 真实 GpuDriverClient/CudaStub 的 destroy_va_space(0) 返回 -1 (sentinel guard).
-// Mock 不模拟此 guard, 因此 mock 仍会被调用并返回 0.
+// MockGpuDriver should now reject handle==0 (consistent with GpuDriverClient/CudaStub).
+// Per H-3 spec L52-57: destroy_va_space(0) returns -1, no log.
 
 TEST_CASE("destroy_va_space_guard_when_handle_zero") {
     MockGpuDriver mock;
@@ -150,18 +141,15 @@ TEST_CASE("destroy_va_space_guard_when_handle_zero") {
 
     int ret = scheduler.driver()->destroy_va_space(0);
 
-    CHECK(ret == 0);
-    CHECK(mock.call_count("destroy_va_space") == 1);
-    CHECK(mock.history().back().args_u64[0] == 0);
+    CHECK(ret == -1);  // Guard returns -1 (not canned default 0)
 }
 
 // ============================================================================
-// T8: register_gpu 在 va_space==0 时的 mock 行为
+// T8: register_gpu guard verification (H-3.5)
 // ============================================================================
 //
-// MockGpuDriver::register_gpu() (mock_gpu_driver.hpp:256-260) 不检查 va_space==0.
-// 真实 GpuDriverClient/CudaStub 的 register_gpu(0, ...) 返回 -1 (sentinel guard).
-// Mock 不模拟此 guard, 因此 mock 仍会被调用并返回 0.
+// MockGpuDriver should now reject va_space_handle==0 (consistent with GpuDriverClient/CudaStub).
+// Per H-3 spec L70-73: register_gpu(0, ...) returns -1, no log.
 
 TEST_CASE("register_gpu_guard_when_va_space_zero") {
     MockGpuDriver mock;
@@ -169,20 +157,15 @@ TEST_CASE("register_gpu_guard_when_va_space_zero") {
 
     int ret = scheduler.driver()->register_gpu(0, 0, 0);
 
-    CHECK(ret == 0);
-    CHECK(mock.call_count("register_gpu") == 1);
-    CHECK(mock.history().back().args_u64[0] == 0);
-    CHECK(mock.history().back().args_u64[1] == 0);
-    CHECK(mock.history().back().args_u64[2] == 0);
+    CHECK(ret == -1);  // Guard returns -1 (not canned default 0)
 }
 
 // ============================================================================
-// T9: create_queue 在 va_space==0 时的 mock 行为
+// T9: create_queue guard verification (H-3.5)
 // ============================================================================
 //
-// MockGpuDriver::create_queue() (mock_gpu_driver.hpp:262-267) 不检查 va_space==0.
-// 真实 GpuDriverClient/CudaStub 的 create_queue(0, ...) 返回 0 (sentinel guard).
-// Mock 不模拟此 guard, 因此 mock 仍会被调用并返回 canned default (0).
+// MockGpuDriver should now reject va_space_handle==0 (consistent with GpuDriverClient/CudaStub).
+// Per H-3 spec L93-96: create_queue(0, ...) returns 0, no log.
 
 TEST_CASE("create_queue_guard_when_va_space_zero") {
     MockGpuDriver mock;
@@ -190,9 +173,7 @@ TEST_CASE("create_queue_guard_when_va_space_zero") {
 
     uint64_t handle = scheduler.driver()->create_queue(0, 0, 50, 4096);
 
-    CHECK(handle == 0);
-    CHECK(mock.call_count("create_queue") == 1);
-    CHECK(mock.history().back().args_u64[0] == 0);
+    CHECK(handle == 0);  // Guard returns 0
 }
 
 // ============================================================================

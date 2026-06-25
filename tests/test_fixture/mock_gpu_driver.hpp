@@ -57,20 +57,30 @@ public:
     int open() override {
         record("open");
         if (injected_errors_["open"]) return -1;
+        is_open_ = true;
         return canned_int("open", 0);
     }
 
     int close() override {
         record("close");
         if (injected_errors_["close"]) return -1;
+        is_open_ = false;
         return canned_int("close", 0);
     }
 
     bool is_open() const override {
         record("is_open");
         if (injected_errors_["is_open"]) return false;
-        return true;
+        return is_open_;
     }
+
+    // ============================================================
+    // H-3.5 lifecycle extensions (3)
+    // ============================================================
+
+    void set_stub_mode(bool mode) override { stub_mode_ = mode; }
+    int initialize() override { initialized_ = true; return 0; }
+    void shutdown() override { initialized_ = false; }
 
     // ============================================================
     // FD 访问 (1)
@@ -240,21 +250,24 @@ public:
     }
 
     // ============================================================
-    // H-3 Phase 2 占位 (5)
+    // H-3 Phase 2 (5) — with H-3.5 guards
     // ============================================================
     uint64_t create_va_space(uint32_t flags) override {
+        if (!is_open()) return 0;  // H-3.5: is_open guard
         record("create_va_space", {flags});
         if (injected_errors_["create_va_space"]) return 0;
         return canned_u64("create_va_space", 0);
     }
 
     int destroy_va_space(uint64_t va_space_handle) override {
+        if (va_space_handle == 0) return -1;  // H-3.5: handle==0 guard
         record("destroy_va_space", {va_space_handle});
         if (injected_errors_["destroy_va_space"]) return -1;
         return 0;
     }
 
     int register_gpu(uint64_t va_space_handle, uint32_t gpu_id, uint32_t flags) override {
+        if (va_space_handle == 0) return -1;  // H-3.5: va_space==0 guard
         record("register_gpu", {va_space_handle, gpu_id, flags});
         if (injected_errors_["register_gpu"]) return -1;
         return 0;
@@ -262,12 +275,14 @@ public:
 
     uint64_t create_queue(uint64_t va_space_handle, uint32_t queue_type,
                           uint32_t priority, uint64_t ring_buffer_size) override {
+        if (va_space_handle == 0) return 0;  // H-3.5: va_space==0 guard
         record("create_queue", {va_space_handle, queue_type, priority, ring_buffer_size});
         if (injected_errors_["create_queue"]) return 0;
         return canned_u64("create_queue", 0);
     }
 
     int destroy_queue(uint64_t queue_handle) override {
+        if (queue_handle == 0) return -1;  // H-3.5: handle==0 guard
         record("destroy_queue", {queue_handle});
         if (injected_errors_["destroy_queue"]) return -1;
         return 0;
@@ -346,6 +361,11 @@ private:
     mutable std::atomic<uint64_t> next_handle_{1};
     mutable std::atomic<uint64_t> next_fence_id_{1};
     uint64_t current_va_space_handle_{0};
+
+    // H-3.5: state tracking for lifecycle methods + guards
+    bool is_open_{false};
+    bool stub_mode_{false};
+    bool initialized_{false};
 };
 
 }  // namespace gpu

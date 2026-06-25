@@ -166,6 +166,82 @@ PR 2 (可选，错误码语义化):
 
 ---
 
+### H-3.8: Issue #1 主动修复协调（2026-06-26 启动）
+
+**触发原因**: H-3.6/H-3.7 完成后，按优先级顺序 #3 → #2 → #1，Issue #1 (stream_id u32 ABI 类型不匹配) 进入协调阶段。这是 H-7 deferred 跟踪的最后一个未解决 issue。
+
+**工作范围**:
+- openspec change: [`2026-06-26-h3-8-issue-1-coordination`](../../../../openspec/changes/2026-06-26-h3-8-issue-1-coordination/) (6 文件完整)
+- GitHub issue 草稿: [`docs/test-fixture/coordination/h7-issue-1-github-issue-draft-2026-06-26.md`](../coordination/h7-issue-1-github-issue-draft-2026-06-26.md)
+- 跨仓 PR 模板: [`docs/07-integration/cross-repo-h7-template.md`](../../07-integration/cross-repo-h7-template.md) (已更新 ABI 拓宽专章)
+- 调研文档: [`docs/shared/research/gpu-queue-id-patterns-2026-06-26.md`](../../shared/research/gpu-queue-id-patterns-2026-06-26.md)
+- 测试设计文档:
+  - [`docs/test-fixture/research/u64-boundary-test-design-2026-06-26.md`](../research/u64-boundary-test-design-2026-06-26.md)
+  - [`docs/test-fixture/research/abi-backward-compat-test-design-2026-06-26.md`](../research/abi-backward-compat-test-design-2026-06-26.md)
+
+**提议方案**（待 UsrLinuxEmu owner 评估）:
+
+PR 1 (最小化 ABI 拓宽 + 向后兼容):
+```diff
+// gpu_ioctl.h:43 (gpu_pushbuffer_args 结构体)
+struct gpu_pushbuffer_args {
+    __u64 entries_addr;
+    __u32 count;
+-   __u32 stream_id;              // ❌ u32（截断）
++   __u64 stream_id;              // ✅ u64（完整 handle）
++   __u32 stream_id_compat;       // ⚠️ deprecated alias（旧调用方使用）
++   __u32 flags_extended;         // ✅ 新 flag 空间（reserved）
+    __u64 va_space_handle;
+    __u64 reserved[2];
+};
+
+// gpgpu_device.cpp:262
+- uint64_t effective_id = static_cast<uint64_t>(args->stream_id);  // R2 mapping 截断
++ uint64_t effective_id = args->stream_id;                        // 直接 u64
++ if (effective_id == 0 && args->stream_id_compat != 0) {
++     // 向后兼容：旧调用方未设置 stream_id，但设置了 stream_id_compat
++     effective_id = static_cast<uint64_t>(args->stream_id_compat);
++ }
+```
+
+PR 2 (6 月后，2026-12-26+，废弃 alias 字段清理):
+- 移除 `stream_id_compat` 字段
+- 移除 `gpgpu_device.cpp` 中 backward compat fallback 逻辑
+- 更新所有 caller（kernel module + userspace helper）
+
+**实施分工**:
+- **TaskRunner 端 (本仓)**: 协调 + 文档 + 测试设计 (DONE 2026-06-26)
+- **UsrLinuxEmu 端 (外部仓)**: 实际代码修改 (📋 待 owner 启动)
+
+**调研结论** (bg_5826c044):
+- AMD ROCm KFD: `HSA_QUEUEID` = `struct queue*` (u64 指针，无截断)
+- AMD ROCm HSA Runtime: `hsa_queue_t*` (u64 指针，无截断)
+- NVIDIA CUDA: `CUstream` = `CUstream_st*` (u64 指针，无截断)
+- NVIDIA UVM: `uvm_va_block_region_t` (u64 packed handle，无截断)
+- **TaskRunner 当前**: `__u32` ABI + `u64` 内部 = **反模式**
+- **推荐**: `__u64` ABI + `deprecated alias` = 与 AMD/NVIDIA 生态一致
+
+**验证状态**: ⏸️ 功能修复待 UsrLinuxEmu owner 实施 (H-3.8 协调阶段)
+
+**备注**: 
+- `flags_extended` 字段不定义 flag 语义（reserved for future use，PR 3 范围）
+- 6 月过渡期从 PR 1 merged 开始计算（2026-06-26 ~ 2026-12-26）
+- 生产硬上限从 ~40 亿提升到 2^64（理论无限）
+
+**跨仓协议**: 按 [ADR-035 §Rule 5.1](../../../../docs/00_adr/adr-035-governance-policy.md) 4 步流程，详见跨仓 PR 模板。
+
+**预期时间表**:
+- Day 1-3: TaskRunner 端协调文档 (DONE 2026-06-26)
+- Day 4-7: UsrLinuxEmu owner 评估 + 实施 PR 1 (📋 待启动)
+- Day 8-10: 跨仓 submodule bump + tadr-105 状态更新 (⏸️ 待 PR 1 merged)
+
+**预期产出**:
+- ⏸️ Issue #1 修复完成，状态从 ⏸️ → ✅ Accepted
+- ⏸️ H-7 deferred 3 issues 全部解决
+- ⏸️ 生产硬上限消除（u64 handle 支持）
+
+---
+
 ## Consumer-Lens
 
 ### TaskRunner 侧的注册点
@@ -184,17 +260,17 @@ Phase 3（Multi-GPU / P2P）需先解决 Issue #1（u32 → u64 拓宽）和 Iss
 
 ## Consequences
 
-### Current (H-3 已 shippable，R2 mapping 工作)
+### Current (H-3.8 协调阶段，H-3/3.5/3.6/3.7 已 shippable)
 
 - ✅ TaskRunner 5 Phase 2 方法正常工作（12/12 doctest cases pass）
 - ✅ CLI cuda_va_space / cuda_queue 工作
 - ✅ Issue #3 已修复（bf8192f + 09ae1b0）
 - ✅ Issue #2 已修复（392a496: GpuQueueEmu 抽象层委托）
-- ⏸️ Issue #1 待协调（H-3.8 后续）
+- ⏸️ Issue #1 协调阶段（H-3.8 2026-06-26 启动）
 
-### Deferred (H-3.8 触发时)
+### Deferred (H-3.8 协调阶段，PR 1 实施中)
 
-- ⏸️ Issue #1 修复需要 ABI 变更（u32 → u64 stream_id）— H-3.8 协调阶段
+- ⏸️ Issue #1 ABI 拓宽需要 UsrLinuxEmu owner 实际代码修改（u32 → u64 + deprecated alias）— H-3.8 协调阶段，PR 1 待 owner 评估
 
 ### Resolved (H-3.6/H-3.7 已完成)
 
@@ -203,7 +279,7 @@ Phase 3（Multi-GPU / P2P）需先解决 Issue #1（u32 → u64 拓宽）和 Iss
 
 ### Mitigation Until Fix
 
-- 📚 **Issue #1**: 监控 `next_queue_handle_`，接近 `UINT32_MAX` 时强制重启 service
+- 📚 **Issue #1**: 监控 `next_queue_handle_`，接近 `UINT32_MAX` 时强制重启 service（H-3.8 协调阶段，临时措施）
 - ✅ **Issue #2**: 已修复（392a496），无需 mitigation
 - ✅ **Issue #3**: 已修复（bf8192f + 09ae1b0），无需 mitigation
 
@@ -215,4 +291,4 @@ Phase 3（Multi-GPU / P2P）需先解决 Issue #1（u32 → u64 拓宽）和 Iss
 
 ---
 
-**最后更新**: 2026-06-26（H-3.6 完成 §Issue #3 → Accepted，H-3.7 完成 §Issue #2 → Accepted，H-3.8 待启动 §Issue #1 协调）
+**最后更新**: 2026-06-26（H-3.6 完成 §Issue #3 → Accepted，H-3.7 完成 §Issue #2 → Accepted，H-3.8 启动 §Issue #1 协调阶段）

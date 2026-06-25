@@ -41,24 +41,24 @@ Cross-Repo: TaskRunner submodule bump required
 - `sim`: 仿真层
 - `hal`: HAL 抽象层
 
-**示例**（H-3.6 Issue #3 PR 1）:
+**示例**（H-3.8 Issue #1 PR 1）:
 ```
-refactor(gpu): use unordered_set for VASpace::attached_queues (H-7 Issue #3)
+feat(gpu): widen stream_id from u32 to u64 + add deprecated alias (H-7 Issue #1)
 
-Replace std::vector<uint64_t> with std::unordered_set<uint64_t> to provide
-O(1) average lookup for stream_id membership validation in
-handlePushbufferSubmitBatch.
+Widen gpu_pushbuffer_args.stream_id from __u32 to __u64 to support
+unbounded next_queue_handle_ (internally uint64_t per tadr-006).
 
 Changes:
-- gpgpu_device.h:77: std::vector → std::unordered_set
-- gpgpu_device.cpp:261: std::find → attached.find()
-- Add <unordered_set> include
+- gpu_ioctl.h:43: stream_id u32 → u64 + add stream_id_compat (deprecated) + flags_extended (reserved)
+- gpgpu_device.cpp:262: remove static_cast + add backward compat fallback logic
+- gpgpu_device.cpp: error logs use effective_stream_id (no truncation)
 
-Behavior compatible: unordered_set::find() returns iterator/end, same
-semantics as std::find().
+Backward compatible: old callers using stream_id_compat continue to work.
+Deprecation period: 2026-06-26 ~ 2026-12-26 (6 months).
 
 Refs: tadr-105 (TaskRunner mirror)
-Refs: adr-034 (UsrLinuxEmu canonical, Issue #3)
+Refs: adr-034 (UsrLinuxEmu canonical, Issue #1)
+Refs: tadr-007 R2 mapping (deprecated workaround)
 Cross-Repo: TaskRunner submodule bump required
 ```
 
@@ -233,6 +233,15 @@ git push origin main
 - [ ] `git log --oneline` 4 个 commit 链路清晰
 
 ## 已知陷阱
+
+### ABI 拓宽陷阱
+
+**症状**: `gpu_ioctl.h` ABI 字段从 u32 拓宽到 u64，但下游 caller 仍按 u32 编译，导致内存布局错乱
+**缓解**:
+- 添加 `__u32 stream_id_compat` deprecated alias 字段（保持旧内存布局兼容）
+- 使用 `__attribute__((packed))` 或显式 padding 控制结构体布局
+- 提供 `CHANGELOG.md` 通知所有下游 caller 升级 ABI
+- 6 月过渡期 + 双驱动版本共存期测试
 
 ### Trap 1: 跨仓 PR 冲突
 

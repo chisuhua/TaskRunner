@@ -1,7 +1,7 @@
 # TaskRunner-UsrLinuxEmu 接口统一同步计划
 
-**版本**: v2.1（H-4.5 docs governance cleanup 后新增 TADR 引用）
-**日期**: 2026-06-23
+**版本**: v2.2（H-3 maintenance transition, 新增 H-3.5~H-3.8 完成详情）
+**日期**: 2026-06-26
 **维护者**: UsrLinuxEmu Architecture Team + TaskRunner owner
 **前置**: H-2.5 ✅ + H-3 ✅ shippable（2026-06-23）
 
@@ -38,7 +38,33 @@
 └────────────────────────────────────────────────────────────┘
 ```
 
----
+### 1.3 H-3.5~H-3.8 补丁修复（2026-06-26）
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ H-3.5 (2026-06-25): CudaStub guard verification follow-up   │
+│   - 2 dynamic_cast removed (MockGpuDriver + IGpuDriver)     │
+│   - IGpuDriver extended to 31 methods (tadr-109)           │
+│   - TADR-105 agenda tracking                               │
+└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│ H-3.6 (2026-06-25): ADR-034 Issue #3 → attached_queues    │
+│   - UsrLinuxEmu: bf8192f (pushbuffer VA+Queue validation) │
+│   - UsrLinuxEmu: 09ae1b0 (4 test cases)                   │
+│   - TaskRunner: f3f52d8 (coordination doc)                │
+└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│ H-3.7 (2026-06-25): ADR-034 Issue #2 → ioctl path bypass  │
+│   - UsrLinuxEmu: 392a496 (route pushbuffer via GpuQueueEmu)│
+│   - TaskRunner: 73390ae (coordination + H-3.7 kickoff)    │
+└────────────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│ H-3.8 (2026-06-26): ADR-034 Issue #1 → stream_id u32→u64 │
+│   - UsrLinuxEmu: 02ae421 (widen stream_id + compat alias) │
+│   - TaskRunner: 9e3db2e (ABI coordination + test design)  │
+│   - TaskRunner: 5ee250a (tadr-105 §Issue #1 → Accepted)  │
+└────────────────────────────────────────────────────────────┘
+```
 
 ## 二、GitHub Issue 追踪
 
@@ -58,7 +84,7 @@
 
 ---
 
-## 三、Phase 1.5 和 Phase 2 已完成
+## 三、Phase 1.5、Phase 2 及 H-3 补丁已全部完成
 
 ### 3.1 Phase 1.5 (S3.5 fence_id 扩展)
 
@@ -87,6 +113,7 @@
 | H-1 (h1-pushbuffer-validation-closeout) | ✅ archived | 2026-06-17 |
 | H-2.5 (h2-5-architecture-foundation) | ✅ archived | 2026-06-19 |
 | H-3 (h3-phase2-management) | ✅ archived | 2026-06-22 |
+| H-3.5 | h3-5-cudastub-guard-fix | ✅ archived | 2026-06-25 (5ff8c26 commit) |
 | H-4 (h4-architecture-governance-cleanup) | 🔵 active | TBD |
 
 ---
@@ -165,8 +192,8 @@ caller:                          driver:
 
 | 候选 | 来源 | 工时 | 前置 TADR |
 |------|------|---:|----------|
-| **H-3.5** | CudaStub guard verification（关闭 H-3 T6-T9 mock-behavior deviation）| 0.5 天 | TADR-006 |
-| **H-7 ADR** | 修复 3 个 owner-flagged upstream issue（stream_id u32 / ioctl 绕过 / attached_queues 弱校验）| 1-2 周 | TADR-008 |
+| **~~H-3.5~~** | CudaStub guard verification | ✅ 完成 (2026-06-25, 5ff8c26) | TADR-006 |
+| **~~H-7 ADR~~** | 3 upstream issues (stream_id / ioctl bypass / attached_queues) | ✅ 全部完成 (H-3.6/3.7/3.8) | TADR-008 |
 | **Phase 3** | Multi-GPU / P2P（需要先完成 H-7 ADR）| 3-4 周 | TADR-005~008 |
 
 ---
@@ -205,5 +232,5 @@ ADR 治理政策见 ADR-035。openspec change 流程：
 
 ---
 
-**最后更新**: 2026-06-23（H-4.5 docs governance cleanup, v2.1 新增 TADR 引用）
+**最后更新**: 2026-06-26（H-3 maintenance transition, v2.2 新增 H-3.5~H-3.8 完成详情）
 **下次审查**: H-3.5 启动时

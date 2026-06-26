@@ -268,15 +268,15 @@ git push origin main
 
 ## 历史 PR 范例
 
-| H-# | Issue | UsrLinuxEmu PR | TaskRunner bump | TADR 状态 | 归档时间 |
-|-----|-------|---------------|-----------------|-----------|---------|
-| H-3.6 | #3 attached_queues | (TBD) | (TBD) | tadr-105 §Issue #3 → Accepted | (TBD) |
-| H-3.7 | #2 ioctl path | (TBD) | (TBD) | tadr-105 §Issue #2 → Accepted | (TBD) |
-| H-3.8 | #1 stream_id u32 | (TBD) | (TBD) | tadr-105 §Issue #1 → Accepted | (TBD) |
+| H-# | Issue | UsrLinuxEmu Commit | TaskRunner bump | TADR 状态 | 归档时间 |
+|-----|-------|-------------------|-----------------|-----------|---------|
+| H-3.6 | #3 attached_queues 弱校验 | `bf8192f` | `f3f52d8` | tadr-105 §Issue #3 → Accepted | 2026-06-26 |
+| H-3.7 | #2 ioctl 绕过 | `392a496` | `73390ae` | tadr-105 §Issue #2 → Accepted | 2026-06-26 |
+| H-3.8 | #1 stream_id u32→u64 | `02ae421` | `9e3db2e` | tadr-105 §Issue #1 → Accepted | 2026-06-26 |
 
 ## 维护
 
 - **Owner**: TaskRunner owner
 - **Reviewers**: UsrLinuxEmu owner + TaskRunner owner
-- **更新时机**: 每完成 1 个 H-7 Issue 修复后，更新"历史 PR 范例"表
+- **更新时机**: 每完成 1 个 H-7 Issue 修复后，更新"历史 PR 范例"表。当前所有 3 个 H-7 Issues 已全部修复归档 (2026-06-26)
 - **关联文档**: ADR-035 §Rule 5.1, openspec change archive 文件

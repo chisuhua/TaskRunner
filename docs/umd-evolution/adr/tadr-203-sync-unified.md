@@ -15,7 +15,7 @@ REPLACES: tadr-003
 **评审者**: 老板 (CTO)
 **关联 ADR (UsrLinuxEmu)**: —
 **关联 Change**: —
-**关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md) §D3 (lines 123-198)
+**关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../test-fixture/archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md) §D3 (lines 123-198)
 
 ---
 
@@ -92,7 +92,7 @@ public:
 ## 跨引用
 
 - **关联 TADR**: TADR-201 (D1 统一调度器), TADR-202 (D2 分层设计)
-- **关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md):123-198
+- **关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../test-fixture/archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md):123-198
 
 ---
 

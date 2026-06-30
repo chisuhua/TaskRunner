@@ -15,7 +15,7 @@ REPLACES: tadr-002
 **评审者**: 老板 (CTO)
 **关联 ADR (UsrLinuxEmu)**: —
 **关联 Change**: —
-**关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md) §D2 (lines 59-122)
+**关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../test-fixture/archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md) §D2 (lines 59-122)
 
 ---
 
@@ -97,7 +97,7 @@ class CommandTranslator {
 ## 跨引用
 
 - **关联 TADR**: TADR-001 (D1 统一调度器), TADR-005 (IGpuDriver 抽象)
-- **关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md):59-122
+- **关联 Source**: [`docs/decision-frame-cuda-vulkan-runtime.md`](../../test-fixture/archive/2026-04-07-decision-frame-cuda-vulkan-runtime.md):59-122
 
 ---
 

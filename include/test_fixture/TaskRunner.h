@@ -9,6 +9,9 @@ namespace async_task {
     class CmdStream;
     class TaskQueue;
 }
+namespace taskrunner {
+    class CudaScheduler;  // GPU 调度器 (H-5)
+}
 
 // Now include dependencies that don't depend on TaskRunner
 #include "test_fixture/Barrier.h"
@@ -55,6 +58,19 @@ public:
     Barrier allocateBarrier(BarrierType type, std::shared_ptr<std::promise<bool>> promise, int groupId = 0);
     void addCmdStream(CmdStream& cmdStream);
 
+    /**
+     * @brief Returns the CudaScheduler for UMD/CUDA Runtime API consumers.
+     *
+     * **Phase 1 Purpose**: Allow CudaRuntimeApi to call CudaScheduler's
+     * `submit_mem_alloc` / `submit_memcpy_*` / `submit_launch` methods.
+     *
+     * **Lifetime**: Valid only after `initialize()` and before `shutdown()`.
+     * Returns nullptr if TaskRunner is not initialized or no scheduler set.
+     *
+     * @return taskrunner::CudaScheduler* or nullptr if not available.
+     */
+    taskrunner::CudaScheduler* getScheduler();
+
 private:
     TaskRunner();
     ~TaskRunner();
@@ -87,6 +103,9 @@ public:
 private:
     // Make cmdStream_ thread_local (declaration only, definition in TaskRunner.cpp)
     static thread_local std::unique_ptr<CmdStream> cmdStream_;
+
+    // CudaScheduler instance (H-5 Phase 1)
+    std::unique_ptr<taskrunner::CudaScheduler> scheduler_;
 
     std::vector<TaskQueue*> allTaskQueues_; // Store all TaskQueues for stealing
     int nextGroupId_ = 1; // Next available group ID
@@ -225,8 +244,19 @@ inline void TaskRunner::initialize() {
         processor->start();
     }
 
+    // === H-5 Phase 1: Create CudaScheduler (default: CudaStub backend) ===
+    // Required for UMD Runtime API consumer (Phase 2 cuInit, Phase 1.5 CLI).
+    // Default backend is CudaStub (zero cross-repo dependency).
+    scheduler_ = std::make_unique<taskrunner::CudaScheduler>(/*driver=*/nullptr);
+    // Note: CudaScheduler(nullptr) auto-creates a CudaStub per existing
+    // constructor contract (H-2.5 backward compat).
+
     // Start dispatch loop
     dispatchThread_ = std::thread(&TaskRunner::dispatchLoop, this);
+}
+
+inline taskrunner::CudaScheduler* TaskRunner::getScheduler() {
+  return scheduler_.get();
 }
 
 inline std::unique_ptr<CmdBuffer> TaskRunner::allocateCmdBuffer(bool isOrdered) {

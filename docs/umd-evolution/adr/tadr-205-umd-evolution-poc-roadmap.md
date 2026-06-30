@@ -1,7 +1,9 @@
 ---
 SCOPE: UMD-EVOLUTION
-STATUS: PROPOSED
+STATUS: ACCEPTED
 DECISION_DATE: 2026-06-24
+POA_RESOLVED: 2026-06-30 (POA-1 + POA-2 dual motivation; see design spec)
+Q4_RESOLVED: 2026-06-30
 IMPLEMENTED: NO
 ---
 
@@ -16,7 +18,7 @@ If/when umd-evolution PoC work begins, it needs a clear phasing to avoid scope c
 Defer until all of the following are true:
 1. H-5 cross-repo sync merged (this change)
 2. H-3.5 follow-up work shipped
-3. Explicit PoC requirement identified (currently none)
+3. ✅ Explicit PoC requirement identified (RESOLVED 2026-06-30): Phase 1 = POA-1 (UsrLinuxEmu Stage 1.4 KFD Consumer) + POA-2 (CI Regression Baseline). See docs/superpowers/specs/2026-06-30-umd-evolution-redesign.md §Resolved PoC Motivation for falsifiable criteria.
 
 ## Proposed Phasing (when initiated)
 

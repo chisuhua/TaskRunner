@@ -1,8 +1,9 @@
 ---
 SCOPE: UMD-EVOLUTION
-STATUS: PROPOSED
+STATUS: ACCEPTED
 DESIGN_DATE: 2026-06-30
 DESIGN_AUTHOR: Sisyphus (with Oracle architectural review)
+Q4_RESOLVED: 2026-06-30 (POA-1 + POA-2 dual motivation)
 RELATED: tadr-201, tadr-202, tadr-203, tadr-204, tadr-205
 ---
 
@@ -334,7 +335,7 @@ Usage: `LD_PRELOAD=./libcuda_taskrunner.so ./vectorAdd`
 | Prerequisite | Source | Status |
 |--------------|--------|--------|
 | Phase 0 complete | internal | 🟡 pending kickoff |
-| Explicit PoC requirement identified | tadr-205:43 | ❌ **undefined** |
+| Explicit PoC requirement identified (POA-1 + POA-2) | tadr-205:43 | ✅ **RESOLVED 2026-06-30** (Oracle recommendation) |
 | test-fixture scope stable in CI | CI | 🟢 34/34 ✅ |
 | IGpuDriver 31 methods verified | H-3.5 / H-3 follow-up | ✅ complete |
 
@@ -366,6 +367,35 @@ Rejected: LD_PRELOAD is NVIDIA UMD's own mechanism; no upside to deviate.
 
 Rejected: Phase 1 + Phase 2 combined has 4-6 weeks total, vs Phase 2 alone ~3 weeks but with much higher risk.
 
+## Resolved PoC Motivation (POA-1 + POA-2, Added 2026-06-30)
+
+Per Oracle architectural review (2026-06-30), Phase 1's PoC motivation is dual:
+
+**POA-1 (external pull): UsrLinuxEmu Stage 1.4 KFD Consumer**
+- When Stage 1.4 starts ("compile real KFD + 5 core ioctls"), it needs a Consumer of `GPU_IOCTL_*` commands beyond the raw CLI tool
+- Phase 1's `CudaRuntimeApi` provides the API consumer (high-level Runtime API semantics) for KFD integration testing
+- Aligned with UsrLinuxEmu roadmap `usrlinuxemu-gpu-driver-design-2026-06-24.md`
+
+**POA-2 (internal pull): CI Regression Test Baseline**
+- Every `gpu_ioctl.h` / `IGpuDriver` interface change needs to be validated by a real consumer
+- Phase 1's 8 test cases are the "golden consumer" that exercises the full call chain CudaRuntimeApi → CudaScheduler → IGpuDriver
+- Phase 1.5 stretch: replace `CudaStub` with `GpuDriverClient` backend and verify 8/8 still pass
+
+**Why not "wait for external customer":**
+- `gap-analysis.md` explicitly warns: investment vs ROI is poor for 3-6 month PoC
+- `usrlinuxemu-gpu-driver-design-2026-06-24.md` §路线图: 6-12 月大概率走 Stage 1.4 集成验证；小概率外部 pull
+
+**Falsifiable Phase 1 success criteria:**
+
+| # | Goal | Metric | Verification |
+|---|------|--------|--------------|
+| 1 | 8 tests pass in CudaStub mode | 8/8 doctest PASS | Local `cd build && ./test_cuda_runtime_api` |
+| 2 | 0 dynamic_cast leak in CudaScheduler | grep -c `dynamic_cast<CudaStub\*>` = 0 | `grep -rn "dynamic_cast<CudaStub\*>" src/test_fixture/` |
+| 3 | ≥5 IGpuDriver methods exercised | Coverage report ≥5 | manual review or test logging |
+| 4 | 3 CLI commands functional | `cuda_runtime_alloc/memcpy/launch` respond OK | manual + script |
+| 5 | `getScheduler()` accessor usable | Phase 2 `cuInit` code compiles with `TASKRUNNER_BUILD_MODE=umd-evolution` | cmake build |
+| 6 | CudaStub→GpuDriverClient swap preserves 8/8 (stretch) | Phase 1.5 future work | separate task post-Phase 1 |
+
 ## Risks
 
 | Risk | Probability | Impact | Mitigation |
@@ -383,7 +413,7 @@ Rejected: Phase 1 + Phase 2 combined has 4-6 weeks total, vs Phase 2 alone ~3 we
 | Q1 | Phase 3.3: YAML (recommended) vs ELF parsing? | Before Phase 3 kickoff |
 | Q2 | Phase 3 scope: All P0+P1, or also P2? | Before Phase 3 kickoff |
 | Q3 | Vulkan extension points: keep or remove? | Before doc commit |
-| Q4 | Trigger gate "explicit PoC requirement": what defines this? | Before Phase 1 |
+| Q4 ✅ RESOLVED (2026-06-30) | Phase 1 success criteria = POA-1 + POA-2. See §Resolved PoC Motivation below. | RESOLVED 2026-06-30 |
 | Q5 | Spec author (you) vs implementation team assignment? | Implementation kickoff |
 
 ## References
@@ -407,5 +437,7 @@ Rejected: Phase 1 + Phase 2 combined has 4-6 weeks total, vs Phase 2 alone ~3 we
 
 ---
 
-**Status**: PROPOSED awaiting user review and approval.
-**Implementation phase**: Blocked on Q4 (PoC requirement definition).
+**Status**: ACCEPTED (2026-06-30).
+**Q4 (PoC motivation) RESOLVED**: 2026-06-30 (POA-1 + POA-2 dual motivation; see §Resolved PoC Motivation).
+**Implementation phase**: Ready for Sub-plan B (Phase 1) execution.
+**Cross-repo pre-req (Out-of-scope for TaskRunner-end work)**: UsrLinuxEmu submodule pointer bump from `a75f779` → current HEAD (per ADR-035 §Rule 5.1).

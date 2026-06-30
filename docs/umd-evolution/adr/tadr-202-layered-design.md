@@ -1,10 +1,13 @@
 ---
 SCOPE: UMD-EVOLUTION
-STATUS: PROPOSED
+STATUS: SUPERSEDED
+SUPERSEDES: tadr-202 (originally Accepted retroactive 2026-06-23)
+SUPERSEDED_BY: ../../test-fixture/adr/tadr-109-igpu-driver-uniform-scheduling.md [TEST-FIXTURE SCOPE]
+SUPERSESSION_DATE: 2026-06-30
 REPLACES: tadr-002
 ---
 
-# TADR-002: UsrLinuxEmu 接口扩展策略 — 分层设计 (C 方案)
+# TADR-202: UsrLinuxEmu 接口扩展策略 — 分层设计 (C 方案)
 
 **状态**: ✅ Accepted (retroactive)
 **日期**: 2026-04-07 (决策) / 2026-06-23 (retroactive TADR 化)
@@ -78,11 +81,18 @@ class CommandTranslator {
 - ⚠️ 需设计 CommandTranslator 转译规则
 - ⚠️ 增加一层间接性（调试时需穿透更多层）
 
-### 实施路径备注
+## SUPERSEDED Status (2026-06-30)
 
-实际实施中，**CommandTranslator 类未单独实现**。H-2.5 引入的 `IGpuDriver` 抽象（见 TADR-005）替代了显式 CommandTranslator 角色：`CudaScheduler` 通过 DI 选择 `GpuDriverClient`（真 ioctl）或 `CudaStub`（mock），每种实现内部自行处理命令编码，无中间转译类。
+**原决策** (2026-04-07): C 方案 — TaskRunner 层 20+ 命令 / UsrLinuxEmu 层 5 种基础命令 + CommandTranslator 转译。
 
-**当前 UsrLinuxEmu 端** `CommandType` 仍保持 KERNEL/DMA_COPY 两种（未按 D2 扩展 5 种基础命令），原因是 Phase 1 + 1.5 + H-3 的 `GPU_IOCTL_*` 命令路径已经通过 ioctl 编号实现扩展，无需 enum 改造。
+**实际实现路径**:
+- CommandTranslator 类**未单独实现**
+- 当前通过 H-2.5 引入的 `IGpuDriver` 抽象（见 [`tadr-109`](../../test-fixture/adr/tadr-109-igpu-driver-uniform-scheduling.md) [TEST-FIXTURE SCOPE]）替代 CommandTranslator 角色
+- 每种 IGpuDriver 实现（GpuDriverClient/CudaStub/MockGpuDriver）内部自行处理命令编码
+
+**当前 UsrLinuxEmu 端** `CommandType` 仍保持 KERNEL/DMA_COPY 两种，未按 D2 扩展 5 种。Phase 1 + 1.5 + H-3 的 `GPU_IOCTL_*` 命令路径已通过 ioctl 编号实现扩展，无需 enum 改造。
+
+**替代关系**: 本 TADR → [`tadr-109`](../../test-fixture/adr/tadr-109-igpu-driver-uniform-scheduling.md) [TEST-FIXTURE SCOPE]；任何相关决策在 shared scope 通过 tadr-3xx 系列登记。
 
 ## 跨引用
 
@@ -91,4 +101,4 @@ class CommandTranslator {
 
 ---
 
-**最后更新**: 2026-06-23（H-4.5 docs governance cleanup TADR 化）
+**最后更新**: 2026-06-30（SUPERSEDED status changed）

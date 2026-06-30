@@ -34,3 +34,16 @@ This directory contains **umd-evolution scope** vision documents. **No productio
 
 - For test-fixture (current main): see `../test-fixture/README.md`
 - For shared infrastructure: see `../shared/README.md`
+
+## Conflict Resolution
+
+When documents in this scope disagree, apply these priorities:
+
+| Conflict | Priority | Rationale |
+|----------|----------|-----------|
+| `vision.md` vs `gap-analysis.md` | **`gap-analysis.md` wins** | ROI analysis is decisive; gap-analysis recommends defer, vision is optimistic |
+| TADR x-y-z vs actual code in `main` | **Code wins** | Main branch is canonical; TADRs document decisions at point-in-time |
+| `vision-source.md` vs `vision.md` | **`vision.md` wins** | `vision-source.md` is DEPRECATED historical reference only |
+| Architecture spec (`docs/superpowers/specs/*-redesign.md`) vs older TADRs | **Spec wins** when STATUS is PROPOSED+archival; older TADRs SUPERSEDED |
+
+Adopted: 2026-06-30 (H-5.1 docs governance cleanup).

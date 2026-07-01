@@ -15,9 +15,7 @@ TaskRunner/
 │   │   ├── cmd_buffer_v2.cpp         # V2 命令缓冲
 │   │   └── cli_main.cpp              # CLI 入口
 │   ├── umd/                          # umd-evolution scope (experimental)
-│   │   ├── cuda_api.cpp              # CUDA API 兼容层
-│   │   ├── module_loader.cpp         # 插件加载器
-│   │   └── ring_buffer.cpp           # 环形缓冲
+│   │   ├── cuda_runtime_api.cpp              # CudaRuntimeApi (Phase 1)
 │   └── shared/                       # shared scope (cross-cutting)
 │       ├── memory_manager.cpp        # 共享内存管理器
 │       └── sync_primitives.cpp       # 同步原语实现
@@ -31,9 +29,7 @@ TaskRunner/
 │   │   ├── CmdStream.h / CmdBuffer.h / EventQueue.h / TaskQueue.h / TaskBuffer.h / Barrier.h
 │   │   └── cmd_cuda.h                # CLI 命令声明
 │   ├── umd/                          # umd-evolution 头文件
-│   │   ├── cuda_api.hpp
-│   │   ├── module_loader.hpp
-│   │   └── ring_buffer.hpp
+│   │   ├── cuda_runtime_api.hpp         # CudaRuntimeApi (Phase 1)
 │   └── shared/                       # shared 头文件
 │       ├── igpu_driver.hpp           # IGpuDriver 接口 (28→31 方法)
 │       ├── sync_primitives.hpp       # 同步原语抽象

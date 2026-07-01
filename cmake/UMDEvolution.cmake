@@ -10,9 +10,6 @@ include(${CMAKE_SOURCE_DIR}/cmake/TestFixture.cmake)
 
 add_library(taskrunner_umd_stub SHARED
     src/umd/cuda_runtime_api.cpp
-    src/umd/cuda_api.cpp
-    src/umd/module_loader.cpp
-    src/umd/ring_buffer.cpp
 )
 target_include_directories(taskrunner_umd_stub PUBLIC
     ${CMAKE_SOURCE_DIR}
@@ -25,8 +22,8 @@ set_target_properties(taskrunner_umd_stub PROPERTIES
 )
 
 # Tests
-add_executable(test_umd_skeleton
-    tests/umd/test_umd_skeleton.cpp
+add_executable(test_cuda_runtime_api
+    tests/umd/test_cuda_runtime_api.cpp
 )
-target_link_libraries(test_umd_skeleton PRIVATE taskrunner_umd_stub)
-add_test(NAME test_umd_skeleton COMMAND test_umd_skeleton)
+target_link_libraries(test_cuda_runtime_api PRIVATE taskrunner_umd_stub)
+add_test(NAME test_cuda_runtime_api COMMAND test_cuda_runtime_api)

@@ -12,6 +12,9 @@ target_include_directories(taskrunner_test_fixture PUBLIC
 )
 target_link_libraries(taskrunner_test_fixture PUBLIC taskrunner_shared)
 target_compile_features(taskrunner_test_fixture PUBLIC cxx_std_17)
+set_target_properties(taskrunner_test_fixture PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)
 
 # CLI
 add_executable(taskrunner

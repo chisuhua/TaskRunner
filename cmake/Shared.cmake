@@ -12,3 +12,6 @@ target_include_directories(taskrunner_shared PUBLIC
 )
 target_link_libraries(taskrunner_shared PUBLIC doctest::doctest)
 target_compile_features(taskrunner_shared PUBLIC cxx_std_17)
+set_target_properties(taskrunner_shared PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+)

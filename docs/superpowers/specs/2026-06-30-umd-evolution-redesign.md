@@ -4,6 +4,7 @@ STATUS: ACCEPTED
 DESIGN_DATE: 2026-06-30
 DESIGN_AUTHOR: Sisyphus (with Oracle architectural review)
 Q4_RESOLVED: 2026-06-30 (POA-1 + POA-2 dual motivation)
+PHASE_2_STATUS: ACCEPTED (2026-07-01, libcuda_taskrunner.so + 37 tests)
 RELATED: tadr-201, tadr-202, tadr-203, tadr-204, tadr-205
 ---
 
@@ -288,6 +289,55 @@ Usage: `LD_PRELOAD=./libcuda_taskrunner.so ./vectorAdd`
 - Stubbed APIs return `CUDA_ERROR_NOT_IMPLEMENTED` (no chain to real libcuda.so)
 - Multi-device: `cuDeviceGetCount` returns 1 regardless of host config
 - Version symbols (`cuInit_v2`) need stub templates; binutils nm-extracted from real libcuda.so
+
+## Phase 2 Implementation Status (ACCEPTED 2026-07-01)
+
+Phase 2 (LD_PRELOAD Driver API shim) is implemented on `main` branch.
+
+### Deliverables (11 commits, 2026-07-01)
+
+| Task | Description | Commit |
+|------|-------------|--------|
+| C.1 | `tools/generate_cu_stubs.py` + 143 cu\* declarations | `a2cfe36` |
+| C.2 | `cu_init.cpp` + `cu_module.cpp` (Oracle cleanup) | `e7741ec` |
+| C.3 | `cu_mem.cpp` (cuMem\*) | `a12e9e9` |
+| C.4 | `cu_launch.cpp` (handle→name resolution) | `a7beaac` |
+| C.5 | `cu_ctx.cpp` + `cu_device.cpp` (Oracle stack) | `e2fdf51` |
+| C.5b | `cu_query.cpp` + `cu_stream.cpp` + `cu_event.cpp` | `12e69a4` |
+| C.6 | `libcuda_taskrunner.so` linked (79 cu\* exported) | `07cbb50` |
+| C.7 | `test_cuda_shim.cpp` (37/37 passing) | `afb00f1` |
+| C.8 | stub completeness check + status docs | `6cbcd56` |
+| C.8b | handle lifecycle documentation | `17de516` |
+| C.9 | final verification (this section) | (current commit) |
+
+### Test Results
+
+- **Phase 1 tests**: 39/39 pass (8 + 11 + 12 + 8)
+- **Phase 2 shim tests**: 37/37 pass
+- **Total**: 76/76 pass, 0 failures
+
+### Symbol Coverage
+
+- **79 cu\* symbols** exported by `libcuda_taskrunner.so`
+- **41/41 critical APIs** implemented (100% coverage)
+- **C.5b additions**: cuDriverGetVersion=12000, cuDevicePrimaryCtx\*, cuGetErrorName/String
+
+### Constraints per Phase 2 Limitations Documented in `runtime-layering.md`
+
+1. No real kernel execution (cuLaunchKernel via CudaStub mock)
+2. ~79 symbols exported but ~40 are functional placeholders
+3. cuMemcpyDtoD returns CUDA_ERROR_NOT_SUPPORTED
+4. Async stream-ops partial (graphs NOT_IMPLEMENTED)
+5. Single-device only
+
+### Phase 3 Status (Not Started)
+
+Phase 3 (API extension: Stream, Event, Memory pool, YAML kernel registry) is
+**not started**. Future work. Refer to design doc Phase 3 section for scope.
+
+### Plan Reference
+
+`docs/superpowers/plans/2026-07-01-umd-phase2-ld-preload.md` — detailed C.1-C.9 tasks.
 
 ## Phase 3: API Extension (Deferred detail)
 

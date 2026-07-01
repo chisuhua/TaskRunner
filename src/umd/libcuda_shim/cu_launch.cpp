@@ -32,27 +32,9 @@ using async_task::umd::Dim3;
 // Locally-defined types missing from compat cuda.h
 // ---------------------------------------------------------------------------
 
-// CUDA Driver API launch config (CUDA 11.0+).
-// See CUDA Driver API: cuLaunchKernelEx / CUlaunchConfig.
+// CUDA Driver API launch config — now defined in include/cuda.h.
+// This file relies on that definition.
 typedef void (*CUhostFn)(void* userData);
-
-typedef struct CUlaunchConfig_st {
-  unsigned int gridDimX;
-  unsigned int gridDimY;
-  unsigned int gridDimZ;
-  unsigned int blockDimX;
-  unsigned int blockDimY;
-  unsigned int blockDimZ;
-  unsigned int sharedMemBytes;
-  CUstream hStream;
-  // Full CUDA Toolkit also includes:
-  // CUoccupancyB2CInfo occupancyInfo;
-  // unsigned int numParams;
-  // void** params;
-  // unsigned int numAttrs;
-  // CUlaunchAttribute* attrs;
-  // Phase 2: basic fields only. Extended attributes left at zero.
-} CUlaunchConfig;
 
 // ---------------------------------------------------------------------------
 // Internal helpers

@@ -130,7 +130,7 @@ extern "C" CUresult cuModuleLoadData(CUmodule* module, const void* image) {
 
 extern "C" CUresult cuModuleLoadDataEx(CUmodule* module, const void* image,
                                        unsigned int numOptions,
-                                       CUjit_option* options, void** optionValues) {
+                                       int* options, void** optionValues) {
   (void)module; (void)image; (void)numOptions; (void)options; (void)optionValues;
   return CUDA_ERROR_NOT_IMPLEMENTED;
 }

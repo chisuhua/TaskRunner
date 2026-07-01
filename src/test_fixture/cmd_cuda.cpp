@@ -30,9 +30,18 @@
 #include <sys/ioctl.h>
 
 #include "test_fixture/gpu_driver_client.h"
+#include "test_fixture/cuda_scheduler.hpp"
+#include "test_fixture/cuda_stub.hpp"
+#include "umd/cuda_runtime_api.hpp"
 
 namespace async_task {
 namespace cmd {
+
+// 全局 CUDA Runtime API 实例及其依赖 (B.5: UMD-EVOLUTION CLI 命令)
+// 使用独立 CudaStub + CudaScheduler (不依赖 TaskRunner 单例)
+static std::unique_ptr<taskrunner::CudaStub> g_runtime_stub;
+static std::unique_ptr<taskrunner::CudaScheduler> g_runtime_sched;
+static std::unique_ptr<async_task::umd::CudaRuntimeApi> g_runtime_api;
 
 void print_cuda_help() {
     std::cout << "CUDA Commands (System C / GPU_IOCTL_*):\n";
@@ -45,6 +54,12 @@ void print_cuda_help() {
     std::cout << "  cuda_queue create <va_space> <type> <prio> <ring> - Create Queue, print handle\n";
     std::cout << "  cuda_queue destroy <handle>                 - Destroy Queue by handle\n";
     std::cout << "\n";
+    std::cout << "CUDA Runtime API Commands (UMD-EVOLUTION Phase 1):\n";
+    std::cout << "  cuda_runtime_register <name> <index>             - Register kernel name->index\n";
+    std::cout << "  cuda_runtime_alloc <size>                        - Allocate device memory\n";
+    std::cout << "  cuda_runtime_memcpy <h2d|d2h> <host> <dev> <sz>  - Memory copy\n";
+    std::cout << "  cuda_runtime_launch <kernel_name>                - Launch registered kernel\n";
+    std::cout << "\n";
     std::cout << "Examples:\n";
     std::cout << "  cuda_alloc 4096\n";
     std::cout << "  cuda_memcpy h2d 0x1000 0 1024\n";
@@ -55,6 +70,9 @@ void print_cuda_help() {
     std::cout << "  cuda_va_space destroy 1\n";
     std::cout << "  cuda_queue create 1 0 50 4096\n";
     std::cout << "  cuda_queue destroy 1\n";
+    std::cout << "  cuda_runtime_register vectorAdd 0\n";
+    std::cout << "  cuda_runtime_alloc 4096\n";
+    std::cout << "  cuda_runtime_launch vectorAdd\n";
 }
 
 uint64_t parse_number(const std::string& str) {
@@ -381,6 +399,152 @@ int cmd_cuda_queue(int argc, char* argv[]) {
     }
 }
 
+/**
+ * B.5: 获取或创建全局 CUDA Runtime API 实例
+ *
+ * 使用独立 CudaStub + CudaScheduler (不依赖 TaskRunner 单例)。
+ */
+static bool ensure_runtime_api() {
+    if (g_runtime_api) return true;
+
+    g_runtime_stub = std::make_unique<taskrunner::CudaStub>();
+    g_runtime_sched = std::make_unique<taskrunner::CudaScheduler>(g_runtime_stub.get());
+    if (g_runtime_sched->initialize(true) != 0) {
+        std::cerr << "Error: CudaScheduler init failed\n";
+        g_runtime_sched.reset();
+        g_runtime_stub.reset();
+        return false;
+    }
+    g_runtime_api = std::make_unique<async_task::umd::CudaRuntimeApi>(g_runtime_sched.get());
+    return true;
+}
+
+/**
+ * B.5: cuda_runtime_register <name> <index>
+ *
+ * 注册 kernel 名称到索引的映射，供 cuda_runtime_launch 使用。
+ */
+int cmd_cuda_runtime_register(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "Error: cuda_runtime_register requires <name> <index>\n";
+        return 1;
+    }
+
+    std::string name = argv[0];
+    std::uint32_t index = static_cast<std::uint32_t>(parse_number(argv[1]));
+
+    if (!ensure_runtime_api()) return 1;
+
+    auto err = g_runtime_api->register_kernel(name, index);
+    if (err == async_task::umd::CudaError::Success) {
+        std::cout << "[CUDA_RUNTIME] registered '" << name << "' as index " << index << std::endl;
+        return 0;
+    } else {
+        std::cerr << "[CUDA_RUNTIME] register failed (err=" << static_cast<int>(err) << ")" << std::endl;
+        return 1;
+    }
+}
+
+/**
+ * B.5: cuda_runtime_alloc <size>
+ *
+ * 使用 CudaRuntimeApi 分配设备内存。
+ */
+int cmd_cuda_runtime_alloc(int argc, char* argv[]) {
+    if (argc < 1) {
+        std::cerr << "Error: cuda_runtime_alloc requires <size>\n";
+        return 1;
+    }
+
+    std::size_t size = static_cast<std::size_t>(parse_number(argv[0]));
+
+    if (!ensure_runtime_api()) return 1;
+
+    void* ptr = nullptr;
+    auto err = g_runtime_api->malloc(&ptr, size);
+    if (err == async_task::umd::CudaError::Success) {
+        std::cout << "[CUDA_RUNTIME] alloc " << size << " bytes at 0x"
+                  << std::hex << reinterpret_cast<std::uintptr_t>(ptr)
+                  << std::dec << std::endl;
+        return 0;
+    } else {
+        std::cerr << "[CUDA_RUNTIME] alloc failed (err=" << static_cast<int>(err) << ")" << std::endl;
+        return 1;
+    }
+}
+
+/**
+ * B.5: cuda_runtime_memcpy <h2d|d2h> <host_ptr> <dev_ptr> <size>
+ *
+ * 使用 CudaRuntimeApi 在 host 和 device 之间拷贝内存。
+ */
+int cmd_cuda_runtime_memcpy(int argc, char* argv[]) {
+    if (argc < 4) {
+        std::cerr << "Error: cuda_runtime_memcpy requires <h2d|d2h> <host_ptr> <dev_ptr> <size>\n";
+        return 1;
+    }
+
+    std::string direction = argv[0];
+    std::uintptr_t host_ptr = parse_number(argv[1]);
+    std::uintptr_t dev_ptr = parse_number(argv[2]);
+    std::size_t size = static_cast<std::size_t>(parse_number(argv[3]));
+
+    if (!ensure_runtime_api()) return 1;
+
+    async_task::umd::CudaMemcpyKind kind = (direction == "h2d")
+        ? async_task::umd::CudaMemcpyKind::HostToDevice
+        : async_task::umd::CudaMemcpyKind::DeviceToHost;
+
+    auto err = (kind == async_task::umd::CudaMemcpyKind::HostToDevice)
+        ? g_runtime_api->memcpy(reinterpret_cast<void*>(dev_ptr),
+                                 reinterpret_cast<void*>(host_ptr),
+                                 size, kind)
+        : g_runtime_api->memcpy(reinterpret_cast<void*>(host_ptr),
+                                 reinterpret_cast<void*>(dev_ptr),
+                                 size, kind);
+
+    if (err == async_task::umd::CudaError::Success) {
+        std::cout << "[CUDA_RUNTIME] memcpy " << direction << " "
+                  << size << " bytes OK" << std::endl;
+        return 0;
+    } else {
+        std::cerr << "[CUDA_RUNTIME] memcpy failed (err=" << static_cast<int>(err) << ")" << std::endl;
+        return 1;
+    }
+}
+
+/**
+ * B.5: cuda_runtime_launch <kernel_name>
+ *
+ * 使用 CudaRuntimeApi 启动预先注册的 kernel。
+ * kernel 必须先通过 cuda_runtime_register 注册。
+ */
+int cmd_cuda_runtime_launch(int argc, char* argv[]) {
+    if (argc < 1) {
+        std::cerr << "Error: cuda_runtime_launch requires <kernel_name>\n";
+        return 1;
+    }
+
+    std::string kernel_name = argv[0];
+
+    if (!ensure_runtime_api()) return 1;
+
+    async_task::umd::Dim3 grid{1};
+    async_task::umd::Dim3 block{256};
+    auto err = g_runtime_api->launch_kernel(kernel_name, grid, block, nullptr, 0);
+    if (err == async_task::umd::CudaError::Success) {
+        std::cout << "[CUDA_RUNTIME] launch " << kernel_name << " OK" << std::endl;
+        return 0;
+    } else if (err == async_task::umd::CudaError::InvalidValue) {
+        std::cerr << "[CUDA_RUNTIME] kernel '" << kernel_name
+                  << "' not registered; use cuda_runtime_register first" << std::endl;
+        return 2;
+    } else {
+        std::cerr << "[CUDA_RUNTIME] launch failed (err=" << static_cast<int>(err) << ")" << std::endl;
+        return 1;
+    }
+}
+
 int dispatch_cuda_command(const std::string& cmd, int argc, char* argv[]) {
     if (cmd == "cuda_alloc") {
         return cmd_cuda_alloc(argc, argv);
@@ -394,6 +558,14 @@ int dispatch_cuda_command(const std::string& cmd, int argc, char* argv[]) {
         return cmd_cuda_va_space(argc, argv);
     } else if (cmd == "cuda_queue") {
         return cmd_cuda_queue(argc, argv);
+    } else if (cmd == "cuda_runtime_register") {
+        return cmd_cuda_runtime_register(argc, argv);
+    } else if (cmd == "cuda_runtime_alloc") {
+        return cmd_cuda_runtime_alloc(argc, argv);
+    } else if (cmd == "cuda_runtime_memcpy") {
+        return cmd_cuda_runtime_memcpy(argc, argv);
+    } else if (cmd == "cuda_runtime_launch") {
+        return cmd_cuda_runtime_launch(argc, argv);
     } else if (cmd == "cuda_help" || cmd == "--help") {
         print_cuda_help();
         return 0;

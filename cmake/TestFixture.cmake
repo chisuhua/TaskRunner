@@ -21,6 +21,7 @@ add_executable(taskrunner
     src/test_fixture/cli_main.cpp
     src/test_fixture/cmd_buffer_v2.cpp
     src/test_fixture/cmd_cuda.cpp
+    src/umd/cuda_runtime_api.cpp
 )
 target_link_libraries(taskrunner PRIVATE taskrunner_test_fixture)
 

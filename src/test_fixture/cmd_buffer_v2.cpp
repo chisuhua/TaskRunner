@@ -51,6 +51,13 @@ void print_help(const char* program_name) {
     std::cout << "  cuda_memcpy <h2d|d2h> <ptr> <offset> <size>    - Memory copy\n";
     std::cout << "  cuda_launch <kernel> <gx> <gy> <gz> <bx> <by> <bz> - Launch kernel\n";
     std::cout << "  cuda_wait <fence_id>                           - Wait for fence\n";
+    std::cout << "  cuda_va_space create/destroy                   - VA Space lifecycle\n";
+    std::cout << "  cuda_queue create/destroy                      - Queue lifecycle\n";
+    std::cout << "  cuda_runtime_register <name> <index>           - Register kernel\n";
+    std::cout << "  cuda_runtime_alloc <size>                      - Runtime alloc\n";
+    std::cout << "  cuda_runtime_memcpy <h2d|d2h> <h> <d> <sz>    - Runtime memcpy\n";
+    std::cout << "  cuda_runtime_launch <name>                     - Runtime launch\n";
+    std::cout << "  cuda_help                                      - Show detailed CUDA help\n";
     std::cout << "\n";
     std::cout << "Examples:\n";
     std::cout << "  " << program_name << " cuda_alloc 4096\n";

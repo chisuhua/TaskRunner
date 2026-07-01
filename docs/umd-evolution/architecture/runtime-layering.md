@@ -42,9 +42,35 @@ The original tadr-201/202/203 proposed a `CudaRuntimeApi → IGpuDriver` direct 
 - **Single stream**: No `cuStreamCreate` in Phase 1.
 - **Kernel names**: Manually registered; no ELF parsing.
 
-## Phase 2 Extension (forward reference)
+## Phase 2 Extension (Status: ✅ Implemented, 2026-07-01)
 
-Phase 2 adds `libcuda_taskrunner.so` (LD_PRELOAD) wrapping `CudaRuntimeApi`. Adds CUfunction→name handle table in the shim layer; existing Phase 1 path is reused.
+Phase 2 was implemented via 7 commits (C.1-C.7):
+- C.1: stub generator + 143 cu* declarations
+- C.2: cu_init + cu_module (Oracle cleanup fix)
+- C.3: cuMem APIs
+- C.4: cuLaunchKernel with handle→name resolution
+- C.5: cuCtx + cuDevice (Oracle stack-tracked context)
+- C.5b: cuQuery + cuStream + cuEvent
+- C.6: libcuda_taskrunner.so built (79 cu* symbols exported)
+- C.7: E2E tests (37/37 passing)
+
+See `docs/superpowers/plans/2026-07-01-umd-phase2-ld-preload.md` for full details.
+
+### Phase 2 Verification Results
+
+- **Total cu* symbols exported**: 79
+- **Critical API coverage**: 41/41 (100%)
+- **E2E tests**: 37/37 pass (test_cuda_shim)
+- **Phase 1 regression**: 39/39 pass (no impact)
+- **Total runtime**: ~95ms for full shim test suite
+
+### Phase 2 Known Limitations
+
+1. **No real kernel execution**: cuLaunchKernel routes through CudaStub which is a fake. Real vectorAdd E2E requires D-3 (ELF parsing), explicitly deferred per gap-analysis.md.
+2. **Stubbed APIs return CUDA_ERROR_NOT_IMPLEMENTED**: 79 exported, but only ~40 have real implementations. The remaining ~40 are functional placeholders.
+3. **D2D memcpy unsupported**: cuMemcpyDtoD returns CUDA_ERROR_NOT_SUPPORTED (Phase 1 limitation).
+4. **Async stream ops incomplete**: cuStreamBeginCapture/EndCapture return NOT_IMPLEMENTED (CUDA Graphs not supported).
+5. **Single-device only**: cuDeviceGetCount returns 1 regardless of host configuration.
 
 ## Phase 1 Implementation Status (Updated 2026-07-01)
 

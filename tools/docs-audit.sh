@@ -318,6 +318,55 @@ if [ $legacy_count -eq 0 ]; then
 fi
 
 # ---------------------------------------------------------------------------
+# Check 9: Phase 2 Shim Completeness
+# ---------------------------------------------------------------------------
+echo ""
+echo "=== 9. Phase 2 Shim Completeness ==="
+
+SHIM="${REPO_ROOT}/build/libcuda_taskrunner.so"
+if [ ! -f "$SHIM" ]; then
+  warn "libcuda_taskrunner.so not built at $SHIM (skipping Phase 2 checks)"
+else
+  # Critical cu* APIs (from CRITICAL_APIS_IMPL_REQUIRED in tools/generate_cu_stubs.py)
+  CRITICAL_APIS=(
+    cuInit cuDriverGetVersion
+    cuDeviceGetCount cuDeviceGet cuDeviceGetName cuDeviceGetAttribute cuDeviceTotalMem
+    cuCtxCreate cuCtxDestroy cuCtxSetCurrent cuCtxGetCurrent
+    cuCtxPushCurrent cuCtxPopCurrent cuCtxSynchronize
+    cuCtxGetDevice cuCtxGetApiVersion cuCtxGetFlags
+    cuDevicePrimaryCtxRetain cuDevicePrimaryCtxRelease cuDevicePrimaryCtxReset
+    cuModuleLoad cuModuleUnload cuModuleGetFunction cuModuleGetGlobal
+    cuMemAlloc cuMemFree cuMemcpyHtoD cuMemcpyDtoH
+    cuMemcpyDtoD cuMemcpy cuMemcpyAsync
+    cuMemsetD32 cuMemsetD8 cuMemAllocHost cuMemFreeHost
+    cuLaunchKernel
+  )
+
+  MISSING=()
+  for api in "${CRITICAL_APIS[@]}"; do
+    if ! nm -D --defined-only "$SHIM" 2>/dev/null | grep -qw "$api"; then
+      MISSING+=("$api")
+    fi
+  done
+
+  EXPORTED=$(nm -D --defined-only "$SHIM" 2>/dev/null | grep -c "cu[A-Z]" || echo 0)
+
+  echo "Total cu* symbols exported: $EXPORTED (min: 30)"
+  if [ "$EXPORTED" -lt 30 ]; then
+    bad "Phase 2 shim: only $EXPORTED cu* symbols (need ≥30)"
+  else
+    ok "Phase 2 shim exports $EXPORTED cu* symbols (≥30)"
+  fi
+
+  echo "Critical APIs checked: ${#CRITICAL_APIS[@]}"
+  if [ ${#MISSING[@]} -gt 0 ]; then
+    bad "Phase 2 shim: ${#MISSING[@]} critical cu* APIs missing: $(printf '%s ' "${MISSING[@]}")"
+  else
+    ok "Phase 2 shim: all ${#CRITICAL_APIS[@]} critical cu* APIs present"
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Summary
 # ---------------------------------------------------------------------------
 echo ""

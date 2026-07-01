@@ -72,6 +72,81 @@ See `docs/superpowers/plans/2026-07-01-umd-phase2-ld-preload.md` for full detail
 4. **Async stream ops incomplete**: cuStreamBeginCapture/EndCapture return NOT_IMPLEMENTED (CUDA Graphs not supported).
 5. **Single-device only**: cuDeviceGetCount returns 1 regardless of host configuration.
 
+## Handle Lifecycle (Phase 2 Shim)
+
+The shim implements handle tables for CUfunction, CUmodule, CUcontext, CUstream,
+and CUevent. This section documents the lifecycle assumptions and known limitations.
+
+### Handle ID Generation
+
+- **Format**: 64-bit integer values, reinterpreted to opaque handle pointers
+- **Counter**: Per-table atomic counter starting at 1 (or 2 for `CUcontext`)
+- **Uniqueness**: Globally unique within the process until process exit
+- **Reserved values**:
+  - `nullptr` (0): Invalid handle (default for many pointer returns)
+  - `0x1`: Primary context sentinel (reserved for `cuDevicePrimaryCtxRetain`)
+  - `0x100`: Primary context actual value (avoids collision with 0x1 reserved)
+
+### Cleanup Semantics
+
+#### cuModuleUnload (Oracle Critical #1 fix applied)
+
+When `cuModuleUnload(hmod)` is called, the shim:
+1. Removes `hmod` from `mod_to_name` map
+2. Iterates `mod_to_func[hmod]` and removes each `CUfunction` from `func_to_name`
+3. Removes `mod_to_func[hmod]` entry
+
+**Limitation**: CUfunction handles registered via `cuModuleGetFunction` for a module NOT loaded via `cuModuleLoad` (e.g., implicit primary context modules) will leak. In Phase 2, these are not encountered since `cuDevicePrimaryCtxRetain` returns 0x100 (a different sentinel).
+
+#### cuCtxDestroy
+
+Removes `ctx` from thread-local stack and marks it as destroyed in global map.
+**Limitation**: Other thread stacks are NOT cleaned up. A multi-threaded application
+may have orphan `CUcontext` references. Documented as known limitation.
+
+#### cuStreamDestroy / cuEventDestroy
+
+Removes handle from active set; std::unordered_map.erase is used.
+**Limitation**: No deferred reclamation; underlying resources are not actually
+released by the CudaStub backend (Phase 2 stub behavior).
+
+### Thread Safety
+
+- All handle table mutations are protected by `std::mutex`
+- `cuCtxSetCurrent/GetCurrent/Push/Pop` use **thread_local** context stack
+- `cuEventElapsedTime` reads from a global timestamp map (locked)
+- `cuStream*` and `cuEvent*` operations are serialized via per-table mutex
+
+**Limitation**: Fine-grained locking (per-handle) is not implemented. Contended
+workloads may experience serialization. Acceptable for Phase 2 PoC.
+
+### Multi-Context Support (Oracle Critical #4 fix applied)
+
+**Before**: All contexts returned hardcoded `0x1` (breaks multi-context apps).
+
+**After**: `cuCtxCreate` allocates new IDs from atomic counter. `cuCtxSetCurrent`/
+`cuCtxPushCurrent` push to thread-local stack. `cuCtxGetCurrent` returns top-of-stack.
+
+**Tested**: cuCtxCreate → SetCurrent → GetCurrent → Destroy cycle works correctly
+across multiple creates (verified in `test_cuda_shim.cpp`).
+
+### Known Lifecycle Limitations
+
+1. **Memory grows unboundedly**: No LRU eviction. Phase 2 expects apps to call
+   `cuModuleUnload`/`cuCtxDestroy` explicitly.
+2. **Thread-local state is not shared**: Each thread has independent context
+   stack. Cross-thread context propagation requires explicit `cuCtxSetCurrent`.
+3. **Handle-32 stored in 64-bit pointer**: The 64-bit slot wastes 4 bytes/handle
+   but avoids ABI compatibility issues with 32-bit-only clients.
+4. **No reference counting on handle use**: Stale handles from unloaded modules
+   return `INVALID_HANDLE` (CUDA_ERROR_INVALID_HANDLE) but the implementation
+   is best-effort (lookup against `mod_to_func` list).
+
+### Cleanup Guarantees on Process Exit
+
+No atexit handler is registered. Process exit simply abandons all in-memory
+state. This is the standard behavior for stub libraries and is acceptable.
+
 ## Phase 1 Implementation Status (Updated 2026-07-01)
 
 **Status: ✅ Phase 1 COMPLETE on `main` branch.**

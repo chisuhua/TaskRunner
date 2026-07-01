@@ -21,6 +21,34 @@ set_target_properties(taskrunner_umd_stub PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
+# Phase 2: LD_PRELOAD shim — libcuda_taskrunner.so
+add_library(cuda_taskrunner SHARED
+    src/umd/libcuda_shim/cu_init.cpp
+    src/umd/libcuda_shim/cu_module.cpp
+    src/umd/libcuda_shim/cu_mem.cpp
+    src/umd/libcuda_shim/cu_launch.cpp
+    src/umd/libcuda_shim/cu_ctx.cpp
+    src/umd/libcuda_shim/cu_device.cpp
+    src/umd/libcuda_shim/cu_query.cpp
+    src/umd/libcuda_shim/cu_stream.cpp
+    src/umd/libcuda_shim/cu_event.cpp
+)
+target_include_directories(cuda_taskrunner PUBLIC
+    ${CMAKE_SOURCE_DIR}
+    ${CMAKE_SOURCE_DIR}/include
+)
+target_link_libraries(cuda_taskrunner PUBLIC
+    taskrunner_test_fixture
+    taskrunner_shared
+    dl
+    pthread
+)
+target_compile_features(cuda_taskrunner PUBLIC cxx_std_17)
+set_target_properties(cuda_taskrunner PROPERTIES
+    POSITION_INDEPENDENT_CODE ON
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}"
+)
+
 # Tests
 add_executable(test_cuda_runtime_api
     tests/umd/test_cuda_runtime_api.cpp

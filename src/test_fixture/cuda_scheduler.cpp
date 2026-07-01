@@ -95,29 +95,18 @@ CudaScheduler::AllocationResult CudaScheduler::submit_mem_alloc(size_t size) {
         return result;
     }
 
-    // 调用 driver 分配真实 GPU 内存 (D10: CudaStub 路径)
-    auto* stub = dynamic_cast<async_task::gpu::CudaStub*>(driver_);
-    if (!stub) {
-        memory_mgr_.free(mem);
-        result.status = -ENOSYS;
-        return result;
-    }
-
-    uint64_t device_ptr = 0;
-    auto cuda_result = stub->mem_alloc(size, &device_ptr);
-    if (cuda_result != async_task::gpu::CudaResult::SUCCESS) {
+    // Phase 1.5: 通过 IGpuDriver 虚接口分配 (删除 dynamic_cast 抽象泄漏)
+    uint64_t bo_handle = driver_->alloc_bo_vram(size, 0);
+    if (bo_handle == 0) {
         memory_mgr_.free(mem);
         result.status = -EIO;
         return result;
     }
+    bo_handles_[mem.device_ptr] = bo_handle;
 
-    // 创建 fence
+    // 创建 fence (alloc 是同步操作，立即 signal)
     auto fence = sync_mgr_.create_fence();
-
-    // 在 stub 模式下，立即 signal fence
-    if (stub->is_stub_mode()) {
-        sync_mgr_.signal_fence(fence);
-    }
+    sync_mgr_.signal_fence(fence);
 
     result.device_ptr = mem.device_ptr;
     result.fence_id = fence->id;
@@ -141,23 +130,20 @@ int CudaScheduler::submit_mem_free(uint64_t device_ptr) {
         return -ENOENT;
     }
 
-    // D10: 调用 driver 释放
-    auto* stub = dynamic_cast<async_task::gpu::CudaStub*>(driver_);
-    if (!stub) {
-        return -ENOSYS;
-    }
-
-    auto cuda_result = stub->mem_free(device_ptr);
-    if (cuda_result != async_task::gpu::CudaResult::SUCCESS) {
-        return -EIO;
+    // Phase 1.5: 通过 IGpuDriver 虚接口释放 (删除 dynamic_cast 抽象泄漏)
+    auto it = bo_handles_.find(device_ptr);
+    if (it != bo_handles_.end()) {
+        int ret = driver_->free_bo(it->second);
+        if (ret != 0) {
+            return -EIO;
+        }
+        bo_handles_.erase(it);
     }
 
     memory_mgr_.free(mem);
 
     auto fence = sync_mgr_.create_fence();
-    if (stub->is_stub_mode()) {
-        sync_mgr_.signal_fence(fence);
-    }
+    sync_mgr_.signal_fence(fence);
 
     return 0;
 }
@@ -183,22 +169,17 @@ int CudaScheduler::submit_memcpy_h2d(uint64_t device_ptr, uint64_t offset,
         return -EOVERFLOW;
     }
 
-    auto* stub = dynamic_cast<async_task::gpu::CudaStub*>(driver_);
-    if (!stub) {
-        return -ENOSYS;
-    }
-
-    auto cuda_result = stub->memcpy_h2d(device_ptr + offset, host_ptr, size);
-    if (cuda_result != async_task::gpu::CudaResult::SUCCESS) {
+    // Phase 1.5: 通过 IGpuDriver 虚接口提交 memcpy (is_h2d=true)
+    int64_t driver_fence = driver_->submit_memcpy(0, reinterpret_cast<uint64_t>(host_ptr),
+                                                   device_ptr + offset, size, true);
+    if (driver_fence < 0) {
         return -EIO;
     }
 
     memory_mgr_.memcpy_h2d(mem, host_ptr, size);
 
     auto fence = sync_mgr_.create_fence();
-    if (stub->is_stub_mode()) {
-        sync_mgr_.signal_fence(fence);
-    }
+    sync_mgr_.signal_fence(fence);
 
     return static_cast<int>(fence->id);
 }
@@ -222,22 +203,16 @@ int CudaScheduler::submit_memcpy_d2h(void* host_ptr, uint64_t device_ptr,
         return -EOVERFLOW;
     }
 
-    auto* stub = dynamic_cast<async_task::gpu::CudaStub*>(driver_);
-    if (!stub) {
-        return -ENOSYS;
-    }
-
-    auto cuda_result = stub->memcpy_d2h(host_ptr, device_ptr + offset, size);
-    if (cuda_result != async_task::gpu::CudaResult::SUCCESS) {
+    int64_t driver_fence = driver_->submit_memcpy(0, device_ptr + offset,
+                                                   reinterpret_cast<uint64_t>(host_ptr), size, false);
+    if (driver_fence < 0) {
         return -EIO;
     }
 
     memory_mgr_.memcpy_d2h(host_ptr, mem, size);
 
     auto fence = sync_mgr_.create_fence();
-    if (stub->is_stub_mode()) {
-        sync_mgr_.signal_fence(fence);
-    }
+    sync_mgr_.signal_fence(fence);
 
     return static_cast<int>(fence->id);
 }
@@ -264,21 +239,10 @@ CudaScheduler::LaunchResult CudaScheduler::submit_launch(const async_task::gpu::
     task.params = params;
     task.state = Task::State::RUNNING;
 
-    auto* stub = dynamic_cast<async_task::gpu::CudaStub*>(driver_);
-    if (!stub) {
-        task.state = Task::State::FAILED;
-        task.error_code = -ENOSYS;
-
-        std::lock_guard<std::mutex> lock(tasks_mutex_);
-        pending_tasks_[task_id] = task;
-
-        result.status = -ENOSYS;
-        return result;
-    }
-
-    uint64_t stub_task_id = 0;
-    auto cuda_result = stub->launch_kernel(params, &stub_task_id);
-    if (cuda_result != async_task::gpu::CudaResult::SUCCESS) {
+    int64_t driver_fence = driver_->submit_launch(0, 0,
+        params.grid_dim_x, params.grid_dim_y, params.grid_dim_z,
+        params.block_dim_x, params.block_dim_y, params.block_dim_z);
+    if (driver_fence < 0) {
         task.state = Task::State::FAILED;
         task.error_code = -EIO;
 
@@ -290,11 +254,8 @@ CudaScheduler::LaunchResult CudaScheduler::submit_launch(const async_task::gpu::
     }
 
     auto fence = sync_mgr_.create_fence();
-
-    if (stub->is_stub_mode()) {
-        task.state = Task::State::COMPLETED;
-        sync_mgr_.signal_fence(fence);
-    }
+    task.state = Task::State::COMPLETED;
+    sync_mgr_.signal_fence(fence);
 
     {
         std::lock_guard<std::mutex> lock(tasks_mutex_);

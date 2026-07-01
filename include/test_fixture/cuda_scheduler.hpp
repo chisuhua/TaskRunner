@@ -23,6 +23,7 @@
 #include "shared/igpu_driver.hpp"
 
 #include <map>
+#include <unordered_map>
 #include <atomic>
 #include <mutex>
 #include <cstdint>
@@ -207,6 +208,9 @@ private:
 
     std::map<uint64_t, Task> pending_tasks_;
     mutable std::mutex tasks_mutex_;
+
+    // Phase 1.5: device_ptr → bo_handle 映射 (GpuDriverClient 后端用)
+    std::unordered_map<uint64_t, uint64_t> bo_handles_;
 
     std::atomic<uint64_t> next_task_id_{1};
     std::atomic<uint64_t> next_fence_id_{1};

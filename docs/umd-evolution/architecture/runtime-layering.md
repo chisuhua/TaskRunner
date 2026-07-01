@@ -45,3 +45,50 @@ The original tadr-201/202/203 proposed a `CudaRuntimeApi → IGpuDriver` direct 
 ## Phase 2 Extension (forward reference)
 
 Phase 2 adds `libcuda_taskrunner.so` (LD_PRELOAD) wrapping `CudaRuntimeApi`. Adds CUfunction→name handle table in the shim layer; existing Phase 1 path is reused.
+
+## Phase 1 Implementation Status (Updated 2026-07-01)
+
+**Status: ✅ Phase 1 COMPLETE on `main` branch.**
+
+### Deliverables
+
+| # | Component | Commit | Notes |
+|---|-----------|--------|-------|
+| 1 | `TaskRunner::getScheduler()` accessor + initialize scheduler | `6f7818d` | B.1 + deviation fix |
+| 2 | `CudaRuntimeApi` header | `020814c` | B.2 (replaces skeleton) |
+| 3 | `CudaRuntimeApi` implementation | `cb07353` | B.3 (5 methods + RAII) |
+| 4 | 8 real test cases | `8bc847a` | B.4 (replaces skeleton tests) |
+| 5 | 4 CLI commands | `4314dae` | B.5 (cuda_runtime_register/alloc/memcpy/launch) |
+| 6 | Phase 1 docs marked implemented | `9a50bd5` | B.6 (this status row) |
+| 7 | **Phase 1 final verification** | B.7 (this commit) | ✅ |
+
+### Test Results (39 cases, 0 failures)
+
+- `test_cuda_scheduler`: 8/8 PASS
+- `test_gpu_architecture`: 11/11 PASS
+- `test_gpu_phase2`: 12/12 PASS
+- `test_cuda_runtime_api`: 8/8 PASS
+
+### Phase 2 Readiness
+
+All Phase 2 prerequisites met:
+- `CudaRuntimeApi` class ready for LD_PRELOAD shim wrapping
+- `getScheduler()` (in test_fixture scope) OR standalone CudaRuntimeApi instance (CLI pattern)
+- 12 cu* APIs identified for Phase 2
+- 200 cu* stubs required for completeness
+- CudaStub backend fully wired (other backends have known limitations)
+
+### POA-1+POA-2 Achievement (Q4 Resolution)
+
+- **POA-1 (UsrLinuxEmu Stage 1.4 KFD Consumer)**: `CudaRuntimeApi` provides the API consumer layer; Phase 2 LD_PRELOAD will let real CUDA programs use this layer.
+- **POA-2 (CI Regression Test Baseline)**: 8 test cases + 4 CLI commands form an executable baseline. Adding new tests to `test_cuda_runtime_api.cpp` extends regression coverage.
+
+### Known Limitations (Phase 1)
+
+1. **GpuDriverClient backend `-ENOSYS`**: CudaScheduler has `dynamic_cast<CudaStub*>` at 5 sites. Phase 1 only verifies via CudaStub mode.
+2. **D2D/H2H memcpy unsupported**: `gpu_ioctl.h` only defines H2D/D2H. Returns `cudaErrorNotSupported`.
+3. **Single stream**: No `cuStreamCreate` in Phase 1.
+4. **No ELF parsing**: Kernel names manually registered.
+5. **CLI scheduler is standalone**: `cmd_cuda.cpp` creates its own CudaStub + CudaScheduler (not via TaskRunner::getScheduler()) to avoid doctest.h dependency.
+
+These limitations are intentional per Phase 1 scope; documented in design spec §Known Limitations (Phase 1).

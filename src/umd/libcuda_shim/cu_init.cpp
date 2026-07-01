@@ -33,6 +33,7 @@ CudaRuntimeApi* runtime() {
   std::call_once(g_init_flag, []() {
     g_stub = std::make_unique<taskrunner::CudaStub>();
     g_scheduler = std::make_unique<taskrunner::CudaScheduler>(g_stub.get());
+    g_scheduler->initialize(true);
     g_runtime = std::make_unique<CudaRuntimeApi>(g_scheduler.get());
   });
   return g_runtime.get();

@@ -40,6 +40,7 @@ target_include_directories(cuda_taskrunner PUBLIC
 target_link_libraries(cuda_taskrunner PUBLIC
     taskrunner_test_fixture
     taskrunner_shared
+    taskrunner_umd_stub
     dl
     pthread
 )
@@ -55,3 +56,10 @@ add_executable(test_cuda_runtime_api
 )
 target_link_libraries(test_cuda_runtime_api PRIVATE taskrunner_umd_stub)
 add_test(NAME test_cuda_runtime_api COMMAND test_cuda_runtime_api)
+
+# Phase 2: Shim E2E test (links against libcuda_taskrunner.so directly).
+add_executable(test_cuda_shim
+    tests/umd/test_cuda_shim.cpp
+)
+target_link_libraries(test_cuda_shim PRIVATE cuda_taskrunner)
+add_test(NAME test_cuda_shim COMMAND test_cuda_shim)

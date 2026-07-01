@@ -18,7 +18,7 @@ The original tadr-201/202/203 proposed a `CudaRuntimeApi → IGpuDriver` direct 
 
 | Layer | Responsibility | Status |
 |-------|----------------|--------|
-| **CudaRuntimeApi** | Provide 3 CUDA Runtime API surface (cudaMalloc/Memcpy/LaunchKernel), kernel name→index registry, RAII handle lifecycle, thread safety mutex | Phase 1 [NEW] |
+| **CudaRuntimeApi** | Provide 3 CUDA Runtime API surface (cudaMalloc/Memcpy/LaunchKernel), kernel name→index registry, RAII handle lifecycle, thread safety mutex | Phase 1 ✅ Implemented (commit 8bc847a, 2026-07-01) |
 | **CudaScheduler** | Submit commands via existing DI infra (`submit_mem_alloc`, `submit_memcpy_h2d/d2h`, `submit_launch`), wait_fence synchronization | Existing (H-3/H-5) |
 | **IGpuDriver** | 31 low-level methods (alloc_bo, submit_memcpy, submit_launch, create_va_space, create_queue, etc.) | Existing (H-2.5) |
 | **GpuDriverClient** | Translate IGpuDriver calls to ioctl commands for UsrLinuxEmu | Existing (H-3) |

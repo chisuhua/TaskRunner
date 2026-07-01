@@ -416,6 +416,26 @@ Per Oracle architectural review (2026-06-30), Phase 1's PoC motivation is dual:
 | Q4 ✅ RESOLVED (2026-06-30) | Phase 1 success criteria = POA-1 + POA-2. See §Resolved PoC Motivation below. | RESOLVED 2026-06-30 |
 | Q5 | Spec author (you) vs implementation team assignment? | Implementation kickoff |
 
+## Phase 1 Implementation Status (Updated 2026-07-01)
+
+Phase 1 deliverables are now complete on `main` branch:
+
+| Component | Status | Commit |
+|-----------|--------|--------|
+| `CudaRuntimeApi` class (header) | ✅ Implemented | `020814c` |
+| `CudaRuntimeApi` implementation | ✅ Implemented | `cb07353` |
+| `TaskRunner::getScheduler()` accessor | ✅ Implemented | `6f7818d` |
+| 8 real test cases | ✅ Pass | `8bc847a` |
+| 4 CLI commands | ✅ Implemented | `4314dae` |
+
+**Test status (39 cases, 0 failures)**:
+- test_cuda_runtime_api: 8/8
+- test_cuda_scheduler: 8/8
+- test_gpu_architecture: 11/11
+- test_gpu_phase2: 12/12
+
+**Phase 2 readiness**: All Phase 2 prerequisites met. `getScheduler()` available, `CudaRuntimeApi` class ready for LD_PRELOAD shim wrapping.
+
 ## References
 
 - `tadr-201-unified-scheduler.md` (SUPERSEDED) — original v0.1 UnifiedScheduler decision

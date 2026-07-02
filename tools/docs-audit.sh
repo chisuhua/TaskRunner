@@ -327,20 +327,31 @@ SHIM="${REPO_ROOT}/build/libcuda_taskrunner.so"
 if [ ! -f "$SHIM" ]; then
   warn "libcuda_taskrunner.so not built at $SHIM (skipping Phase 2 checks)"
 else
-  # Critical cu* APIs (from CRITICAL_APIS_IMPL_REQUIRED in tools/generate_cu_stubs.py)
-  CRITICAL_APIS=(
-    cuInit cuDriverGetVersion
-    cuDeviceGetCount cuDeviceGet cuDeviceGetName cuDeviceGetAttribute cuDeviceTotalMem
-    cuCtxCreate cuCtxDestroy cuCtxSetCurrent cuCtxGetCurrent
-    cuCtxPushCurrent cuCtxPopCurrent cuCtxSynchronize
-    cuCtxGetDevice cuCtxGetApiVersion cuCtxGetFlags
-    cuDevicePrimaryCtxRetain cuDevicePrimaryCtxRelease cuDevicePrimaryCtxReset
-    cuModuleLoad cuModuleUnload cuModuleGetFunction cuModuleGetGlobal
-    cuMemAlloc cuMemFree cuMemcpyHtoD cuMemcpyDtoH
-    cuMemcpyDtoD cuMemcpy cuMemcpyAsync
-    cuMemsetD32 cuMemsetD8 cuMemAllocHost cuMemFreeHost
-    cuLaunchKernel
-  )
+  # Critical cu* APIs (sourced from CRITICAL_APIS_IMPL_REQUIRED in
+  # tools/generate_cu_stubs.py — single source of truth).
+  # 2026-07-02 hotfix: previously a manually-maintained 41-item subset that
+  # drifted from the 79-item dict in generate_cu_stubs.py.
+  CRITICAL_APIS=()
+  if command -v python3 >/dev/null 2>&1; then
+    while IFS= read -r api; do
+      CRITICAL_APIS+=("$api")
+    done < <(python3 -c "
+import ast, sys
+src = open('${REPO_ROOT}/tools/generate_cu_stubs.py').read()
+tree = ast.parse(src)
+for node in ast.walk(tree):
+    if isinstance(node, ast.Assign):
+        for target in node.targets:
+            if isinstance(target, ast.Name) and target.id == 'CRITICAL_APIS_IMPL_REQUIRED':
+                if isinstance(node.value, ast.Dict):
+                    for key in node.value.keys:
+                        if isinstance(key, ast.Constant):
+                            print(key.value)
+")
+  fi
+  if [ ${#CRITICAL_APIS[@]} -eq 0 ]; then
+    warn "Could not extract CRITICAL_APIS from generate_cu_stubs.py (python3 missing or parse error)"
+  fi
 
   MISSING=()
   for api in "${CRITICAL_APIS[@]}"; do

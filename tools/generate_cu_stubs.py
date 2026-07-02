@@ -13,6 +13,12 @@ from pathlib import Path
 
 # APIs implemented in real cu_*.cpp files. These MUST NOT be stubbed.
 # Each maps to the source file containing the implementation.
+#
+# 2026-07-02 (hotfix — Path C Step 1 of umd-shim-coverage-hardening review):
+#   Registered 42 previously-unregistered APIs that were already implemented
+#   in .cpp files but not tracked here, causing cu_stub_table.inc to falsely
+#   label them as STUB. See openspec/changes/2026-07-02-umd-shim-coverage-hardening/
+#   .openspec.yaml review_status for context.
 CRITICAL_APIS_IMPL_REQUIRED = {
     # Initialization & Version
     "cuInit": "cu_init.cpp",
@@ -24,6 +30,7 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     "cuDeviceGetName": "cu_query.cpp",
     "cuDeviceGetAttribute": "cu_query.cpp",
     "cuDeviceTotalMem": "cu_query.cpp",
+    "cuDeviceComputeCapability": "cu_device.cpp",
     # Context
     "cuCtxCreate": "cu_ctx.cpp",
     "cuCtxDestroy": "cu_ctx.cpp",
@@ -35,14 +42,27 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     "cuCtxGetDevice": "cu_ctx.cpp",
     "cuCtxGetApiVersion": "cu_query.cpp",
     "cuCtxGetFlags": "cu_ctx.cpp",
+    "cuCtxGetCacheConfig": "cu_ctx.cpp",
+    "cuCtxSetCacheConfig": "cu_ctx.cpp",
+    "cuCtxGetSharedMemConfig": "cu_ctx.cpp",
+    "cuCtxSetSharedMemConfig": "cu_ctx.cpp",
+    "cuCtxGetLimit": "cu_ctx.cpp",
+    "cuCtxSetLimit": "cu_ctx.cpp",
     "cuDevicePrimaryCtxRetain": "cu_query.cpp",
     "cuDevicePrimaryCtxRelease": "cu_query.cpp",
     "cuDevicePrimaryCtxReset": "cu_query.cpp",
+    "cuDevicePrimaryCtxGetState": "cu_query.cpp",
+    "cuDevicePrimaryCtxSetFlags": "cu_query.cpp",
     # Module
     "cuModuleLoad": "cu_module.cpp",
     "cuModuleUnload": "cu_module.cpp",
     "cuModuleGetFunction": "cu_module.cpp",
     "cuModuleGetGlobal": "cu_module.cpp",
+    "cuModuleGetTexRef": "cu_module.cpp",
+    "cuModuleGetSurfRef": "cu_module.cpp",
+    "cuModuleLoadData": "cu_module.cpp",
+    "cuModuleLoadDataEx": "cu_module.cpp",
+    "cuModuleLoadFatBinary": "cu_module.cpp",
     # Memory
     "cuMemAlloc": "cu_mem.cpp",
     "cuMemFree": "cu_mem.cpp",
@@ -55,8 +75,39 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     "cuMemsetD8": "cu_mem.cpp",
     "cuMemAllocHost": "cu_mem.cpp",
     "cuMemFreeHost": "cu_mem.cpp",
+    "cuMemAllocManaged": "cu_mem.cpp",
+    "cuMemAllocPitch": "cu_mem.cpp",
+    "cuMemGetInfo": "cu_mem.cpp",
+    "cuMemGetAddressRange": "cu_mem.cpp",
+    # Stream
+    "cuStreamCreate": "cu_stream.cpp",
+    "cuStreamDestroy": "cu_stream.cpp",
+    "cuStreamSynchronize": "cu_stream.cpp",
+    "cuStreamQuery": "cu_stream.cpp",
+    "cuStreamWaitEvent": "cu_stream.cpp",
+    "cuStreamAddCallback": "cu_stream.cpp",
+    "cuStreamBeginCapture": "cu_stream.cpp",
+    "cuStreamEndCapture": "cu_stream.cpp",
+    "cuStreamCreateWithPriority": "cu_stream.cpp",
+    "cuStreamGetPriority": "cu_stream.cpp",
+    "cuStreamGetFlags": "cu_stream.cpp",
+    "cuStreamWaitValue32": "cu_stream.cpp",
+    "cuStreamWriteValue32": "cu_stream.cpp",
+    # Event
+    "cuEventCreate": "cu_event.cpp",
+    "cuEventDestroy": "cu_event.cpp",
+    "cuEventRecord": "cu_event.cpp",
+    "cuEventSynchronize": "cu_event.cpp",
+    "cuEventElapsedTime": "cu_event.cpp",
+    "cuEventQuery": "cu_event.cpp",
     # Launch
     "cuLaunchKernel": "cu_launch.cpp",
+    "cuLaunchKernelEx": "cu_launch.cpp",
+    "cuLaunchCooperativeKernel": "cu_launch.cpp",
+    "cuLaunchHostFunc": "cu_launch.cpp",
+    # Error helpers
+    "cuGetErrorName": "cu_query.cpp",
+    "cuGetErrorString": "cu_query.cpp",
 }
 
 # All CUDA Driver APIs (~200). Those in CRITICAL_APIS_IMPL_REQUIRED become
@@ -75,7 +126,8 @@ CUDA_DRIVER_APIS = [
     "cuCtxGetSharedMemConfig", "cuCtxSetSharedMemConfig",
     "cuCtxGetLimit", "cuCtxSetLimit",
     "cuDevicePrimaryCtxRetain", "cuDevicePrimaryCtxRelease",
-    "cuDevicePrimaryCtxReset", "cuDevicePrimaryCtxSetFlags",
+    "cuDevicePrimaryCtxReset", "cuDevicePrimaryCtxGetState",
+    "cuDevicePrimaryCtxSetFlags",
     # Module Loading
     "cuModuleLoad", "cuModuleLoadData", "cuModuleLoadDataEx",
     "cuModuleLoadFatBinary", "cuModuleUnload", "cuModuleGetFunction",

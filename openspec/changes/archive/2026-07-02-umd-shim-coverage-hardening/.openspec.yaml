@@ -1,0 +1,68 @@
+schema: spec-driven
+created: 2026-07-02
+status: SUPERSEDED
+archived: 2026-07-02
+superseded_by:
+  - "Phase 2 drift hotfix (commit d8ca3d3) — independently executed, not part of this change"
+  - "Future change: 2026-07-02-phase16-shim-extension (to be created)"
+status_history:
+  - "PROPOSED (2026-07-02 initial)"
+  - "DRAFT (2026-07-02 self-review found data baseline drift)"
+  - "SUPERSEDED (2026-07-02 — drift fixed via hotfix d8ca3d3; new change supersedes)"
+review_status:
+  verdict: STRONG_NO_GO
+  reviewed_by: Sisyphus (self-review, Oracle backend API error)
+  reviewed_at: 2026-07-02
+  must_fix:
+    - id: MUST-FIX-1
+      severity: P0
+      summary: "All numerical baseline claims were wrong (STUB/REAL_IMPL counts)"
+      status: RESOLVED
+      resolved_by: "commit d8ca3d3"
+      evidence: "cu_stub_table.inc had 143 declarations (37 REAL_IMPL + 106 STUB); 79 exported via nm; 79 actually implemented in .cpp"
+    - id: MUST-FIX-2
+      severity: P0
+      summary: "Sub-plan A targets files in UsrLinuxEmu repo, not TaskRunner"
+      status: NOT_RESOLVED
+      evidence: "h3-phase2-management is at UsrLinuxEmu/openspec/changes/archive/2026-06-22-h3-phase2-management/"
+    - id: MUST-FIX-3
+      severity: P0
+      summary: "Sub-plan C claimed to implement 9 APIs that already exist"
+      status: RESOLVED
+      resolved_by: "commit d8ca3d3"
+      evidence: "cuGetErrorName/String in cu_query.cpp:30-50; cuCtx*Config/Limit in cu_ctx.cpp — now correctly registered"
+    - id: MUST-FIX-4
+      severity: P0
+      summary: "cuMemGetInfo 8GB default was fake-success risk"
+      status: NOT_RESOLVED
+      evidence: "Should pull from GpuDriverClient::get_device_info() — deferred to future change"
+    - id: MUST-FIX-5
+      severity: P0
+      summary: "docs-audit.sh Check 9 CRITICAL_APIS array inconsistent with generate_cu_stubs.py dict"
+      status: RESOLVED
+      resolved_by: "commit d8ca3d3"
+      evidence: "Check 9 now uses dynamic AST extraction from generate_cu_stubs.py (single source of truth)"
+  resolved_separately: "Phase 2 drift hotfix (commit d8ca3d3)"
+goal: "ORIGINAL GOAL: Harden libcuda_taskrunner.so shim by promoting backend-independent cu* stubs to real implementations, expanding test coverage, resolving H-3 follow-up fixes, and preparing Phase 3 skeleton. SUPERSEDED: most stub-promotion work was unnecessary (APIs already implemented); only semantic fixes, test coverage, and H-3 cross-repo cleanup remain (deferred to future change)."
+cross_repo:
+  prerequisite:
+    - "openspec/changes/archive/2026-07-02-taskrunner-umd-backend-enable/ (Phase 1.5 Stretch)"
+  blocks:
+    - "Phase 3 kickoff (depends on UsrLinuxEmu Stage 1.4 + future change's skeleton)"
+  parallel_with:
+    - "UsrLinuxEmu Stage 1.0-1.3 (PCIe/IOMMU/DRM/UVM emulation, no TaskRunner dependency)"
+  specs:
+    - "external/TaskRunner/docs/superpowers/specs/2026-07-02-umd-shim-coverage-hardening.md (kept as reflection material)"
+    - "external/TaskRunner/docs/superpowers/plans/2026-07-02-umd-shim-coverage-hardening.md (kept as reflection material)"
+related_documents:
+  - "external/TaskRunner/docs/umd-evolution/roadmap/phase-2-complete.md"
+  - "external/TaskRunner/docs/umd-evolution/roadmap/phase-3-deferred.md"
+  - "external/TaskRunner/docs/umd-evolution/roadmap/current-status.md"
+  - "external/TaskRunner/docs/superpowers/specs/2026-07-02-phase1.5-cudastub-dynamic-cast-fix.md"
+  - "../../../UsrLinuxEmu/docs/07-integration/h3-activation-followup.md"
+  - "../../../UsrLinuxEmu/docs/roadmap/stage-1-kernel-emu.md"
+outcome:
+  scope: umd-evolution
+  final_disposition: "SUPERSEDED"
+  actual_resolution: "Drift fixed in d8ca3d3; remaining MUST-FIX-2 (H-3 cross-repo) and MUST-FIX-4 (cuMemGetInfo real data source) deferred to future change"
+  cross_repo_code_change: "none from this change (hotfix d8ca3d3 is independent)"

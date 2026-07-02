@@ -127,11 +127,22 @@ class CudaRuntimeApi {
    * @param sharedMem Dynamic shared memory size (bytes).
    * @return CudaError::Success on success.
    */
-  CudaError launch_kernel(const std::string& name, Dim3 gridDim,
+CudaError launch_kernel(const std::string& name, Dim3 gridDim,
                           Dim3 blockDim, void** args,
                           std::size_t sharedMem);
 
- private:
+  /**
+   * @brief Query the underlying IGpuDriver's total VRAM size.
+   *
+   * Returns the value of gpu_device_info::vram_size from the driver backend
+   * (CudaStub mock value or GpuDriverClient real value). Used by shim layer
+   * to back cuMemGetInfo without hardcoding fake values.
+   *
+   * @return Total device memory in bytes, or 0 if backend unavailable.
+   */
+  std::size_t get_total_memory();
+
+  private:
   // Device memory allocation tracking.
   struct DeviceMem {
     std::uint64_t va_space_handle;

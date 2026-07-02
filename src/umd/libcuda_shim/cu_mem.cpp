@@ -121,8 +121,15 @@ extern "C" CUresult cuMemAllocPitch(CUdeviceptr* dptr, size_t* pitch,
 
 extern "C" CUresult cuMemGetInfo(size_t* free, size_t* total) {
   if (!free || !total) return CUDA_ERROR_INVALID_VALUE;
-  *free = 4ULL * 1024 * 1024 * 1024;     // 4 GB free
-  *total = 8ULL * 1024 * 1024 * 1024;    // 8 GB total
+
+  std::size_t total_bytes =
+      async_task::umd::shim::runtime()->get_total_memory();
+  if (total_bytes == 0) {
+    const char* env = std::getenv("TASKRUNNER_GPU_MEM_SIZE");
+    total_bytes = env ? std::stoull(env) : (8ULL * 1024 * 1024 * 1024);
+  }
+  *total = total_bytes;
+  *free = total_bytes;
   return CUDA_SUCCESS;
 }
 

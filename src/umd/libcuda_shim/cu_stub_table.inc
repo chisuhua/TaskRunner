@@ -134,15 +134,15 @@ CUresult cuDevicePrimaryCtxSetFlags(void);
 __attribute__((weak, visibility("default")))
 CUresult cuModuleLoad(void);
 
-// REAL_IMPL in cu_module.cpp
+// STUB
 __attribute__((weak, visibility("default")))
 CUresult cuModuleLoadData(void);
 
-// REAL_IMPL in cu_module.cpp
+// STUB
 __attribute__((weak, visibility("default")))
 CUresult cuModuleLoadDataEx(void);
 
-// REAL_IMPL in cu_module.cpp
+// STUB
 __attribute__((weak, visibility("default")))
 CUresult cuModuleLoadFatBinary(void);
 

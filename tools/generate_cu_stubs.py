@@ -60,9 +60,10 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     "cuModuleGetGlobal": "cu_module.cpp",
     "cuModuleGetTexRef": "cu_module.cpp",
     "cuModuleGetSurfRef": "cu_module.cpp",
-    "cuModuleLoadData": "cu_module.cpp",
-    "cuModuleLoadDataEx": "cu_module.cpp",
-    "cuModuleLoadFatBinary": "cu_module.cpp",
+    # cuModuleLoadData / cuModuleLoadDataEx / cuModuleLoadFatBinary intentionally
+    # absent — their .cpp bodies only return CUDA_ERROR_NOT_IMPLEMENTED, so
+    # registering them as REAL_IMPL would be misleading. Real ELF/CUBIN
+    # parsing is deferred to Phase D-3.
     # Memory
     "cuMemAlloc": "cu_mem.cpp",
     "cuMemFree": "cu_mem.cpp",

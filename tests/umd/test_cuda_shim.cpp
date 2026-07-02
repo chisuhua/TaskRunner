@@ -348,4 +348,129 @@ TEST_CASE("cuInit is idempotent across multiple calls") {
   CHECK(cuInit(1) == CUDA_SUCCESS);
 }
 
+// ---------------------------------------------------------------------------
+// Phase 1.6 — A.1 cuMemGetInfo real data source (hotfix d8ca3d3+ followup)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("cuMemGetInfo returns real backend vram_size via IGpuDriver") {
+  size_t free_bytes = 0, total_bytes = 0;
+  CHECK(cuMemGetInfo(&free_bytes, &total_bytes) == CUDA_SUCCESS);
+  CHECK(total_bytes > 0);
+  CHECK(free_bytes > 0);
+  CHECK(free_bytes <= total_bytes);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1.6 — A.3 test coverage expansion (cuEvent*)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("cuEventCreate returns valid event handle") {
+  CUevent event;
+  CHECK(cuEventCreate(&event, 0) == CUDA_SUCCESS);
+  CHECK(event != nullptr);
+  CHECK(cuEventDestroy(event) == CUDA_SUCCESS);
+}
+
+TEST_CASE("cuEventRecord and cuEventSynchronize basic flow") {
+  CUevent event;
+  CHECK(cuEventCreate(&event, 0) == CUDA_SUCCESS);
+  CHECK(cuEventRecord(event, /*hStream=*/0) == CUDA_SUCCESS);
+  CHECK(cuEventSynchronize(event) == CUDA_SUCCESS);
+  CHECK(cuEventDestroy(event) == CUDA_SUCCESS);
+}
+
+TEST_CASE("cuEventQuery returns SUCCESS after sync") {
+  CUevent event;
+  CHECK(cuEventCreate(&event, 0) == CUDA_SUCCESS);
+  CHECK(cuEventRecord(event, 0) == CUDA_SUCCESS);
+  CHECK(cuEventSynchronize(event) == CUDA_SUCCESS);
+  CHECK(cuEventQuery(event) == CUDA_SUCCESS);
+  CHECK(cuEventDestroy(event) == CUDA_SUCCESS);
+}
+
+TEST_CASE("cuEventElapsedTime measures positive interval") {
+  CUevent start, end;
+  CHECK(cuEventCreate(&start, 0) == CUDA_SUCCESS);
+  CHECK(cuEventCreate(&end, 0) == CUDA_SUCCESS);
+  CHECK(cuEventRecord(start, 0) == CUDA_SUCCESS);
+  CHECK(cuEventRecord(end, 0) == CUDA_SUCCESS);
+  CHECK(cuEventSynchronize(end) == CUDA_SUCCESS);
+  float ms = -1.0f;
+  CHECK(cuEventElapsedTime(&ms, start, end) == CUDA_SUCCESS);
+  CHECK(ms >= 0.0f);
+  CHECK(cuEventDestroy(start) == CUDA_SUCCESS);
+  CHECK(cuEventDestroy(end) == CUDA_SUCCESS);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1.6 — A.3 test coverage expansion (cuStream*)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("cuStreamQuery returns SUCCESS for idle stream") {
+  CUstream stream;
+  CHECK(cuStreamCreate(&stream, 0) == CUDA_SUCCESS);
+  CHECK(cuStreamQuery(stream) == CUDA_SUCCESS);
+  CHECK(cuStreamSynchronize(stream) == CUDA_SUCCESS);
+  CHECK(cuStreamDestroy(stream) == CUDA_SUCCESS);
+}
+
+TEST_CASE("cuStreamWaitEvent basic flow") {
+  CUstream stream;
+  CUevent event;
+  CHECK(cuStreamCreate(&stream, 0) == CUDA_SUCCESS);
+  CHECK(cuEventCreate(&event, 0) == CUDA_SUCCESS);
+  CHECK(cuEventRecord(event, 0) == CUDA_SUCCESS);
+  CHECK(cuStreamWaitEvent(stream, event, 0) == CUDA_SUCCESS);
+  CHECK(cuStreamSynchronize(stream) == CUDA_SUCCESS);
+  CHECK(cuEventDestroy(event) == CUDA_SUCCESS);
+  CHECK(cuStreamDestroy(stream) == CUDA_SUCCESS);
+}
+
+TEST_CASE("cuStreamCreateWithPriority returns valid stream") {
+  CUstream stream;
+  CHECK(cuStreamCreateWithPriority(&stream, 0, /*priority=*/0) == CUDA_SUCCESS);
+  CHECK(stream != nullptr);
+  int priority = -1;
+  CHECK(cuStreamGetPriority(stream, &priority) == CUDA_SUCCESS);
+  CHECK(cuStreamDestroy(stream) == CUDA_SUCCESS);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1.6 — A.3 test coverage expansion (cuCtx*Config/Limit)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("cuCtxGetCacheConfig returns default config") {
+  CUfunc_cache config;
+  CHECK(cuCtxGetCacheConfig(&config) == CUDA_SUCCESS);
+  CHECK(config >= CU_FUNC_CACHE_PREFER_NONE);
+  CHECK(config <= CU_FUNC_CACHE_PREFER_SHARED);
+}
+
+TEST_CASE("cuCtxSetCacheConfig then Get returns same value") {
+  CUfunc_cache original;
+  CHECK(cuCtxGetCacheConfig(&original) == CUDA_SUCCESS);
+  CHECK(cuCtxSetCacheConfig(CU_FUNC_CACHE_PREFER_L1) == CUDA_SUCCESS);
+  CUfunc_cache updated;
+  CHECK(cuCtxGetCacheConfig(&updated) == CUDA_SUCCESS);
+  CHECK(updated == CU_FUNC_CACHE_PREFER_L1);
+  CHECK(cuCtxSetCacheConfig(original) == CUDA_SUCCESS);
+}
+
+TEST_CASE("cuCtxGetLimit returns non-zero for stack size") {
+  size_t stack_size = 0;
+  CHECK(cuCtxGetLimit(&stack_size, CU_LIMIT_STACK_SIZE) == CUDA_SUCCESS);
+  CHECK(stack_size > 0);
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1.6 — A.3 test coverage expansion (cuLaunchCooperativeKernel)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("cuLaunchCooperativeKernel returns NOT_SUPPORTED (no cooperative HW)") {
+  CUfunction func = nullptr;
+  void* args[1] = {nullptr};
+  CHECK(cuLaunchCooperativeKernel(func, 1, 1, 1, 1, 1, 1, 0, /*hStream=*/0,
+                                  args, nullptr) == CUDA_ERROR_NOT_SUPPORTED);
+}
+
 }  // namespace

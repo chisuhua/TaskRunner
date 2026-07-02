@@ -144,4 +144,13 @@ CudaError CudaRuntimeApi::launch_kernel(const std::string& name,
                                                        : CudaError::Unknown;
 }
 
+std::size_t CudaRuntimeApi::get_total_memory() {
+  if (!scheduler_) return 0;
+  auto* drv = scheduler_->driver();
+  if (!drv) return 0;
+  gpu_device_info info{};
+  if (drv->get_device_info(&info) != 0) return 0;
+  return info.vram_size;
+}
+
 }  // namespace async_task::umd

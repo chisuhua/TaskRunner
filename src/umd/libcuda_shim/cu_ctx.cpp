@@ -14,9 +14,10 @@
 #include <vector>
 
 // Missing types from compat cuda.h (Phase 2 PoC: int-sized enum compatibility).
-typedef int CUfunc_cacheConfig;
-typedef int CUsharedconfig;
-typedef int CUlimit;
+// Phase 1.7: cuda.h provides proper CUfunc_cache enum, CUsharedconfig/CUlimit int typedefs.
+
+// Cache config storage (accessed by extern "C" cuCtxGet/SetCacheConfig).
+static CUfunc_cache g_cache_config = CU_FUNC_CACHE_PREFER_NONE;
 
 namespace async_task::umd::shim {
 
@@ -151,20 +152,21 @@ extern "C" CUresult cuCtxGetApiVersion(CUcontext ctx, unsigned int* version) {
   return CUDA_SUCCESS;
 }
 
-extern "C" CUresult cuCtxGetCacheConfig(CUfunc_cacheConfig* pconfig) {
-  // compat cuda.h may not define CUfunc_cacheConfig; use int as fallback.
-  // This function is informational only in Phase 2.
-  (void)pconfig;
+extern "C" CUresult cuCtxGetCacheConfig(CUfunc_cache* pconfig) {
+  if (!pconfig) return CUDA_ERROR_INVALID_VALUE;
+  *pconfig = g_cache_config;
   return CUDA_SUCCESS;
 }
 
-extern "C" CUresult cuCtxSetCacheConfig(CUfunc_cacheConfig config) {
-  (void)config;
+extern "C" CUresult cuCtxSetCacheConfig(CUfunc_cache config) {
+  g_cache_config = config;
   return CUDA_SUCCESS;
 }
 
 extern "C" CUresult cuCtxGetSharedMemConfig(CUsharedconfig* pConfig) {
-  (void)pConfig;
+  if (!pConfig) return CUDA_ERROR_INVALID_VALUE;
+  // Default: 4-byte bank size (CU_SHARED_MEM_CONFIG_DEFAULT_BANK_SIZE in real CUDA).
+  *pConfig = 0;
   return CUDA_SUCCESS;
 }
 
@@ -175,8 +177,21 @@ extern "C" CUresult cuCtxSetSharedMemConfig(CUsharedconfig config) {
 
 extern "C" CUresult cuCtxGetLimit(size_t* pvalue, CUlimit limit) {
   if (!pvalue) return CUDA_ERROR_INVALID_VALUE;
-  *pvalue = 0;
-  (void)limit;
+  // Phase 2 PoC: return reasonable defaults per limit type.
+  switch (limit) {
+    case CU_LIMIT_STACK_SIZE:
+      *pvalue = 1024;
+      break;
+    case CU_LIMIT_PRINTF_FIFO_SIZE:
+      *pvalue = 1048576;
+      break;
+    case CU_LIMIT_MALLOC_HEAP_SIZE:
+      *pvalue = 8388608;
+      break;
+    default:
+      *pvalue = 0;
+      break;
+  }
   return CUDA_SUCCESS;
 }
 

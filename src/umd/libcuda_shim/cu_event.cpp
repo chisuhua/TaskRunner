@@ -59,6 +59,7 @@ extern "C" CUresult cuEventRecord(CUevent hEvent, CUstream hStream) {
 
 extern "C" CUresult cuEventSynchronize(CUevent hEvent) {
   // Phase 2 PoC: no-op (synchronous semantics — event recorded synchronously).
+  if (!hEvent) return CUDA_ERROR_INVALID_VALUE;
   (void)hEvent;
   return CUDA_SUCCESS;
 }
@@ -89,4 +90,14 @@ extern "C" CUresult cuEventElapsedTime(float* pMilliseconds, CUevent hStart,
   if (*pMilliseconds < 0.0f) *pMilliseconds = 0.0f;
 
   return CUDA_SUCCESS;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1.7 — A.4: cuEventCreateWithFlags
+// ---------------------------------------------------------------------------
+
+extern "C" CUresult cuEventCreateWithFlags(CUevent* phEvent,
+                                            unsigned int flags) {
+  (void)flags;
+  return cuEventCreate(phEvent, 0);
 }

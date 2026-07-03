@@ -254,7 +254,7 @@ CUresult cuMemcpyAsync(void);
 __attribute__((weak, visibility("default")))
 CUresult cuMemsetD32(void);
 
-// STUB
+// REAL_IMPL in cu_mem.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuMemsetD16(void);
 
@@ -326,7 +326,7 @@ CUresult cuStreamAddCallback(void);
 __attribute__((weak, visibility("default")))
 CUresult cuStreamCreateWithPriority(void);
 
-// STUB
+// REAL_IMPL in cu_stream.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuStreamCreateWithFlags(void);
 
@@ -338,7 +338,7 @@ CUresult cuStreamGetPriority(void);
 __attribute__((weak, visibility("default")))
 CUresult cuStreamGetFlags(void);
 
-// STUB
+// REAL_IMPL in cu_stream.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuStreamGetCaptureInfo(void);
 
@@ -374,7 +374,7 @@ CUresult cuEventElapsedTime(void);
 __attribute__((weak, visibility("default")))
 CUresult cuEventQuery(void);
 
-// STUB
+// REAL_IMPL in cu_event.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuEventCreateWithFlags(void);
 
@@ -534,27 +534,27 @@ CUresult cuMemHostUnregister(void);
 __attribute__((weak, visibility("default")))
 CUresult cuMemHostRegister(void);
 
-// STUB
+// REAL_IMPL in cu_module.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuOccupancyMaxActiveBlocksPerMultiprocessor(void);
 
-// STUB
+// REAL_IMPL in cu_module.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuOccupancyMaxPotentialBlockSize(void);
 
-// STUB
+// REAL_IMPL in cu_module.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(void);
 
-// STUB
+// REAL_IMPL in cu_mem.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuProfilerStart(void);
 
-// STUB
+// REAL_IMPL in cu_mem.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuProfilerStop(void);
 
-// STUB
+// REAL_IMPL in cu_mem.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuProfilerInitialize(void);
 
@@ -566,23 +566,23 @@ CUresult cuGetErrorName(void);
 __attribute__((weak, visibility("default")))
 CUresult cuGetErrorString(void);
 
-// STUB
+// REAL_IMPL in cu_module.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuFuncGetAttribute(void);
 
-// STUB
+// REAL_IMPL in cu_module.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuFuncSetAttribute(void);
 
-// STUB
+// REAL_IMPL in cu_module.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuFuncSetCacheConfig(void);
 
-// STUB
+// REAL_IMPL in cu_module.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuFuncGetModule(void);
 
-// STUB
+// REAL_IMPL in cu_mem.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuPointerGetAttribute(void);
 

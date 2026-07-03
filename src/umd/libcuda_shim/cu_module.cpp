@@ -39,6 +39,12 @@ struct HandleTable {
   // Function handle -> kernel name (real implementation in cu_launch.cpp).
   std::unordered_map<CUfunction, std::string> func_to_name;
 
+  // Function handle -> function attributes (cuFuncGetAttribute/SetAttribute).
+  std::unordered_map<CUfunction, std::unordered_map<int, int>> func_to_attrs;
+
+  // Function handle -> owning module (cuFuncGetModule reverse lookup).
+  std::unordered_map<CUfunction, CUmodule> func_to_module;
+
   std::mutex mu;
 };
 HandleTable g_handles;
@@ -75,6 +81,9 @@ extern "C" CUresult cuModuleGetFunction(CUfunction* hfunc, CUmodule hmod,
   *hfunc = reinterpret_cast<CUfunction>(
       async_task::umd::shim::g_handles.next_id.fetch_add(1));
   async_task::umd::shim::g_handles.func_to_name[*hfunc] = name;
+
+  // Track function -> module for cuFuncGetModule reverse lookup.
+  async_task::umd::shim::g_handles.func_to_module[*hfunc] = hmod;
 
   // Track which functions belong to this module for cleanup.
   auto it = async_task::umd::shim::g_handles.mod_to_func.find(hmod);
@@ -138,4 +147,126 @@ extern "C" CUresult cuModuleLoadDataEx(CUmodule* module, const void* image,
 extern "C" CUresult cuModuleLoadFatBinary(CUmodule* module, const void* fatCubin) {
   (void)module; (void)fatCubin;
   return CUDA_ERROR_NOT_IMPLEMENTED;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1.7 — A.1: cuFuncGetAttribute / cuFuncSetAttribute / cuFuncSetCacheConfig / cuFuncGetModule
+// ---------------------------------------------------------------------------
+
+extern "C" CUresult cuFuncGetAttribute(int* val, CUfunction_attribute attr,
+                                       CUfunction f) {
+  if (!val || !f) return CUDA_ERROR_INVALID_VALUE;
+  auto& table = async_task::umd::shim::g_handles;
+  std::lock_guard<std::mutex> lock(table.mu);
+
+  if (table.func_to_name.find(f) == table.func_to_name.end())
+    return CUDA_ERROR_INVALID_HANDLE;
+
+  // Check if user has set a custom value via cuFuncSetAttribute.
+  auto attrs_it = table.func_to_attrs.find(f);
+  if (attrs_it != table.func_to_attrs.end()) {
+    auto val_it = attrs_it->second.find(static_cast<int>(attr));
+    if (val_it != attrs_it->second.end()) {
+      *val = val_it->second;
+      return CUDA_SUCCESS;
+    }
+  }
+
+  // Default values per CUDA architecture.
+  switch (attr) {
+    case CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK:
+      *val = 1024;
+      break;
+    case CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES:
+      *val = 48 * 1024;
+      break;
+    case CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES:
+      *val = 64 * 1024;
+      break;
+    case CU_FUNC_ATTRIBUTE_NUM_REGS:
+      *val = 32;
+      break;
+    default:
+      return CUDA_ERROR_INVALID_VALUE;
+  }
+  return CUDA_SUCCESS;
+}
+
+extern "C" CUresult cuFuncSetAttribute(CUfunction f, CUfunction_attribute attr,
+                                       int val) {
+  if (!f) return CUDA_ERROR_INVALID_VALUE;
+  auto& table = async_task::umd::shim::g_handles;
+  std::lock_guard<std::mutex> lock(table.mu);
+
+  if (table.func_to_name.find(f) == table.func_to_name.end())
+    return CUDA_ERROR_INVALID_HANDLE;
+
+  table.func_to_attrs[f][static_cast<int>(attr)] = val;
+  return CUDA_SUCCESS;
+}
+
+extern "C" CUresult cuFuncSetCacheConfig(CUfunction f, CUfunc_cache config) {
+  if (!f) return CUDA_ERROR_INVALID_VALUE;
+  auto& table = async_task::umd::shim::g_handles;
+  std::lock_guard<std::mutex> lock(table.mu);
+
+  if (table.func_to_name.find(f) == table.func_to_name.end())
+    return CUDA_ERROR_INVALID_HANDLE;
+
+  table.func_to_attrs[f][1000] = static_cast<int>(config);  // 1000 = cache config key
+  return CUDA_SUCCESS;
+}
+
+extern "C" CUresult cuFuncGetModule(CUmodule* mod, CUfunction f) {
+  if (!mod || !f) return CUDA_ERROR_INVALID_VALUE;
+  auto& table = async_task::umd::shim::g_handles;
+  std::lock_guard<std::mutex> lock(table.mu);
+
+  auto it = table.func_to_module.find(f);
+  if (it == table.func_to_module.end())
+    return CUDA_ERROR_INVALID_HANDLE;
+
+  *mod = it->second;
+  return CUDA_SUCCESS;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1.7 — A.2: cuOccupancyMaxActiveBlocksPerMultiprocessor / WithFlags / cuOccupancyMaxPotentialBlockSize
+// ---------------------------------------------------------------------------
+
+extern "C" CUresult cuOccupancyMaxActiveBlocksPerMultiprocessor(
+    int* blocks, CUfunction f, int blockSize, size_t dynSMem) {
+  if (!blocks || !f) return CUDA_ERROR_INVALID_VALUE;
+  if (blockSize <= 0) return CUDA_ERROR_INVALID_VALUE;
+  (void)dynSMem;
+
+  // Heuristic: assume 48KB shared memory per SM, compute max blocks.
+  const int shared_mem_per_sm = 48 * 1024;
+  int heuristic = shared_mem_per_sm / std::max(blockSize, 1);
+  *blocks = std::max(1, std::min(32, heuristic));
+  return CUDA_SUCCESS;
+}
+
+extern "C" CUresult cuOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(
+    int* blocks, CUfunction f, int blockSize, size_t dynSMem,
+    unsigned int flags) {
+  (void)flags;
+  return cuOccupancyMaxActiveBlocksPerMultiprocessor(blocks, f, blockSize,
+                                                     dynSMem);
+}
+
+extern "C" CUresult cuOccupancyMaxPotentialBlockSize(
+    int* minGridSize, int* blockSize, CUfunction f,
+    CUoccupancyB2DSize blockSizeToDynamicSMem, size_t dynSMemPerBlock,
+    int blockSizeLimit) {
+  if (!minGridSize || !blockSize) return CUDA_ERROR_INVALID_VALUE;
+  (void)f;
+  (void)blockSizeToDynamicSMem;
+  (void)dynSMemPerBlock;
+  (void)blockSizeLimit;
+
+  // Reasonable heuristic for a stub GPU.
+  *minGridSize = 80;    // 80 SMs
+  *blockSize = 256;     // 256 threads per block
+  return CUDA_SUCCESS;
 }

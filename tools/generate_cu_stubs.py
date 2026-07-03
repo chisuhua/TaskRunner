@@ -90,8 +90,10 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     "cuStreamBeginCapture": "cu_stream.cpp",
     "cuStreamEndCapture": "cu_stream.cpp",
     "cuStreamCreateWithPriority": "cu_stream.cpp",
+    "cuStreamCreateWithFlags": "cu_stream.cpp",
     "cuStreamGetPriority": "cu_stream.cpp",
     "cuStreamGetFlags": "cu_stream.cpp",
+    "cuStreamGetCaptureInfo": "cu_stream.cpp",
     "cuStreamWaitValue32": "cu_stream.cpp",
     "cuStreamWriteValue32": "cu_stream.cpp",
     # Event
@@ -101,6 +103,7 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     "cuEventSynchronize": "cu_event.cpp",
     "cuEventElapsedTime": "cu_event.cpp",
     "cuEventQuery": "cu_event.cpp",
+    "cuEventCreateWithFlags": "cu_event.cpp",
     # Launch
     "cuLaunchKernel": "cu_launch.cpp",
     "cuLaunchKernelEx": "cu_launch.cpp",
@@ -109,6 +112,22 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     # Error helpers
     "cuGetErrorName": "cu_query.cpp",
     "cuGetErrorString": "cu_query.cpp",
+    # Function attributes — Phase 1.7 A.1
+    "cuFuncGetAttribute": "cu_module.cpp",
+    "cuFuncSetAttribute": "cu_module.cpp",
+    "cuFuncSetCacheConfig": "cu_module.cpp",
+    "cuFuncGetModule": "cu_module.cpp",
+    # Occupancy — Phase 1.7 A.2
+    "cuOccupancyMaxActiveBlocksPerMultiprocessor": "cu_module.cpp",
+    "cuOccupancyMaxActiveBlocksPerMultiprocessorWithFlags": "cu_module.cpp",
+    "cuOccupancyMaxPotentialBlockSize": "cu_module.cpp",
+    # Pointer attribute — Phase 1.7 A.3
+    "cuPointerGetAttribute": "cu_mem.cpp",
+    # Light stubs — Phase 1.7 A.4
+    "cuMemsetD16": "cu_mem.cpp",
+    "cuProfilerStart": "cu_mem.cpp",
+    "cuProfilerStop": "cu_mem.cpp",
+    "cuProfilerInitialize": "cu_mem.cpp",
 }
 
 # All CUDA Driver APIs (~200). Those in CRITICAL_APIS_IMPL_REQUIRED become

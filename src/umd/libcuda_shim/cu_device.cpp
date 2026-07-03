@@ -56,8 +56,20 @@ extern "C" CUresult cuDeviceGetAttribute(int* pi, CUdevice_attribute attrib,
     case CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_X:
       *pi = 1024;
       break;
+    case CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Y:
+      *pi = 1024;
+      break;
+    case CU_DEVICE_ATTRIBUTE_MAX_BLOCK_DIM_Z:
+      *pi = 64;
+      break;
     case CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_X:
       *pi = 2147483647;
+      break;
+    case CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Y:
+      *pi = 65535;
+      break;
+    case CU_DEVICE_ATTRIBUTE_MAX_GRID_DIM_Z:
+      *pi = 65535;
       break;
     case CU_DEVICE_ATTRIBUTE_MAX_SHARED_MEMORY_PER_BLOCK:
       *pi = 49152;

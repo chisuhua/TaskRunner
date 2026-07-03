@@ -23,9 +23,11 @@ typedef void* CUevent;
 typedef void* CUgraph;
 typedef void* CUtexref;
 typedef void* CUsurfref;
+typedef void* CUarray;
 typedef int   CUdevice;
 typedef unsigned long long CUdeviceptr;
 typedef uint32_t cuuint32_t;
+typedef unsigned long long cuuint64_t;
 
 /* --- Result type --- */
 typedef enum CUresult_enum {
@@ -87,10 +89,61 @@ typedef struct CUlaunchConfig_st {
   void**       extra;
 } CUlaunchConfig;
 
+/* --- Function attribute enum (cuFuncGetAttribute/SetAttribute) --- */
+typedef enum CUfunction_attribute_enum {
+  CU_FUNC_ATTRIBUTE_MAX_THREADS_PER_BLOCK = 0,
+  CU_FUNC_ATTRIBUTE_SHARED_SIZE_BYTES    = 1,
+  CU_FUNC_ATTRIBUTE_CONST_SIZE_BYTES     = 2,
+  CU_FUNC_ATTRIBUTE_NUM_REGS             = 3,
+  CU_FUNC_ATTRIBUTE_MAX                  = 100
+} CUfunction_attribute;
+
+/* --- Pointer attribute enum (cuPointerGetAttribute) --- */
+typedef enum CUpointer_attribute_enum {
+  CU_POINTER_ATTRIBUTE_CONTEXT          = 1,
+  CU_POINTER_ATTRIBUTE_MEMORY_TYPE      = 2,
+  CU_POINTER_ATTRIBUTE_DEVICE_POINTER   = 3,
+  CU_POINTER_ATTRIBUTE_HOST_POINTER     = 4,
+  CU_POINTER_ATTRIBUTE_RANGE_START_ADDR = 10,
+  CU_POINTER_ATTRIBUTE_RANGE_SIZE       = 11,
+  CU_POINTER_ATTRIBUTE_MAX              = 16
+} CUpointer_attribute;
+
+/* --- Memory type enum (used by cuPointerGetAttribute) --- */
+typedef enum CUresourcetype_enum {
+  CU_MEMORYTYPE_HOST   = 1,
+  CU_MEMORYTYPE_DEVICE = 2,
+  CU_MEMORYTYPE_ARRAY  = 3,
+  CU_MEMORYTYPE_UNIFIED = 4
+} CUresourcetype;
+
+/* --- Stream capture status (cuStreamGetCaptureInfo) --- */
+typedef enum CUstreamCaptureStatus_enum {
+  CU_STREAM_CAPTURE_STATUS_NONE        = 0,
+  CU_STREAM_CAPTURE_STATUS_ACTIVE      = 1,
+  CU_STREAM_CAPTURE_STATUS_INVALIDATED = 2
+} CUstreamCaptureStatus;
+
+/* --- Function cache config enum --- */
+typedef enum CUfunc_cache_enum {
+  CU_FUNC_CACHE_PREFER_NONE   = 0,
+  CU_FUNC_CACHE_PREFER_SHARED = 1,
+  CU_FUNC_CACHE_PREFER_L1     = 2,
+  CU_FUNC_CACHE_PREFER_EQUAL  = 3
+} CUfunc_cache;
+
+/* --- Occupancy callback type (cuOccupancyMaxPotentialBlockSize) --- */
+typedef size_t (*CUoccupancyB2DSize)(int blockSize);
+
 /* --- Context/function attribute types (opaque int enums) --- */
 typedef int CUfunc_cacheConfig;
 typedef int CUsharedconfig;
 typedef int CUlimit;
+
+// Limit enum values (used as int, not typed enum).
+#define CU_LIMIT_STACK_SIZE 0
+#define CU_LIMIT_PRINTF_FIFO_SIZE 1
+#define CU_LIMIT_MALLOC_HEAP_SIZE 2
 typedef int CUgraphExec;
 typedef int CUgraphNode;
 
@@ -116,8 +169,8 @@ CUresult cuCtxSynchronize(void);
 CUresult cuCtxGetDevice(CUdevice* device);
 CUresult cuCtxGetFlags(unsigned int* flags);
 CUresult cuCtxGetApiVersion(CUcontext ctx, unsigned int* version);
-CUresult cuCtxGetCacheConfig(CUfunc_cacheConfig* pconfig);
-CUresult cuCtxSetCacheConfig(CUfunc_cacheConfig config);
+CUresult cuCtxGetCacheConfig(CUfunc_cache* pconfig);
+CUresult cuCtxSetCacheConfig(CUfunc_cache config);
 CUresult cuCtxGetSharedMemConfig(CUsharedconfig* pConfig);
 CUresult cuCtxSetSharedMemConfig(CUsharedconfig config);
 CUresult cuCtxGetLimit(size_t* pvalue, CUlimit limit);
@@ -202,6 +255,47 @@ CUresult cuLaunchCooperativeKernel(CUfunction f,
                                    unsigned int blockDimZ,
                                    unsigned int sharedMemBytes, CUstream hStream,
                                    void** kernelParams);
+
+/* --- Phase 1.7 A.1: cuFunc* 属性 API --- */
+CUresult cuFuncGetAttribute(int* val, CUfunction_attribute attr, CUfunction f);
+CUresult cuFuncSetAttribute(CUfunction f, CUfunction_attribute attr, int val);
+CUresult cuFuncSetCacheConfig(CUfunction f, CUfunc_cache config);
+CUresult cuFuncGetModule(CUmodule* mod, CUfunction f);
+
+/* --- Phase 1.7 A.2: cuOccupancy* 启发式 API --- */
+CUresult cuOccupancyMaxActiveBlocksPerMultiprocessor(int* blocks, CUfunction f,
+                                                     int blockSize,
+                                                     size_t dynSMem);
+CUresult cuOccupancyMaxActiveBlocksPerMultiprocessorWithFlags(
+    int* blocks, CUfunction f, int blockSize, size_t dynSMem,
+    unsigned int flags);
+CUresult cuOccupancyMaxPotentialBlockSize(int* minGridSize, int* blockSize,
+                                          CUfunction f,
+                                          CUoccupancyB2DSize blockSizeToDynamicSMem,
+                                          size_t dynSMemPerBlock,
+                                          int blockSizeLimit);
+
+/* --- Phase 1.7 A.3: cuPointerGetAttribute --- */
+CUresult cuPointerGetAttribute(void* data, CUpointer_attribute attr,
+                               CUdeviceptr ptr);
+
+/* --- Phase 1.7 A.4: 轻量 stub API --- */
+CUresult cuStreamCreateWithFlags(CUstream* phStream, unsigned int flags);
+CUresult cuStreamGetCaptureInfo(CUstream hStream,
+                                CUstreamCaptureStatus* captureStatus,
+                                cuuint64_t* id);
+CUresult cuEventCreateWithFlags(CUevent* phEvent, unsigned int flags);
+CUresult cuMemsetD16(CUdeviceptr dstDevice, unsigned short us, size_t N);
+CUresult cuProfilerStart(void);
+CUresult cuProfilerStop(void);
+CUresult cuProfilerInitialize(const char* configFile, const char* outputFile,
+                              unsigned int outputMode);
+
+/* --- Phase 1.7 STUB sanity API (cuArrayCreate/cuGraphCreate/etc) --- */
+CUresult cuArrayCreate(CUarray* pHandle, const void* allocSize);
+CUresult cuGraphCreate(CUgraph* phGraph, unsigned int flags);
+CUresult cuTexRefCreate(CUtexref* pTexRef);
+CUresult cuMemHostRegister(void* p, size_t bytesize, unsigned int Flags);
 
 CUresult cuGetErrorName(CUresult error, const char** pstr);
 CUresult cuGetErrorString(CUresult error, const char** pstr);

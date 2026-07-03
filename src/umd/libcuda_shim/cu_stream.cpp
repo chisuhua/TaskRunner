@@ -126,3 +126,23 @@ extern "C" CUresult cuStreamWaitValue32(CUstream hStream, CUdeviceptr addr,
   (void)flags;
   return CUDA_SUCCESS;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 1.7 — A.4: cuStreamCreateWithFlags / cuStreamGetCaptureInfo
+// ---------------------------------------------------------------------------
+
+extern "C" CUresult cuStreamCreateWithFlags(CUstream* phStream,
+                                             unsigned int flags) {
+  (void)flags;
+  return cuStreamCreate(phStream, 0);
+}
+
+extern "C" CUresult cuStreamGetCaptureInfo(CUstream hStream,
+                                            CUstreamCaptureStatus* captureStatus,
+                                            cuuint64_t* id) {
+  (void)hStream;
+  (void)id;
+  if (!captureStatus) return CUDA_ERROR_INVALID_VALUE;
+  *captureStatus = CU_STREAM_CAPTURE_STATUS_NONE;
+  return CUDA_SUCCESS;
+}

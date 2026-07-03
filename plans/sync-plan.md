@@ -113,7 +113,7 @@
 | H-1 (h1-pushbuffer-validation-closeout) | ✅ archived | 2026-06-17 |
 | H-2.5 (h2-5-architecture-foundation) | ✅ archived | 2026-06-19 |
 | H-3 (h3-phase2-management) | ✅ archived | 2026-06-22 |
-| H-3.5 | h3-5-cudastub-guard-fix | ✅ archived | 2026-06-25 (5ff8c26 commit) |
+| H-3.5 | h3-5-followup-test-fixture-cleanup | ✅ archived | 2026-06-25 (5ff8c26 commit) |
 | H-4 (h4-architecture-governance-cleanup) | 🔵 active | TBD |
 
 ---

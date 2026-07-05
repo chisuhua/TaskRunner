@@ -27,3 +27,9 @@ UsrLinuxEmu/
 
 # OpenCode runtime artifacts (session continuations, todo state)
 .omo/
+
+# Understand tool cache (graph state)
+.understand-anything/
+
+# Additional scratch build dir (no underscore prefix)
+build2/

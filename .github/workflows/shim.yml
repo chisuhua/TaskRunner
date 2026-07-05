@@ -1,0 +1,77 @@
+# .github/workflows/shim.yml
+# Workstream B.2: CI/Build Infrastructure for TaskRunner shim layer
+#
+# Jobs:
+#   1. build-and-test   — UMD-evolution mode, all test binaries via ctest
+#   2. docs-audit       — Run docs-audit.sh to validate H-5 3-scope structure
+#   3. sanitizer        — Matrix: ASan / UBSan / TSan (mutually exclusive, each single)
+#
+# Author: TaskRunner owner (Sisyphus-H5 session)
+# Created: 2026-07-03
+
+name: TaskRunner-Shim-CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: ${{ github.workspace }}/build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake g++
+
+      - run: cmake -B "$BUILD_DIR" -DTASKRUNNER_BUILD_MODE=umd-evolution
+
+      - run: cmake --build "$BUILD_DIR" -j$(nproc)
+
+      - run: cd "$BUILD_DIR" && ctest --output-on-failure -j$(nproc)
+
+  docs-audit:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: ${{ github.workspace }}/build
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - run: bash tools/docs-audit.sh
+
+  sanitizer:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: ${{ github.workspace }}/build
+    strategy:
+      fail-fast: false
+      matrix:
+        san:
+          - name: ASan
+            flag: -DSANITIZER_ADDRESS=ON
+          - name: UBSan
+            flag: -DSANITIZER_UNDEFINED=ON
+          - name: TSan
+            flag: -DSANITIZER_THREAD=ON
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake g++
+
+      - run: |
+          cmake -B "$BUILD_DIR" \
+            -DTASKRUNNER_BUILD_MODE=umd-evolution \
+            ${{ matrix.san.flag }}
+
+      - run: cmake --build "$BUILD_DIR" -j$(nproc)
+
+      - run: cd "$BUILD_DIR" && ctest --output-on-failure -j$(nproc)

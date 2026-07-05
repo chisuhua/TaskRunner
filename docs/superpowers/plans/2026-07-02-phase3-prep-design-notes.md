@@ -1,11 +1,13 @@
 ---
 SCOPE: UMD-EVOLUTION
-STATUS: DRAFT
+STATUS: ACTIVE
 DESIGN_DATE: 2026-07-02
+PROMOTED_DATE: 2026-07-05
 DESIGN_AUTHOR: Sisyphus
-RELATED: phase-3-deferred.md (supersedes as primary roadmap), phase-2-complete.md
+RELATED: phase-3-deferred.md (supersedes as primary roadmap), phase-2-complete.md, phase-1-6-7-extensions-complete.md
 RELATED_TADR: tadr-205, tadr-201/202/203 (all SUPERSEDED)
-TRIGGER: External conditions met (see Trigger Conditions below)
+TRIGGER_CONDITION_MET: 2026-07-04 (UsrLinuxEmu Stage 1.4 Tier-2 complete)
+NEXT_SUBPLAN: docs/superpowers/plans/2026-07-05-umd-phase3.3-event-texture.md
 ---
 
 # Phase 3 Kickoff — Design Notes

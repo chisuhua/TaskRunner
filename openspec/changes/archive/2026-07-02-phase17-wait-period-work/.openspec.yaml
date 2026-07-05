@@ -1,0 +1,69 @@
+schema: spec-driven
+created: 2026-07-02
+status: APPLIED
+archived: 2026-07-06
+goal: "Phase 1.7 wait-period work (parallel to UsrLinuxEmu Stage 1.0-1.3): implement 14 backend-independent cu* STUB APIs, add CI/build infrastructure (sanitizers, coverage, workflow), expand test coverage depth, and prepare Phase 3 kickoff design docs — further reducing STUB count from 68 to ~54 and hardening the shim for when Stage 1.4 triggers Phase 3."
+baseline:
+  total_declarations: 144
+  real_implementations: 76
+  stubs: 68
+  exported_via_nm: 79
+  test_cases: 49
+  docs_audit_checks: 53
+prerequisite:
+  - "commit d988393 (Phase 1.6 — cuMemGetInfo real data + cuModuleLoad* demote + test coverage expansion + Phase 3 prep)"
+  - "commit d8ca3d3 (Phase 2 drift hotfix)"
+  - "commit 82a2839 (Phase 1.5 Stretch dynamic_cast fix)"
+cross_repo:
+  parallel_with:
+    - "UsrLinuxEmu Stage 1.0-1.3 (PCIe/IOMMU/DRM/UVM, no TaskRunner dependency)"
+  blocks:
+    - "Phase 3 kickoff will be enabled by UsrLinuxEmu Stage 1.4 + Phase 3 prep docs from this change"
+workstreams:
+  - id: A
+    name: "Backend-independent STUB implementations"
+    effort: "1-2 days"
+    stub_reduction: "68 → ~54 (-14 or more)"
+    test_increase: "49 → ~60 (+11)"
+  - id: B
+    name: "CI/Build infrastructure"
+    effort: "1 day"
+    stub_reduction: 0
+    deliverables: "ASan/TSan builds, .github/workflows, pre-commit hook, coverage"
+  - id: C
+    name: "Test coverage depth expansion"
+    effort: "1-2 days"
+    stub_reduction: 0
+    test_increase: "49 → ~70 (+21)"
+  - id: D
+    name: "Documentation & Phase 3 kickoff prep"
+    effort: "0.5-1 day"
+    deliverables: "cuMemPool*/cuStreamBeginCapture design sketches, shim architecture doc"
+related_documents:
+  - "../../docs/umd-evolution/roadmap/phase-2-complete.md"
+  - "../../docs/umd-evolution/roadmap/phase-3-deferred.md"
+  - "../../docs/umd-evolution/roadmap/current-status.md"
+  - "../../docs/superpowers/specs/2026-07-02-phase1.5-cudastub-dynamic-cast-fix.md"
+  - "../../docs/superpowers/plans/2026-07-02-phase3-prep-design-notes.md"
+outcome:
+  scope: umd-evolution
+  estimated_effort: "4-5 working days (all 4 workstreams combined)"
+  expected_test_count: "49 + 32 = ≥81 E2E tests"
+  expected_symbol_count: "79 (unchanged ABI)"
+  expected_stub_count: "68 → ~54 (demote ~14 backend-independent STUBs to REAL_IMPL)"
+  expected_real_impl_count: "76 → ~90 (stub reduction)"
+  expected_audit_checks: "53 (unchanged, pre-existing baseline)"
+  cross_repo_code_change: "none from TaskRunner side"
+  actual_resolution:
+    implementation_commits:
+      - "ba16139 feat(tools): add verify-phase17.sh — runner for the Phase 1.7 test-coverage-completion change"
+      - "916b299 test(shim): Phase 1.7 — test coverage completion (69→103, +34 cases / +149 assertions)"
+      - "defd272 feat(shim): Phase 1.7 — 15 REAL_IMPL APIs (A.1/A.2/A.3/A.4) + critical bugfixes"
+      - "d988393 feat(shim): Phase 1.6 shim extension — cuMemGetInfo real data + cuModuleLoad* demote + test coverage + Phase 3 prep"
+      - "d8ca3d3 fix(shim): register 42 drift APIs in CRITICAL_APIS_IMPL_REQUIRED + unify docs-audit source"
+    actual_test_count: "69 → 103 (Phase 1.7 + Phase 1.6 combined)"
+    actual_stub_count: "68 → 53"
+    actual_real_impl_count: "76 → 91"
+    test_coverage_gap: "Phase 1.7 new APIs (15) + STUB sanity (53) — partially addressed (15 APIs covered in phase17-test-coverage-completion, still pending merge)"
+  followups:
+    - "openspec/changes/2026-07-02-phase17-test-coverage-completion/ — completes Phase 1.7 coverage gap (in PROPOSED state, awaiting kickoff)"

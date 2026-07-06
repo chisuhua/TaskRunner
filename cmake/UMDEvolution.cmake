@@ -68,3 +68,22 @@ add_executable(test_cuda_shim
 )
 target_link_libraries(test_cuda_shim PRIVATE cuda_taskrunner)
 add_test(NAME test_cuda_shim COMMAND test_cuda_shim)
+
+# Phase 3.1+3.2: per-API shim E2E tests (links against libcuda_taskrunner.so).
+add_executable(test_cu_stream_capture
+    tests/umd/test_cu_stream_capture.cpp
+)
+target_link_libraries(test_cu_stream_capture PRIVATE cuda_taskrunner)
+add_test(NAME test_cu_stream_capture COMMAND test_cu_stream_capture)
+
+add_executable(test_cu_graph
+    tests/umd/test_cu_graph.cpp
+)
+target_link_libraries(test_cu_graph PRIVATE cuda_taskrunner)
+add_test(NAME test_cu_graph COMMAND test_cu_graph)
+
+add_executable(test_cu_mem_pool
+    tests/umd/test_cu_mem_pool.cpp
+)
+target_link_libraries(test_cu_mem_pool PRIVATE cuda_taskrunner)
+add_test(NAME test_cu_mem_pool COMMAND test_cu_mem_pool)

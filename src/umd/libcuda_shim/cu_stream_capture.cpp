@@ -58,10 +58,11 @@ extern "C" CUresult cuStreamEndCapture(CUstream hStream, CUgraph* phGraph) {
     table.state[hStream] = 2;
     return CUDA_ERROR_ILLEGAL_STATE;
   }
-  uint64_t id = table.next_graph_id.fetch_add(1);
-  *phGraph = reinterpret_cast<CUgraph>(static_cast<uintptr_t>(id));
   table.state[hStream] = 0;
-  return CUDA_SUCCESS;
+  // Delegate to cuGraphCreate so the graph is registered in cu_graph.cpp's
+  // GraphTable (otherwise cuGraphInstantiate would reject as INVALID_HANDLE).
+  // cuGraphCreate acquires its own mutex on the GraphTable, no deadlock.
+  return cuGraphCreate(phGraph, 0);
 }
 
 extern "C" CUresult cuStreamIsCapturing(CUstream hStream,

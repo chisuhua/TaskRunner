@@ -372,6 +372,19 @@ CUresult cuMemPoolTrimTo(CUmemPool pool, size_t minBytesToKeep);
 CUresult cuMemPoolExportToShareableHandle(void* shareableHandle, CUmemPool pool,
                                            CUmemPoolHandleType handleType,
                                            unsigned int flags);
+CUresult cuGraphCreate(CUgraph* phGraph, unsigned int flags);
+CUresult cuGraphDestroy(CUgraph hGraph);
+CUresult cuGraphAddKernelNode(CUgraphNode* phGraphNode, CUgraph hGraph,
+                                CUgraphNode* dependencies, size_t numDependencies,
+                                const CUDA_KERNEL_NODE_PARAMS* nodeParams);
+CUresult cuGraphAddMemcpyNode(CUgraphNode* phGraphNode, CUgraph hGraph,
+                                CUgraphNode* dependencies, size_t numDependencies,
+                                const CUDA_MEMCPY_NODE_PARAMS* nodeParams);
+CUresult cuGraphInstantiate(CUgraphExec* phGraphExec, CUgraph hGraph,
+                              CUgraphNode* phErrorNode, char* logBuffer,
+                              size_t bufferSize);
+CUresult cuGraphLaunch(CUgraphExec hGraphExec, CUstream hStream);
+CUresult cuGraphExecDestroy(CUgraphExec hGraphExec);
 CUresult cuEventCreateWithFlags(CUevent* phEvent, unsigned int flags);
 CUresult cuMemsetD16(CUdeviceptr dstDevice, unsigned short us, size_t N);
 CUresult cuProfilerStart(void);

@@ -27,6 +27,7 @@ namespace {
 
 struct MemPoolTable {
   std::atomic<std::uint64_t> next_pool_id{1};
+  std::atomic<std::uint64_t> next_alloc_id{1};
   std::unordered_map<CUmemPool, std::size_t> pool_maxSize;
   std::mutex mu;
 };
@@ -60,15 +61,16 @@ extern "C" CUresult cuMemPoolAlloc(CUmemPoolPtr* ptr, size_t size,
   if (!ptr || !pool) return CUDA_ERROR_INVALID_VALUE;
   if (size == 0) return CUDA_ERROR_INVALID_VALUE;
   (void)props;
-  // PoC: return synthetic non-dereferenceable VA pointer (pool_handle | size).
+  // PoC: synthetic non-dereferenceable VA = pool_handle | alloc_counter.
+  // Lower bits vary per alloc so each allocation produces a unique handle.
   // Phase 4+ bridges to g_gpu_client->mem_pool_alloc() IOCTL for real VA.
-  uintptr_t base = reinterpret_cast<uintptr_t>(pool);
-  *ptr = reinterpret_cast<CUmemPoolPtr>((base << 32) | static_cast<uintptr_t>(size));
+  uint64_t aid = async_task::umd::shim::g_pools.next_alloc_id.fetch_add(1);
+  *ptr = reinterpret_cast<CUmemPoolPtr>(static_cast<uintptr_t>(aid));
   return CUDA_SUCCESS;
 }
 
 extern "C" CUresult cuMemPoolFree(CUmemPoolPtr ptr, CUmemPool pool) {
-  (void)ptr;
+  if (!ptr) return CUDA_ERROR_INVALID_VALUE;
   if (!pool) return CUDA_ERROR_INVALID_VALUE;
   return CUDA_SUCCESS;
 }

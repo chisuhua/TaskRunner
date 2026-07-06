@@ -137,6 +137,15 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     # Graph node accessors (Phase 3.1)
     "cuGraphNodeGetType": "cu_graph_node.cpp",
     "cuGraphNodeSetAttribute": "cu_graph_node.cpp",
+    # Memory pool (Phase 3.2)
+    "cuMemPoolCreate": "cu_mem_pool.cpp",
+    "cuMemPoolDestroy": "cu_mem_pool.cpp",
+    "cuMemPoolAlloc": "cu_mem_pool.cpp",
+    "cuMemPoolFree": "cu_mem_pool.cpp",
+    "cuMemPoolSetAttribute": "cu_mem_pool.cpp",
+    "cuMemPoolGetAttribute": "cu_mem_pool.cpp",
+    "cuMemPoolTrimTo": "cu_mem_pool.cpp",
+    "cuMemPoolExportToShareableHandle": "cu_mem_pool.cpp",
     # Light stubs — Phase 1.7 A.4
     "cuMemsetD16": "cu_mem.cpp",
     "cuProfilerStart": "cu_mem.cpp",
@@ -185,6 +194,10 @@ CUDA_DRIVER_APIS = [
     "cuStreamCreateWithPriority", "cuStreamCreateWithFlags",
     "cuStreamGetPriority", "cuStreamGetFlags", "cuStreamGetCaptureInfo",
     "cuStreamBeginCapture", "cuStreamEndCapture", "cuStreamIsCapturing",
+    "cuMemPoolCreate", "cuMemPoolDestroy",
+    "cuMemPoolAlloc", "cuMemPoolFree",
+    "cuMemPoolSetAttribute", "cuMemPoolGetAttribute",
+    "cuMemPoolTrimTo", "cuMemPoolExportToShareableHandle",
     "cuEventCreate", "cuEventDestroy", "cuEventRecord",
     "cuEventSynchronize", "cuEventElapsedTime", "cuEventQuery",
     "cuEventCreateWithFlags",

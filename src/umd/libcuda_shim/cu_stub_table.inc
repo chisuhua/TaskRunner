@@ -282,6 +282,38 @@ CUresult cuMemExportToShareableHandle(void);
 __attribute__((weak, visibility("default")))
 CUresult cuMemImportFromShareableHandle(void);
 
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolCreate(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolDestroy(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolAlloc(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolFree(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolSetAttribute(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolGetAttribute(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolTrimTo(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolExportToShareableHandle(void);
+
 // REAL_IMPL in cu_mem.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuMemGetInfo(void);

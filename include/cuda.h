@@ -178,6 +178,42 @@ typedef struct CUgraphNodeParams_st {
   char reserved[64];
 } CUgraphNodeParams;
 
+// Phase 3.2 PoC: minimal mempool types. Expanded in Phase 4+.
+typedef void* CUmemPool;
+typedef void* CUmemPoolPtr;
+typedef void* CUmemAllocationHandle;
+
+typedef enum CUmemAllocationType_enum {
+  CU_MEM_ALLOCATION_TYPE_INVALID = 0,
+  CU_MEM_ALLOCATION_TYPE_PINNED  = 1
+} CUmemAllocationType;
+
+typedef enum CUmemPoolHandleType_enum {
+  CU_MEM_HANDLE_TYPE_NONE                  = 0,
+  CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR = 1
+} CUmemPoolHandleType;
+
+typedef struct CUmemLocation_st {
+  int type;
+  int id;
+} CUmemLocation;
+
+typedef enum CUmemPoolAttribute_enum {
+  CU_MEMPOOL_ATTR_RELEASE_THRESHOLD               = 1,
+  CU_MEMPOOL_ATTR_REUSE_FOLLOW_EVENT_DEPENDENCIES  = 3,
+  CU_MEMPOOL_ATTR_REUSE_ALLOW_OPPORTUNISTIC        = 4,
+  CU_MEMPOOL_ATTR_REUSE_ALLOW_INTERNAL_DEPENDENCIES = 5
+} CUmemPoolAttribute;
+
+typedef struct CUmemPoolProps_st {
+  CUmemAllocationType allocType;
+  CUmemPoolHandleType handleType;
+  CUmemLocation location;
+  size_t maxSize;
+  unsigned long long vaSpaceHandle;
+  unsigned int reserved[4];
+} CUmemPoolProps;
+
 /* --- Function prototypes for libcuda_taskrunner.so --- */
 CUresult cuInit(unsigned int Flags);
 CUresult cuDriverGetVersion(int* version);
@@ -323,6 +359,19 @@ CUresult cuGraphExecKernelNodeSetParams(CUgraphExec hGraphExec, CUgraphNode hNod
                                         const CUDA_KERNEL_NODE_PARAMS* nodeParams);
 CUresult cuGraphExecMemcpyNodeSetParams(CUgraphExec hGraphExec, CUgraphNode hNode,
                                         const CUDA_MEMCPY_NODE_PARAMS* nodeParams);
+CUresult cuMemPoolCreate(CUmemPool* pool, const CUmemPoolProps* poolProps);
+CUresult cuMemPoolDestroy(CUmemPool pool);
+CUresult cuMemPoolAlloc(CUmemPoolPtr* ptr, size_t size, CUmemPool pool,
+                        CUmemPoolProps* props);
+CUresult cuMemPoolFree(CUmemPoolPtr ptr, CUmemPool pool);
+CUresult cuMemPoolSetAttribute(CUmemPool pool, CUmemPoolAttribute attr,
+                                const void* value);
+CUresult cuMemPoolGetAttribute(CUmemPool pool, CUmemPoolAttribute attr,
+                                void* value);
+CUresult cuMemPoolTrimTo(CUmemPool pool, size_t minBytesToKeep);
+CUresult cuMemPoolExportToShareableHandle(void* shareableHandle, CUmemPool pool,
+                                           CUmemPoolHandleType handleType,
+                                           unsigned int flags);
 CUresult cuEventCreateWithFlags(CUevent* phEvent, unsigned int flags);
 CUresult cuMemsetD16(CUdeviceptr dstDevice, unsigned short us, size_t N);
 CUresult cuProfilerStart(void);

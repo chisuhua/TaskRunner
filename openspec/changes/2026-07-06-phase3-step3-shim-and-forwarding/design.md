@@ -50,6 +50,19 @@
 - **Phase 4+ 桥接**：可在 shim → GpuDriverClient 加桥接（参考 `cuda_runtime_api.cpp` 用 `scheduler_->submit_memcpy_h2d()` 的模式）
 - **handle 类型稳定性**：`CUstream = void*` / `CUgraph = void*` / `CUmemPool = void*` / `CUevent = void*`（与 CUDA 规范一致）
 
+### 1.1 Stage 1.4 Regression Risk Assessment
+
+Modifications to `cu_stream.cpp` (lines 95-100, 102-106, 140-148) and `cu_mem.cpp` (line 258-261) are confined to:
+
+1. Deleting 3 stub functions (whose current implementation returns `CUDA_ERROR_NOT_IMPLEMENTED`)
+2. Modifying `cuStreamGetCaptureInfo` to delegate to `cuStreamIsCapturing` (new function)
+
+A grep-based audit confirms:
+- `grep -r "cuStreamBeginCapture\|cuStreamEndCapture\|cuStreamGetCaptureInfo\|cuGraphCreate" tests/` returns 0 matches.
+- All Stage 1.4 tests (`test_cu_stream`, `test_cu_mem`, etc.) do not reference the modified functions.
+
+**Risk verdict**: Stage 1.4 regressions are extremely unlikely. The 76+ baseline test count is expected to be preserved with zero regressions.
+
 ## 2. GpuDriverClient Override Design (Workstream 1)
 
 > **关键事实（self-review 验证）**：
@@ -493,6 +506,10 @@ extern "C" CUresult cuMemPoolDestroy(CUmemPool pool) {
   return CUDA_SUCCESS;
 }
 
+// WARNING (Phase 3 PoC): cuMemPoolAlloc returns a SYNTHETIC pointer
+//   (pool_handle + size). The pointer MUST NOT be dereferenced or passed
+//   to any memory operation. Real allocation is deferred to Phase 4.
+//   Shims/tests may store this value but cannot use it as memory.
 extern "C" CUresult cuMemPoolAlloc(CUdeviceptr* dptr, size_t size, CUmemPool pool,
                                     CUmemAllocationParams* allocParams) {
   if (!dptr || !pool || size == 0) return CUDA_ERROR_INVALID_VALUE;
@@ -611,15 +628,15 @@ TEST_CASE("cu_stream_capture: GLOBAL begin → end → graph") {
 
 | # | Commit | Files | 行数 |
 |---|--------|-------|------|
-| C1 | docs(sync-plan) | `plans/sync-plan.md` | +30 |
-| C2 | feat(gpu-driver-client) | `include/test_fixture/gpu_driver_client.h` + `src/test_fixture/gpu_driver_client.cpp` | +250 |
+| C1 | docs(sync-plan)-prep | `plans/sync-plan.md` | +5 |
+| C2 | feat(gpu-driver-client) | `include/test_fixture/gpu_driver_client.h` | +250 |
 | C3 | feat(shim)-3.1 | `src/umd/libcuda_shim/cu_stream_capture.cpp` (NEW) + 修改 cu_stream.cpp (删除 11 行 stub) | +130 |
 | C4 | feat(shim)-3.2 | `src/umd/libcuda_shim/cu_graph.cpp` + `cu_graph_node.cpp` + `cu_graph_exec.cpp` (3 NEW) + 修改 cu_mem.cpp (删除 4 行 cuGraphCreate stub) | +400 |
 | C5 | feat(shim)-3.3 | `src/umd/libcuda_shim/cu_mem_pool.cpp` (NEW) | +200 |
 | C6 | test(shim) | `tests/umd/test_cu_stream_capture.cpp` + `test_cu_graph.cpp` + `test_cu_mem_pool.cpp` | +600 |
-| C7 | docs(sync) + openspec archive | `plans/sync-plan.md` + `openspec/changes/2026-07-05-phase3-1-igpu-driver-extension/` → archive/ | +200 |
+| C7 | docs(sync) + openspec archive | `plans/sync-plan.md` (Step 3 done entry) + `openspec/changes/archive/2026-07-05-phase3-1-igpu-driver-extension/` | +200 |
 
-**总行数**: 30 + 250 + 130 + 400 + 200 + 600 + 200 = **~1810 行**
+**总行数**: 5 + 250 + 130 + 400 + 200 + 600 + 200 = **~1785 行**
 
 ## 6. Architectural Decisions (formalized)
 

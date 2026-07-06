@@ -169,6 +169,15 @@ The system MUST remove the following obsolete stubs from existing files:
 | `cuStreamGetCaptureInfo` | `src/umd/libcuda_shim/cu_stream.cpp:140-148` | MODIFY to call `cuStreamIsCapturing` |
 | `cuGraphCreate` | `src/umd/libcuda_shim/cu_mem.cpp:258-261` | DELETE |
 
+#### Scenario: cuStreamGetCaptureInfo migration to cuStreamIsCapturing
+
+- **GIVEN** any CUstream handle (valid or null)
+- **WHEN** `cuStreamGetCaptureInfo(stream, captureStatus, id)` is called after migration
+- **THEN** the system MUST delegate to `cuStreamIsCapturing(stream, captureStatus)`
+- **AND** if `id != nullptr`, set `*id = 0` (PoC: graph capture ID not yet tracked)
+- **AND** return value semantics match `cuStreamIsCapturing`
+- **BEHAVIOR CHANGE**: prior implementation always returned `CU_STREAM_CAPTURE_STATUS_NONE`; new implementation reflects actual `CaptureTable.state[stream]`.
+
 ### REQ-S3-7: E2E Test Coverage
 
 The system MUST provide ≥75 new E2E test cases covering the 22 new shim functions:
@@ -238,7 +247,7 @@ None — Step 3 is purely additive (with stub migration in §REQ-S3-6).
 - **Step 1 openspec**: [../../2026-07-05-phase3-1-igpu-driver-extension/](../2026-07-05-phase3-1-igpu-driver-extension/)
 - **Step 2 upstream (UsrLinuxEmu)**: [https://github.com/chisuhua/UsrLinuxEmu/pull/20](https://github.com/chisuhua/UsrLinuxEmu/pull/20)
 - **Coordination PR**: [../../../superpowers/cross-repo-prs/2026-07-05-phase3-1-stream-mempool-coordination.md](../../../superpowers/cross-repo-prs/2026-07-05-phase3-1-stream-mempool-coordination.md)
-- **UsrLinuxEmu accepted-resolution.md** (Fix-1~14): [../../../../../UsrLinuxEmu/openspec/changes/2026-07-05-sim-stream-primitive-support/accepted-resolution.md](../../../../../UsrLinuxEmu/openspec/changes/2026-07-05-sim-stream-primitive-support/accepted-resolution.md)
+- **UsrLinuxEmu accepted-resolution.md** (Fix-1~14): [../../../../../../UsrLinuxEmu/openspec/changes/2026-07-05-sim-stream-primitive-support/accepted-resolution.md](../../../../../../UsrLinuxEmu/openspec/changes/2026-07-05-sim-stream-primitive-support/accepted-resolution.md)
 - **Existing shim pattern reference**: `src/umd/libcuda_shim/cu_stream.cpp`, `cu_event.cpp`, `cu_mem.cpp` (self-contained atomic + map + mutex)
 
 ## Decision Numbering

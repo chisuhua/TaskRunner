@@ -6,21 +6,23 @@
 
 ## 0. 前置条件（验证基线）
 
-- [ ] **0.1** 确认 TaskRunner HEAD 是 `12bed8d`：
+- [ ] **0.1** 确认 Step 1 基线提交 `12bed8d` 是当前 HEAD 的祖先：
   ```bash
   cd /workspace/project/UsrLinuxEmu/external/TaskRunner
-  git log --oneline -1
-  # 预期: 12bed8d docs(sync-plan): update Phase 3 cross-repo coordination status
+  git merge-base --is-ancestor 12bed8d HEAD && echo "Step 1 baseline present"
+  # 预期: 输出 "Step 1 baseline present"（exit 0）
+  # HEAD 可以是 ed8ecc0 或任何包含 12bed8d 的后继提交
   ```
 - [ ] **0.2** 确认 IGpuDriver 方法数 = 46（不含析构 = 47）：
   ```bash
   grep -c "^    virtual " include/shared/igpu_driver.hpp
   # 预期: 47 (46 + 1 析构)
   ```
-- [ ] **0.3** 确认 GpuDriverClient 当前 override 数 = 31：
+- [ ] **0.3** 确认 GpuDriverClient 当前 override 数 = 29（所有 inline 方法使用 `override` 关键字）：
   ```bash
-  grep -c "GpuDriverClient::" include/test_fixture/gpu_driver_client.h
-  # 预期: 31（不含析构）
+  grep -c "override" include/test_fixture/gpu_driver_client.h
+  # 预期: 29（当前 override 数量；Step 3 完成后 = 44）
+  # 注: 使用 "override" 关键字计数而非 "GpuDriverClient::" 因为所有方法在 header inline 定义
   ```
 - [ ] **0.4** 确认 UsrLinuxEmu symlink + IOCTL 可达：
   ```bash
@@ -39,8 +41,8 @@
 - [ ] **0.6** 创建 worktree（基于 main @ 12bed8d）：
   ```bash
   cd /workspace/project/UsrLinuxEmu/external/TaskRunner
-  git worktree add .worktrees/phase3-step3 -b phase3-step3-shim-and-forwarding
-  cd .worktrees/phase3-step3
+  git worktree add .rddf/wt/phase3-step3-shim-and-forwarding -b phase3-step3-shim-and-forwarding
+  cd .rddf/wt/phase3-step3-shim-and-forwarding
   # 后续所有 commit 在此 worktree 实施
   ```
 
@@ -48,7 +50,7 @@
 
 > **Commit**: `feat(gpu-driver-client): 15 forwarding overrides for Phase 3.1/3.2 (commit C2)`
 >
-> **影响文件**: `include/test_fixture/gpu_driver_client.h`（声明）+ `src/test_fixture/gpu_driver_client.cpp`（实现）
+> **影响文件**: `include/test_fixture/gpu_driver_client.h`（inline 定义）
 >
 > **模式**：每个方法 inline `ioctl(fd_, GPU_IOCTL_*, &args)`（**不**抽 `submit_ioctl()` helper）
 
@@ -95,11 +97,13 @@ int64_t mem_pool_alloc_async(uint64_t pool_handle, uint64_t size,
 int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
 ```
 
-### 1.2 修改 .cpp (gpu_driver_client.cpp)
+### 1.2 修改 header (gpu_driver_client.h)
 
-- [ ] **1.2.1** `stream_capture_status` (Pattern B)
+> Note: GpuDriverClient 现有的 31 个 override 全部 inline 定义在 `include/test_fixture/gpu_driver_client.h`（类定义体内）。新增 15 个方法沿用同一模式 `int method(...) override { ... }`，**不**创建或修改任何 .cpp。
+
+- [ ] **1.2.1** 在 gpu_driver_client.h 类体内（H-3 Phase 2 段后、private: 前）添加 stream_capture_status（Pattern B, header inline）：
   ```cpp
-  int GpuDriverClient::stream_capture_status(uint32_t stream_id, uint32_t* status_out) {
+  int stream_capture_status(uint32_t stream_id, uint32_t* status_out) override {
     if (!is_open()) return -1;
     if (!status_out) return -EINVAL;
     gpu_stream_capture_status_args args = {};
@@ -114,16 +118,16 @@ int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
   }
   ```
 
-- [ ] **1.2.2** `stream_capture_begin` (Pattern A)
-- [ ] **1.2.3** `stream_capture_end` (Pattern B)
-- [ ] **1.2.4** `graph_create` (Pattern B)
-- [ ] **1.2.5** `graph_destroy` (Pattern A)
-- [ ] **1.2.6** `graph_add_kernel_node` (Pattern A) — F-3: kernargs_bo 透传
-- [ ] **1.2.7** `graph_add_memcpy_node` (Pattern A) — is_h2d 字段
-- [ ] **1.2.8** `graph_instantiate` (Pattern B)
-- [ ] **1.2.9** `submit_graph` (Pattern C) — **关键**：字段名是 `exec_handle`
+- [ ] **1.2.2** 在 header 中添加 `stream_capture_begin`（Pattern A, inline）
+- [ ] **1.2.3** 在 header 中添加 `stream_capture_end`（Pattern B, inline）
+- [ ] **1.2.4** 在 header 中添加 `graph_create`（Pattern B, inline）
+- [ ] **1.2.5** 在 header 中添加 `graph_destroy`（Pattern A, inline）
+- [ ] **1.2.6** 在 header 中添加 `graph_add_kernel_node`（Pattern A, inline）— F-3: kernargs_bo 透传
+- [ ] **1.2.7** 在 header 中添加 `graph_add_memcpy_node`（Pattern A, inline）— is_h2d 字段
+- [ ] **1.2.8** 在 header 中添加 `graph_instantiate`（Pattern B, inline）
+- [ ] **1.2.9** 在 header 中添加 `submit_graph`（Pattern C, inline）— **关键**：字段名是 `exec_handle`，返回 int64_t
   ```cpp
-  int64_t GpuDriverClient::submit_graph(uint64_t graph_exec_handle, uint32_t stream_id) {
+  int64_t submit_graph(uint64_t graph_exec_handle, uint32_t stream_id) override {
     if (!is_open()) return -1;
     if (graph_exec_handle == 0) return -1;
     gpu_graph_launch_args args = {};
@@ -134,14 +138,15 @@ int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
                 << " (errno=" << errno << ")\n";
       return -1;
     }
-    return args.fence_id_out;
+    return args.fence_id_out;  // F-4: ≥ 1<<32 = sim fence
   }
   ```
-- [ ] **1.2.10** `destroy_graph_exec` (Pattern A)
-- [ ] **1.2.11** `mem_pool_create` (Pattern D) — **关键**：嵌套 struct
+
+- [ ] **1.2.10** 在 header 中添加 `destroy_graph_exec`（Pattern A, inline）
+- [ ] **1.2.11** 在 header 中添加 `mem_pool_create`（Pattern D, inline）— **关键**：嵌套 struct
   ```cpp
-  int GpuDriverClient::mem_pool_create(uint64_t va_space_handle, uint64_t size,
-                                        uint32_t flags, uint64_t* pool_handle_out) {
+  int mem_pool_create(uint64_t va_space_handle, uint64_t size,
+                      uint32_t flags, uint64_t* pool_handle_out) override {
     if (!is_open()) return -1;
     if (!pool_handle_out) return -EINVAL;
     if (va_space_handle == 0) {
@@ -162,10 +167,44 @@ int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
     return 0;
   }
   ```
-- [ ] **1.2.12** `mem_pool_destroy` (Pattern A)
-- [ ] **1.2.13** `mem_pool_alloc` (Pattern B)
-- [ ] **1.2.14** `mem_pool_alloc_async` (Pattern E) — 返回 int64_t
-- [ ] **1.2.15** `mem_pool_free_async` (Pattern C) — 返回 int64_t
+
+- [ ] **1.2.12** 在 header 中添加 `mem_pool_destroy`（Pattern A, inline）
+- [ ] **1.2.13** 在 header 中添加 `mem_pool_alloc`（Pattern B, inline）
+- [ ] **1.2.14** 在 header 中添加 `mem_pool_alloc_async`（Pattern E, inline）— 返回 int64_t
+  ```cpp
+  int64_t mem_pool_alloc_async(uint64_t pool_handle, uint64_t size,
+                               uint32_t stream_id, uint64_t* va_out) override {
+    if (!is_open()) return -1;
+    if (!va_out) return -EINVAL;
+    gpu_mem_pool_alloc_async_args args = {};
+    args.pool_handle = pool_handle;
+    args.size = size;
+    args.stream_id = stream_id;
+    if (ioctl(fd_, GPU_IOCTL_MEM_POOL_ALLOC_ASYNC, &args) < 0) {
+      std::cerr << "GpuDriverClient: GPU_IOCTL_MEM_POOL_ALLOC_ASYNC failed"
+                << " (errno=" << errno << ")\n";
+      return -1;
+    }
+    *va_out = args.va_out;
+    return args.fence_id_out;
+  }
+  ```
+
+- [ ] **1.2.15** 在 header 中添加 `mem_pool_free_async`（Pattern C, inline）— 返回 int64_t
+  ```cpp
+  int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override {
+    if (!is_open()) return -1;
+    gpu_mem_pool_free_async_args args = {};
+    args.va = va;
+    args.stream_id = stream_id;
+    if (ioctl(fd_, GPU_IOCTL_MEM_POOL_FREE_ASYNC, &args) < 0) {
+      std::cerr << "GpuDriverClient: GPU_IOCTL_MEM_POOL_FREE_ASYNC failed"
+                << " (errno=" << errno << ")\n";
+      return -1;
+    }
+    return args.fence_id_out;
+  }
+  ```
 
 ### 1.3 验证
 
@@ -176,8 +215,7 @@ int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
 ### 1.4 提交
 
 ```bash
-git add include/test_fixture/gpu_driver_client.h \
-        src/test_fixture/gpu_driver_client.cpp
+git add include/test_fixture/gpu_driver_client.h
 git commit -m "feat(gpu-driver-client): 15 forwarding overrides for Phase 3.1/3.2
 
 Implements the 15 new IGpuDriver methods added in Step 1 (commit 21f71c9) by

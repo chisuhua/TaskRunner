@@ -74,10 +74,10 @@ related_documents:
   - "../../../docs/superpowers/specs/2026-07-02-phase3-stream-capture-design.md"
   - "../../../docs/superpowers/specs/2026-07-02-phase3-mempool-design.md"
   - "../../../docs/superpowers/plans/2026-07-02-phase3-prep-design-notes.md"
-  - "../../../../UsrLinuxEmu/openspec/changes/2026-07-05-sim-stream-primitive-support/accepted-resolution.md"
-  - "../../../../UsrLinuxEmu/openspec/changes/2026-07-05-sim-stream-primitive-support/design.md"
-  - "../../../../UsrLinuxEmu/docs/00_adr/adr-015-gpu-ioctl-unification.md"
-  - "../../../../UsrLinuxEmu/docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md"
+  - "../../../UsrLinuxEmu/openspec/changes/2026-07-05-sim-stream-primitive-support/accepted-resolution.md"
+  - "../../../UsrLinuxEmu/openspec/changes/2026-07-05-sim-stream-primitive-support/design.md"
+  - "../../../UsrLinuxEmu/docs/00_adr/adr-015-gpu-ioctl-unification.md"
+  - "../../../UsrLinuxEmu/docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md"
 outcome:
   scope: shared + umd-evolution
   estimated_effort: "5-7 working days (all 5 workstreams combined)"

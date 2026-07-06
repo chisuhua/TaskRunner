@@ -48,7 +48,7 @@ Phase 3.1/3.2 跨仓协调的 Step 1（TaskRunner IGpuDriver 31→46）和 Step 
 
 ### 1. GpuDriverClient 15 forwarding overrides (Workstream 1, 1 day)
 
-**文件**: `include/test_fixture/gpu_driver_client.h`（声明）+ `src/test_fixture/gpu_driver_client.cpp`（实现）
+**文件**: `include/test_fixture/gpu_driver_client.h`（声明 + 15 个 override 全部为 inline 实现，**不**创建或修改任何 .cpp；与既有 31 个 override 同模式）
 
 **关键事实**：
 - GpuDriverClient 类已存在（577 行），Step 1 加的 15 个 IGpuDriver 虚函数目前**未实现**（仍是 no-op `return -1`）
@@ -75,20 +75,25 @@ Phase 3.1/3.2 跨仓协调的 Step 1（TaskRunner IGpuDriver 31→46）和 Step 
 | `mem_pool_alloc_async` | 0x63 | `gpu_mem_pool_alloc_async_args` |
 | `mem_pool_free_async` | 0x64 | `gpu_mem_pool_free_async_args` |
 
-**实施模式**（以 `graph_create` 为例）：
+**实施模式**（以 `graph_create` 为例，header inline 实现）：
 ```cpp
-int GpuDriverClient::graph_create(uint64_t* graph_handle_out) {
+int graph_create(uint64_t* graph_handle_out) override {
+  if (!is_open()) return -1;
   if (!graph_handle_out) return -EINVAL;
   gpu_graph_create_args args = {};  // zero-init OUT fields
-  int ret = submit_ioctl(GPU_IOCTL_GRAPH_CREATE, &args);
-  if (ret == 0) *graph_handle_out = args.graph_handle_out;
-  return ret;
+  if (ioctl(fd_, GPU_IOCTL_GRAPH_CREATE, &args) < 0) {
+    std::cerr << "GpuDriverClient: GPU_IOCTL_GRAPH_CREATE failed"
+              << " (errno=" << errno << ")\n";
+    return -1;
+  }
+  *graph_handle_out = args.graph_handle_out;
+  return 0;
 }
 ```
 
 ### 2. cuStreamCapture + cuGraph shim (Workstream 2, 1.5 days)
 
-**关键事实（self-review 修正）**：shim **不自包含**地调 GpuDriverClient。每个 shim .cpp 在匿名 namespace 内维护自己的 atomic + map + mutex state table（与既有 cu_stream.cpp / cu_event.cpp / cu_mem.cpp 一致）。**Phase 4+** 可桥接 shim → GpuDriverClient。
+**关键事实（self-review 修正）**：shim 是**自包含**的，每个 .cpp 在匿名 namespace 内维护自己的 atomic + map + mutex state table（与既有 cu_stream.cpp / cu_event.cpp / cu_mem.cpp 一致）。Shim **不**调 GpuDriverClient。**Phase 4+** 可桥接 shim → GpuDriverClient。
 
 **新增文件**：
 - `src/umd/libcuda_shim/cu_stream_capture.cpp`（3 funcs: cuStreamBeginCapture / cuStreamEndCapture / cuStreamIsCapturing）
@@ -100,25 +105,36 @@ int GpuDriverClient::graph_create(uint64_t* graph_handle_out) {
 - `src/umd/libcuda_shim/cu_stream.cpp`（删除 11 行 stub）
 - `src/umd/libcuda_shim/cu_mem.cpp`（删除 4 行 cuGraphCreate stub）
 
-**实施模式**（以 cuStreamBeginCapture 为例）：
+**全局 state**（cu_stream_capture.cpp 内，匿名 namespace）：
 ```cpp
-CUresult cuStreamBeginCapture(CUstream hStream, CUstreamCaptureMode mode) {
-  if (mode != CU_STREAM_CAPTURE_MODE_GLOBAL) {
-    return CUDA_ERROR_NOT_SUPPORTED;  // F-1: only GLOBAL accepted
+struct CaptureTable {
+  std::atomic<std::uint64_t> next_graph_id{1};
+  std::unordered_map<CUstream, uint32_t> state;  // 0=NONE, 1=ACTIVE, 2=INVALID
+  std::mutex mu;
+};
+CaptureTable g_captures;
+```
+
+**实施模式**（以 cuStreamBeginCapture 为例，与 design.md §3.1 一致）：
+```cpp
+extern "C" CUresult cuStreamBeginCapture(CUstream hStream,
+                                         CUstreamCaptureMode mode) {
+  if (mode != CU_STREAM_CAPTURE_MODE_GLOBAL) return CUDA_ERROR_NOT_SUPPORTED;  // F-1
+  if (!hStream) return CUDA_ERROR_INVALID_VALUE;
+  auto& table = async_task::umd::shim::g_captures;
+  std::lock_guard<std::mutex> lock(table.mu);
+  if (table.state[hStream] == 1) {
+    table.state[hStream] = 2;
+    return CUDA_ERROR_ILLEGAL_STATE;
   }
-  uint32_t stream_id = reinterpret_cast<uintptr_t>(hStream);
-  int ret = g_gpu_driver_client->stream_capture_begin(stream_id, 0);
-  if (ret < 0) {
-    LOG_ERROR("cuStreamBeginCapture failed: %d", ret);
-    return CUDA_ERROR_UNKNOWN;
-  }
+  table.state[hStream] = 1;
   return CUDA_SUCCESS;
 }
 ```
 
 **Handle 约定**：
-- `CUstream` = `void*` (cast to/from `uint32_t` stream_id)
-- `CUgraph` / `CUgraphExec` = `void*` (cast to/from `uint64_t` handle)
+- `CUstream` = `void*`（直接用作 CaptureTable state key，不经 stream_id 转换）
+- `CUgraph` / `CUgraphExec` = `void*`（atomic counter 分配）
 - `CUresult` 映射：`< 0` → `CUDA_ERROR_*`，`== 0` → `CUDA_SUCCESS`
 
 ### 3. cuMemPool shim (Workstream 3, 2 days)
@@ -126,21 +142,32 @@ CUresult cuStreamBeginCapture(CUstream hStream, CUstreamCaptureMode mode) {
 **新增文件**：
 - `src/umd/libcuda_shim/cu_mem_pool.cpp`（8 funcs: cuMemPoolCreate / cuMemPoolDestroy / cuMemPoolAlloc / cuMemPoolFree / cuMemPoolSetAttribute / cuMemPoolGetAttribute / cuMemPoolTrim / cuMemPoolExportToShareableHandle）
 
-**实施模式**（以 cuMemPoolCreate 为例）：
+**全局 state**（cu_mem_pool.cpp 内，匿名 namespace）：
 ```cpp
-CUresult cuMemPoolCreate(CUmemPool* pool, const CUmemPoolProps* poolProps) {
+struct MemPoolTable {
+  std::atomic<uint64_t> next_pool_id{1};
+  std::unordered_map<CUmemPool, uint64_t> pool_meta;  // handle → maxSize
+  std::mutex mu;
+};
+MemPoolTable g_pools;
+```
+
+**实施模式**（以 cuMemPoolCreate 为例，与 design.md §3.3 + B-2 Option B 一致）：
+```cpp
+extern "C" CUresult cuMemPoolCreate(CUmemPool* pool, const CUmemPoolProps* poolProps) {
   if (!pool || !poolProps) return CUDA_ERROR_INVALID_VALUE;
-  uint64_t pool_handle = 0;
-  int ret = g_gpu_driver_client->mem_pool_create(
-      poolProps->vaSpaceHandle,  // existing va_space_handle
-      poolProps->maxSize,
-      poolProps->usage,
-      &pool_handle);
-  if (ret < 0) return CUDA_ERROR_OUT_OF_MEMORY;
-  *pool = reinterpret_cast<CUmemPool>(static_cast<uintptr_t>(pool_handle));
+  if (poolProps->vaSpaceHandle == 0) return CUDA_ERROR_INVALID_VALUE;  // B-2: H-1 sentinel guard
+  auto& t = async_task::umd::shim::g_pools;
+  std::lock_guard<std::mutex> lock(t.mu);
+  uint64_t id = t.next_pool_id.fetch_add(1);
+  *pool = reinterpret_cast<CUmemPool>(static_cast<uintptr_t>(id));
+  t.pool_meta[*pool] = poolProps->maxSize;
   return CUDA_SUCCESS;
 }
 ```
+
+> **注**：PoC 中 `cuMemPoolAlloc` 返回合成指针 `pool_handle + size`（design.md §3.3 WARNING），不可解引用。Phase 4+ 接入 `g_gpu_client->mem_pool_alloc()` IOCTL 路径。
+> 全局 GpuDriverClient 实例名是 `g_gpu_client`（`async_task::gpu::` 命名空间），**不是** `g_gpu_driver_client`（参见上文"关键事实"）。
 
 ### 4. E2E test coverage (Workstream 4, 2 days)
 
@@ -149,27 +176,34 @@ CUresult cuMemPoolCreate(CUmemPool* pool, const CUmemPoolProps* poolProps) {
 - `tests/umd/test_cu_graph.cpp`（≥20 cases）
 - `tests/umd/test_cu_mem_pool.cpp`（≥25 cases）
 
-**测试模式**（以 cuStreamBeginCapture 为例）：
+**测试模式**（以 cuStreamBeginCapture 为例，shim-only 验证，不经 GpuDriverClient）：
 ```cpp
 TEST_CASE("cu_stream_capture: cuStreamBeginCapture with GLOBAL mode") {
-  // GIVEN: a stream and empty capture state
-  CUstream stream = create_test_stream();
-  REQUIRE(g_gpu_driver_client->stream_capture_status(stream_id(stream), &status) == 0);
-  REQUIRE(status == SIM_STREAM_CAPTURE_STATUS_NONE);
+  // GIVEN: a fresh stream with empty capture state
+  CUstream stream = create_test_stream();  // helper: returns unique handle
+
+  CUstreamCaptureStatus status;
+  REQUIRE(cuStreamIsCapturing(stream, &status) == CUDA_SUCCESS);
+  REQUIRE(status == CU_STREAM_CAPTURE_STATUS_NONE);
 
   // WHEN: begin capture with GLOBAL mode
   CUresult ret = cuStreamBeginCapture(stream, CU_STREAM_CAPTURE_MODE_GLOBAL);
 
   // THEN: capture state is ACTIVE
   CHECK(ret == CUDA_SUCCESS);
-  CHECK(g_gpu_driver_client->stream_capture_status(stream_id(stream), &status) == 0);
-  CHECK(status == SIM_STREAM_CAPTURE_STATUS_ACTIVE);
+  REQUIRE(cuStreamIsCapturing(stream, &status) == CUDA_SUCCESS);
+  CHECK(status == CU_STREAM_CAPTURE_STATUS_ACTIVE);
 
   // CLEANUP
-  cuStreamEndCapture(stream, &graph);
+  CUgraph graph = nullptr;
+  REQUIRE(cuStreamEndCapture(stream, &graph) == CUDA_SUCCESS);
+  REQUIRE(graph != nullptr);
+  REQUIRE(cuGraphDestroy(graph) == CUDA_SUCCESS);
   destroy_test_stream(stream);
 }
 ```
+
+> **注**：测试通过 shim 自身的 `cuStreamIsCapturing` 验证状态变迁（CUstreamCaptureStatus 枚举），**不**直接调 GpuDriverClient 的 `stream_capture_status`（保持 E2E 测试纯走 shim 路径，符合 D-S3-1 自包含 shim 设计）。
 
 ### 5. Documentation + cross-repo sync (Workstream 5, 0.5 day)
 

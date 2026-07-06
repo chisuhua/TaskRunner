@@ -178,6 +178,7 @@ caller:                          driver:
 | S3 | ✅ 完成 | 2026-04-28 |
 | S3.5 | ✅ 完成 | 2026-05-13 |
 | S5 | ✅ 完成 | 2026-06-19 |
+| **Phase 3.1+3.2 Step 1** | ✅ 完成 | **2026-07-06 (commit e6a34eb)** |
 
 ### 5.2 测试基线
 
@@ -185,16 +186,47 @@ caller:                          driver:
 |------|------|------|
 | test_cuda_scheduler | ✅ 8/8 | H-1 baseline preserved |
 | test_gpu_phase2 | ✅ 12/12 | H-3 新增 |
-| test_gpu_architecture | ⚠️ 10/11 | H-2.5 Bonus 预存在 baseline |
-| UsrLinuxEmu docs-audit | ✅ 36/36 | pre-commit hook |
+| test_gpu_architecture | ✅ 11/11 | H-2.5 baseline + Phase 3.1 fix |
+| test_cuda_shim | ✅ 103/103 | Phase 1.7 (commit defd272) |
+| test_cuda_runtime_api | ✅ 8/8 | Phase 1 CudaRuntimeApi |
+| **总计** | **142/142** | **+565 assertions, 0 failures** |
+| UsrLinuxEmu docs-audit | ✅ 53/53 | pre-commit hook (Phase 1.7 后) |
 
 ### 5.3 下一波 change 候选
 
-| 候选 | 来源 | 工时 | 前置 TADR |
-|------|------|---:|----------|
-| **~~H-3.5~~** | CudaStub guard verification | ✅ 完成 (2026-06-25, 5ff8c26) | TADR-006 |
-| **~~H-7 ADR~~** | 3 upstream issues (stream_id / ioctl bypass / attached_queues) | ✅ 全部完成 (H-3.6/3.7/3.8) | TADR-008 |
-| **Phase 3** | Multi-GPU / P2P（需要先完成 H-7 ADR）| 3-4 周 | TADR-005~008 |
+| 候选 | 来源 | 工时 | 前置 TADR | 状态 |
+|------|------|---:|----------|------|
+| **~~H-3.5~~** | CudaStub guard verification | ✅ 完成 (2026-06-25, 5ff8c26) | TADR-006 | Done |
+| **~~H-7 ADR~~** | 3 upstream issues | ✅ 全部完成 (H-3.6/3.7/3.8) | TADR-008 | Done |
+| **Phase 3.1+3.2 Step 1** | IGpuDriver 31→46 扩展 | ✅ 完成 (2026-07-06, e6a34eb) | TADR-301 | Done |
+| **Phase 3.1+3.2 Step 2** | UsrLinuxEmu sim primitives + 18 IOCTL | 🟡 PR #20 ready (bd51dc9) | ADR-015 | **等 review + merge** |
+| **Phase 3.1+3.2 Step 3** | GpuDriverClient 15 forwarding + shim + E2E | ⏳ 未开始 (~6 天) | TADR-301 | 待 Step 2 merge |
+| **Phase 3.1+3.2 Step 4** | UsrLinuxEmu submodule bump | ⏳ 待 Step 3 merge | ADR-035 | 待 Step 3 |
+| **Phase 1.7 test coverage** | 25-30 E2E tests (REAL_IMPL 50.5%→≥85%) | 🟢 可立即开始 (独立) | — | PROPOSED |
+| **Phase 3.3 Event+Texture** | Frontend-only (cuEvent + cuTexRef) | 🟢 可立即开始 (独立) | — | DRAFT plan |
+
+### 5.4 Phase 3 跨仓协调时间线
+
+```
+2026-07-04  Stage 1.4 完成 (80f6a44 + 9378153) → 触发 Phase 3.1+3.2 kickoff
+2026-07-05  UsrLinuxEmu openspec ACCEPTED + 11 项 BLOCKER/MUST-FIX 决议
+2026-07-05  UsrLinuxEmu PR #20 创建 (bd51dc9, 49 tests pass, 81/81 zero-regression)
+2026-07-06  TaskRunner Step 1 完成 (e6a34eb) ✅ ← 当前
+2026-07-15  🎯 Step 2 merge 截止 (UsrLinuxEmu owner 决定)
+2026-07-21  🎯 Step 3 merge 截止 (TaskRunner owner)
+2026-07-22  🎯 Step 4 submodule bump 截止 (UsrLinuxEmu owner)
+2026-07-25  🎯 最终回归 + openspec archive
+```
+
+### 5.5 决策追踪（D-SC-* / D-MP-*）
+
+| 编号 | 决策 | 来源 | 状态 |
+|------|------|------|------|
+| D-SC-5 | Capture mode 仅接受 GLOBAL | F-1 (UsrLinuxEmu) | ✅ |
+| D-SC-9 | GpuQueueEmu API 集成路径 (`submit(uint64_t, uint32_t)`) | B-1 (UsrLinuxEmu) | ✅ |
+| D-SC-11 | fence_id 范围划分 (HAL [1, 1<<32-1] + sim [1<<32, INT64_MAX]) | B-3 (UsrLinuxEmu) | ✅ |
+| D-SC-12 | kernargs_bo_handle=0 语义 | F-3 (UsrLinuxEmu) | ✅ |
+| D-MP-1 | Pool VA 范围 Option B (VA 子范围预留) | B-2 (UsrLinuxEmu) | ✅ |
 
 ---
 

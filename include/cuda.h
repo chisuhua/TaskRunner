@@ -145,8 +145,38 @@ typedef int CUlimit;
 #define CU_LIMIT_STACK_SIZE 0
 #define CU_LIMIT_PRINTF_FIFO_SIZE 1
 #define CU_LIMIT_MALLOC_HEAP_SIZE 2
-typedef int CUgraphExec;
-typedef int CUgraphNode;
+typedef void* CUgraphExec;
+typedef void* CUgraphNode;
+typedef enum CUgraphNodeType_enum {
+  CU_GRAPH_NODE_TYPE_KERNEL     = 0,
+  CU_GRAPH_NODE_TYPE_MEMCPY     = 1,
+  CU_GRAPH_NODE_TYPE_MEMSET     = 2,
+  CU_GRAPH_NODE_TYPE_HOST       = 3,
+  CU_GRAPH_NODE_TYPE_GRAPH      = 4,
+  CU_GRAPH_NODE_TYPE_EMPTY      = 5,
+  CU_GRAPH_NODE_TYPE_WAIT_EVENT = 6
+} CUgraphNodeType;
+
+// Phase 3.1 PoC: minimal node parameter structs. Fields expanded in Phase 4+.
+typedef struct CUDA_KERNEL_NODE_PARAMS_st {
+  CUfunction func;
+  void** kernelParams;
+  void** extra;
+  int gridDimX; int gridDimY; int gridDimZ;
+  int blockDimX; int blockDimY; int blockDimZ;
+  int sharedMemBytes;
+} CUDA_KERNEL_NODE_PARAMS;
+
+typedef struct CUDA_MEMCPY_NODE_PARAMS_st {
+  int copyKind;
+  CUdeviceptr src;
+  CUdeviceptr dst;
+  size_t byteCount;
+} CUDA_MEMCPY_NODE_PARAMS;
+
+typedef struct CUgraphNodeParams_st {
+  char reserved[64];
+} CUgraphNodeParams;
 
 /* --- Function prototypes for libcuda_taskrunner.so --- */
 CUresult cuInit(unsigned int Flags);
@@ -287,6 +317,12 @@ CUresult cuStreamGetCaptureInfo(CUstream hStream,
                                 cuuint64_t* id);
 CUresult cuStreamIsCapturing(CUstream hStream,
                              CUstreamCaptureStatus* captureStatus);
+CUresult cuGraphNodeGetType(CUgraphNode hNode, CUgraphNodeType* type);
+CUresult cuGraphNodeSetAttribute(CUgraphNode hNode, CUgraphNodeParams* nodeParams);
+CUresult cuGraphExecKernelNodeSetParams(CUgraphExec hGraphExec, CUgraphNode hNode,
+                                        const CUDA_KERNEL_NODE_PARAMS* nodeParams);
+CUresult cuGraphExecMemcpyNodeSetParams(CUgraphExec hGraphExec, CUgraphNode hNode,
+                                        const CUDA_MEMCPY_NODE_PARAMS* nodeParams);
 CUresult cuEventCreateWithFlags(CUevent* phEvent, unsigned int flags);
 CUresult cuMemsetD16(CUdeviceptr dstDevice, unsigned short us, size_t N);
 CUresult cuProfilerStart(void);

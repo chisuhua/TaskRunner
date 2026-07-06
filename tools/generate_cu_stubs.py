@@ -124,6 +124,19 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     "cuOccupancyMaxPotentialBlockSize": "cu_module.cpp",
     # Pointer attribute — Phase 1.7 A.3
     "cuPointerGetAttribute": "cu_mem.cpp",
+    # Graph lifecycle + add-node (Phase 3.1)
+    "cuGraphCreate": "cu_graph.cpp",
+    "cuGraphDestroy": "cu_graph.cpp",
+    "cuGraphAddKernelNode": "cu_graph.cpp",
+    "cuGraphAddMemcpyNode": "cu_graph.cpp",
+    "cuGraphInstantiate": "cu_graph.cpp",
+    "cuGraphLaunch": "cu_graph.cpp",
+    "cuGraphExecDestroy": "cu_graph.cpp",
+    "cuGraphExecKernelNodeSetParams": "cu_graph_exec.cpp",
+    "cuGraphExecMemcpyNodeSetParams": "cu_graph_exec.cpp",
+    # Graph node accessors (Phase 3.1)
+    "cuGraphNodeGetType": "cu_graph_node.cpp",
+    "cuGraphNodeSetAttribute": "cu_graph_node.cpp",
     # Light stubs — Phase 1.7 A.4
     "cuMemsetD16": "cu_mem.cpp",
     "cuProfilerStart": "cu_mem.cpp",
@@ -192,6 +205,8 @@ CUDA_DRIVER_APIS = [
     "cuGraphAddMemsetNode", "cuGraphAddHostNode",
     "cuGraphAddEmptyNode", "cuGraphExecLaunch", "cuGraphExecDestroy",
     "cuGraphExecUpdate", "cuGraphExecKernelNodeSetParams",
+    "cuGraphExecMemcpyNodeSetParams",
+    "cuGraphNodeGetType", "cuGraphNodeSetAttribute",
     # Linking & Compilation
     "cuLinkAddData", "cuLinkAddFile", "cuLinkComplete",
     "cuLinkDestroy", "cuLinkCreate",

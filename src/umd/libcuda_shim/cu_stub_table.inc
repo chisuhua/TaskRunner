@@ -450,15 +450,15 @@ CUresult cuArrayDestroy(void);
 __attribute__((weak, visibility("default")))
 CUresult cuArray3DCreate(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphCreate(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphDestroy(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphInstantiate(void);
 
@@ -466,7 +466,7 @@ CUresult cuGraphInstantiate(void);
 __attribute__((weak, visibility("default")))
 CUresult cuGraphInstantiateWithFlags(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphLaunch(void);
 
@@ -474,11 +474,11 @@ CUresult cuGraphLaunch(void);
 __attribute__((weak, visibility("default")))
 CUresult cuGraphUpload(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphAddKernelNode(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphAddMemcpyNode(void);
 
@@ -498,7 +498,7 @@ CUresult cuGraphAddEmptyNode(void);
 __attribute__((weak, visibility("default")))
 CUresult cuGraphExecLaunch(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphExecDestroy(void);
 
@@ -506,9 +506,21 @@ CUresult cuGraphExecDestroy(void);
 __attribute__((weak, visibility("default")))
 CUresult cuGraphExecUpdate(void);
 
-// STUB
+// REAL_IMPL in cu_graph_exec.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphExecKernelNodeSetParams(void);
+
+// REAL_IMPL in cu_graph_exec.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuGraphExecMemcpyNodeSetParams(void);
+
+// REAL_IMPL in cu_graph_node.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuGraphNodeGetType(void);
+
+// REAL_IMPL in cu_graph_node.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuGraphNodeSetAttribute(void);
 
 // STUB
 __attribute__((weak, visibility("default")))

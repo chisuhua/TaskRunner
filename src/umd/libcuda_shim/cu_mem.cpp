@@ -255,11 +255,6 @@ extern "C" CUresult cuArrayCreate(CUarray* pHandle, const void* allocSize) {
   return CUDA_ERROR_NOT_IMPLEMENTED;
 }
 
-extern "C" CUresult cuGraphCreate(CUgraph* phGraph, unsigned int flags) {
-  (void)phGraph; (void)flags;
-  return CUDA_ERROR_NOT_IMPLEMENTED;
-}
-
 extern "C" CUresult cuTexRefCreate(CUtexref* pTexRef) {
   (void)pTexRef;
   return CUDA_ERROR_NOT_IMPLEMENTED;

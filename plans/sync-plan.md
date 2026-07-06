@@ -1,9 +1,9 @@
 # TaskRunner-UsrLinuxEmu 接口统一同步计划
 
-**版本**: v2.2（H-3 maintenance transition, 新增 H-3.5~H-3.8 完成详情）
-**日期**: 2026-06-26
+**版本**: v2.3（Phase 3 Step 3 done, 7 atomic commits, 225 tests passing）
+**日期**: 2026-07-07
 **维护者**: UsrLinuxEmu Architecture Team + TaskRunner owner
-**前置**: H-2.5 ✅ + H-3 ✅ shippable（2026-06-23）
+**前置**: H-2.5 ✅ + H-3 ✅ shippable（2026-06-23）+ Step 1+2 ✅ merged（2026-07-06）
 
 ---
 
@@ -63,6 +63,27 @@
 │   - UsrLinuxEmu: 02ae421 (widen stream_id + compat alias) │
 │   - TaskRunner: 9e3db2e (ABI coordination + test design)  │
 │   - TaskRunner: 5ee250a (tadr-105 §Issue #1 → Accepted)  │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 1.4 Phase 3 Step 3 完成（2026-07-07）
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Step 3 (2026-07-07): cuStreamCapture + cuGraph + cuMemPool shim │
+│   - C2: 15 GpuDriverClient forwarding overrides (header inline)│
+│   - C3: 3 cuStream* capture APIs REAL_IMPL (cu_stream_capture.cpp)│
+│   - C4: 11 cuGraph* APIs REAL_IMPL (cu_graph.cpp + cu_graph_node.cpp│
+│        + cu_graph_exec.cpp, removed cuGraphCreate stub from cu_mem.cpp)│
+│   - C5: 8 cuMemPool* APIs REAL_IMPL (cu_mem_pool.cpp)         │
+│   - C6: 83 new E2E test cases (3 binaries, 225 total tests)│
+│   - C7: this sync-plan.md update + archive handoff           │
+│                                                              │
+│   7 atomic commits on branch phase3-step3-shim-and-forwarding│
+│   Build: 0 warnings, 225/225 tests pass (142 baseline + 83 new)│
+│   11 cuGraph* + 8 cuMemPool* + 4 cuStream* capture symbols exported│
+│                                                              │
+│   Next: notify UsrLinuxEmu owner → Step 4 (submodule bump)  │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -179,6 +200,7 @@ caller:                          driver:
 | S3.5 | ✅ 完成 | 2026-05-13 |
 | S5 | ✅ 完成 | 2026-06-19 |
 | **Phase 3.1+3.2 Step 1** | ✅ 完成 | **2026-07-06 (commit e6a34eb)** |
+| **Phase 3.1+3.2 Step 3** | ✅ 完成 | **2026-07-07 (branch phase3-step3-shim-and-forwarding, 7 atomic commits)** |
 
 ### 5.2 测试基线
 
@@ -189,7 +211,10 @@ caller:                          driver:
 | test_gpu_architecture | ✅ 11/11 | H-2.5 baseline + Phase 3.1 fix |
 | test_cuda_shim | ✅ 103/103 | Phase 1.7 (commit defd272) |
 | test_cuda_runtime_api | ✅ 8/8 | Phase 1 CudaRuntimeApi |
-| **总计** | **142/142** | **+565 assertions, 0 failures** |
+| test_cu_stream_capture | ✅ 30/30 | Phase 3.1 (Step 3) NEW |
+| test_cu_graph | ✅ 25/25 | Phase 3.1 (Step 3) NEW |
+| test_cu_mem_pool | ✅ 28/28 | Phase 3.2 (Step 3) NEW |
+| **总计** | **225/225** | **+83 new + 142 baseline, 0 failures** |
 | UsrLinuxEmu docs-audit | ✅ 53/53 | pre-commit hook (Phase 1.7 后) |
 
 ### 5.3 下一波 change 候选
@@ -199,9 +224,9 @@ caller:                          driver:
 | **~~H-3.5~~** | CudaStub guard verification | ✅ 完成 (2026-06-25, 5ff8c26) | TADR-006 | Done |
 | **~~H-7 ADR~~** | 3 upstream issues | ✅ 全部完成 (H-3.6/3.7/3.8) | TADR-008 | Done |
 | **Phase 3.1+3.2 Step 1** | IGpuDriver 31→46 扩展 | ✅ 完成 (2026-07-06, e6a34eb) | TADR-301 | Done |
-| **Phase 3.1+3.2 Step 2** | UsrLinuxEmu sim primitives + 18 IOCTL | 🟡 PR #20 ready (bd51dc9) | ADR-015 | **等 review + merge** |
-| **Phase 3.1+3.2 Step 3** | GpuDriverClient 15 forwarding + shim + E2E | ⏳ 未开始 (~6 天) | TADR-301 | 待 Step 2 merge |
-| **Phase 3.1+3.2 Step 4** | UsrLinuxEmu submodule bump | ⏳ 待 Step 3 merge | ADR-035 | 待 Step 3 |
+| **Phase 3.1+3.2 Step 2** | UsrLinuxEmu sim primitives + 18 IOCTL | ✅ 完成 (2026-07-06, 138f15a, PR #20 merged) | ADR-015 | Done |
+| **Phase 3.1+3.2 Step 3** | GpuDriverClient 15 forwarding + shim + E2E | ✅ 完成 (2026-07-07, 7 atomic commits, 225/225 tests) | TADR-301 | Done |
+| **Phase 3.1+3.2 Step 4** | UsrLinuxEmu submodule bump | ⏳ 待 Step 3 merge | ADR-035 | 待 PR merge |
 | **Phase 1.7 test coverage** | 25-30 E2E tests (REAL_IMPL 50.5%→≥85%) | 🟢 可立即开始 (独立) | — | PROPOSED |
 | **Phase 3.3 Event+Texture** | Frontend-only (cuEvent + cuTexRef) | 🟢 可立即开始 (独立) | — | DRAFT plan |
 
@@ -211,9 +236,10 @@ caller:                          driver:
 2026-07-04  Stage 1.4 完成 (80f6a44 + 9378153) → 触发 Phase 3.1+3.2 kickoff
 2026-07-05  UsrLinuxEmu openspec ACCEPTED + 11 项 BLOCKER/MUST-FIX 决议
 2026-07-05  UsrLinuxEmu PR #20 创建 (bd51dc9, 49 tests pass, 81/81 zero-regression)
-2026-07-06  TaskRunner Step 1 完成 (e6a34eb) ✅ ← 当前
-2026-07-15  🎯 Step 2 merge 截止 (UsrLinuxEmu owner 决定)
-2026-07-21  🎯 Step 3 merge 截止 (TaskRunner owner)
+2026-07-06  TaskRunner Step 1 完成 (e6a34eb) ✅
+2026-07-06  UsrLinuxEmu PR #20 merged (138f15a, 36 处 IOCTL 引用) ✅
+2026-07-07  TaskRunner Step 3 完成 (phase3-step3-shim-and-forwarding, 7 atomic commits, 225/225 tests) ✅ ← 当前
+2026-07-15  🎯 Step 3 PR merge 截止 (TaskRunner owner)
 2026-07-22  🎯 Step 4 submodule bump 截止 (UsrLinuxEmu owner)
 2026-07-25  🎯 最终回归 + openspec archive
 ```

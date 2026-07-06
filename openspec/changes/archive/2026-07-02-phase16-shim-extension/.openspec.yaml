@@ -1,0 +1,49 @@
+schema: spec-driven
+created: 2026-07-02
+status: SUPERSEDED
+archived: 2026-07-06
+goal: "Phase 1.6 wait-period work: fix cuMemGetInfo fake-success, demote cuModuleLoad*Data fake-REAL_IMPLs, expand test coverage for newly-registered APIs (37→≥47), prepare H-3 cross-repo PR description, and create Phase 3 skeleton doc — all based on accurate post-hotfix baseline (STUB=65, REAL_IMPL=79)."
+supersedes:
+  - "openspec/changes/archive/2026-07-02-umd-shim-coverage-hardening/ (SUPERSEDED, wrong baseline)"
+prerequisite:
+  - "commit d8ca3d3 (Phase 2 drift hotfix — already merged)"
+baseline:
+  total_declarations: 144
+  real_implementations: 79
+  stubs: 65
+  exported_via_nm: 79
+  test_cases: 37
+  docs_audit_checks: 54
+cross_repo:
+  prerequisite:
+    - "commit d8ca3d3 (Phase 2 drift hotfix, TaskRunner side)"
+    - "openspec/changes/archive/2026-07-02-taskrunner-umd-backend-enable/ (Phase 1.5 Stretch)"
+  parallel_with:
+    - "UsrLinuxEmu Stage 1.0-1.3 (PCIe/IOMMU/DRM/UVM, no TaskRunner dependency)"
+  triggers_phase3_when:
+    - "UsrLinuxEmu Stage 1.4 starts (KFD consumer integration)"
+    - "External demand for additional cu* APIs"
+related_documents:
+  - "../../docs/umd-evolution/roadmap/phase-2-complete.md"
+  - "../../docs/umd-evolution/roadmap/phase-3-deferred.md"
+  - "../../docs/umd-evolution/roadmap/current-status.md"
+  - "../../docs/superpowers/specs/2026-07-02-phase1.5-cudastub-dynamic-cast-fix.md"
+  - "../../../UsrLinuxEmu/docs/07-integration/h3-activation-followup.md"
+  - "../../../UsrLinuxEmu/docs/roadmap/stage-1-kernel-emu.md"
+outcome:
+  scope: umd-evolution
+  estimated_effort: "3-4 working days"
+  expected_test_count: "37+10 = ≥47 E2E tests"
+  expected_symbol_count: "79 (unchanged ABI)"
+  expected_stub_count: "65 → 68 (cuModuleLoad* demoted)"
+  expected_real_impl_count: "79 → 76 (cuModuleLoad* demoted)"
+  cross_repo_code_change: "none from TaskRunner side; PR description for UsrLinuxEmu H-3 fixes"
+  supersession_status:
+    rationale: |
+      5 workstreams (A.1, A.2, A.3, H-3, Phase 3 skeleton) split:
+      - A.1 cuMemGetInfo real data source: ✅ done in cu_mem.cpp (runtime()->get_total_memory() + env fallback)
+      - A.2 cuModuleLoad* demote: ❌ NOT DONE — separate change created (2026-07-06-phase16-cuModuleLoad-demote)
+      - A.3 test coverage 37→≥47: ✅ exceeded (103 cases) by archived phase17-wait-period-work
+      - H-3 cross-repo PR description: ✅ done (docs/superpowers/cross-repo-prs/2026-07-02-h3-followup-fixes.md)
+      - Phase 3 skeleton: ✅ done (docs/superpowers/plans/2026-07-02-phase3-prep-design-notes.md is ACTIVE)
+    remaining_work: "Only A.2 remains, refactored as separate minimal change 2026-07-06-phase16-cuModuleLoad-demote"

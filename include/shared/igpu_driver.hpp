@@ -337,6 +337,176 @@ public:
      */
     virtual void shutdown() {}
 
+    // ============================================================
+    // Phase 3.1 Stream Capture / Graph (10, 虚函数 默认 no-op, 非纯虚)
+    // ============================================================
+    //
+    // 决策来源 (UsrLinuxEmu Architecture Team 2026-07-05 反馈):
+    // - F-1 capture mode 仅接受 GLOBAL (其他 mode 返回 -1, 不静默 fallback)
+    // - B-3 fence_id 范围划分 (HAL [1, 1<<32-1] + sim [1<<32, INT64_MAX])
+    // - F-3 kernargs_bo_handle=0 表示无 kernargs BO (不校验 BO 表)
+    // - F-4 int64_t 返回约定 (<0 = errno, >= (1<<32) = valid fence_id)
+    //
+    // 兼容性: 所有方法为 虚函数 + 默认 no-op 实现 (非纯虚).
+    // CudaStub / MockGpuDriver 不强制 override; GpuDriverClient 在 Step 3
+    // 实现 15 forwarding 方法覆盖这些默认实现.
+
+    /**
+     * @brief 查询 stream capture 状态 (Phase 3.1)
+     * @param stream_id 流 ID
+     * @param[out] status_out SIM_STREAM_CAPTURE_STATUS_* (NONE/ACTIVE/INVALID)
+     * @return 0 成功, -1 失败
+     */
+    virtual int stream_capture_status(uint32_t stream_id, uint32_t* status_out) { return -1; }
+
+    /**
+     * @brief 开始 stream capture (Phase 3.1)
+     * @note UsrLinuxEmu 仅接受 SIM_CAPTURE_MODE_GLOBAL (0); 其他 mode 返回 -1
+     * @param stream_id 流 ID
+     * @param mode capture mode (CU_STREAM_CAPTURE_MODE_*)
+     * @return 0 成功, -1 失败
+     */
+    virtual int stream_capture_begin(uint32_t stream_id, uint32_t mode) { return -1; }
+
+    /**
+     * @brief 结束 stream capture, 返回 graph handle (Phase 3.1)
+     * @param stream_id 流 ID
+     * @param[out] graph_handle_out 返回的 graph handle (>=1)
+     * @return 0 成功, -1 失败
+     */
+    virtual int stream_capture_end(uint32_t stream_id, uint64_t* graph_handle_out) { return -1; }
+
+    /**
+     * @brief 创建空 CUDA graph (Phase 3.1)
+     * @param[out] graph_handle_out graph handle (>=1)
+     * @return 0 成功, -1 失败
+     */
+    virtual int graph_create(uint64_t* graph_handle_out) { return -1; }
+
+    /**
+     * @brief 销毁 CUDA graph (Phase 3.1)
+     * @param graph_handle graph handle
+     * @return 0 成功, -1 失败
+     */
+    virtual int graph_destroy(uint64_t graph_handle) { return -1; }
+
+    /**
+     * @brief 向 graph 添加 kernel launch 节点 (Phase 3.1)
+     * @note kernargs_bo_handle == 0 表示无参数 kernel, 不校验 BO 表存在性
+     * @param graph_handle graph handle
+     * @param kernel_index 内核注册表索引
+     * @param grid_x, grid_y, grid_z 启动 grid 维度
+     * @param block_x, block_y, block_z 启动 block 维度
+     * @param kernargs_bo_handle kernargs BO handle (0 = 无)
+     * @return 0 成功, -1 失败
+     */
+    virtual int graph_add_kernel_node(uint64_t graph_handle, uint32_t kernel_index,
+                                      uint32_t grid_x, uint32_t grid_y, uint32_t grid_z,
+                                      uint32_t block_x, uint32_t block_y, uint32_t block_z,
+                                      uint64_t kernargs_bo_handle) { return -1; }
+
+    /**
+     * @brief 向 graph 添加 memcpy 节点 (Phase 3.1)
+     * @param graph_handle graph handle
+     * @param src_va 源虚拟地址
+     * @param dst_va 目的虚拟地址
+     * @param size 拷贝字节数
+     * @param is_h2d 1=H2D, 0=D2H
+     * @return 0 成功, -1 失败
+     */
+    virtual int graph_add_memcpy_node(uint64_t graph_handle,
+                                      uint64_t src_va, uint64_t dst_va,
+                                      uint64_t size, uint32_t is_h2d) { return -1; }
+
+    /**
+     * @brief 实例化 graph 为可执行对象 (Phase 3.1)
+     * @param graph_handle graph handle
+     * @param[out] exec_handle_out executable handle (>=1)
+     * @return 0 成功, -1 失败
+     */
+    virtual int graph_instantiate(uint64_t graph_handle, uint64_t* exec_handle_out) { return -1; }
+
+    /**
+     * @brief 提交 graph executable 启动 (Phase 3.1)
+     * @note F-4 返回约定: <0 = errno, >= (1<<32) = valid sim fence_id, 0 = 成功无 fence
+     * @param graph_exec_handle executable handle
+     * @param stream_id 流 ID
+     * @return fence_id (>= (1<<32) 表示 sim fence), <0 = errno, -1 = 未实现
+     */
+    virtual int64_t submit_graph(uint64_t graph_exec_handle, uint32_t stream_id) { return -1; }
+
+    /**
+     * @brief 销毁 graph executable (Phase 3.1)
+     * @param graph_exec_handle executable handle
+     * @return 0 成功, -1 失败
+     */
+    virtual int destroy_graph_exec(uint64_t graph_exec_handle) { return -1; }
+
+    // ============================================================
+    // Phase 3.2 Memory Pool (5, 虚函数 默认 no-op, 非纯虚)
+    // ============================================================
+    //
+    // 决策来源 (UsrLinuxEmu Architecture Team 2026-07-05 反馈):
+    // - B-2 Pool VA 范围采用 Option B (VA 子范围预留); sim_mem_pool_props_t
+    //   加 va_base / va_limit 字段
+    // - F-2 attr value blob 布局 (Step 3 实施, 本 change 不涉及)
+    //
+    // 兼容性: 所有方法为 虚函数 + 默认 no-op 实现 (非纯虚).
+    //
+    // 注意: set_attr/get_attr/trim 3 个 IOCTL (0x65-0x67) 不需要单独 IGpuDriver
+    // 方法 — Oracle 决策, 通过现有 alloc/destroy 语义覆盖. 若 Phase 3.x 需要
+    // 显式属性控制, 加 3 个方法 (Phase 3.2 → 49 total).
+
+    /**
+     * @brief 创建 memory pool (Phase 3.2)
+     * @note UsrLinuxEmu B-2: pool 预留 maxSize VA 子范围 via sim_mem_pool_props_t
+     * @param va_space_handle 所属 VA Space handle
+     * @param size pool 总大小 (字节)
+     * @param flags pool 标志 (CU_MEMPOOL_*)
+     * @param[out] pool_handle_out pool handle (>=1)
+     * @return 0 成功, -1 失败
+     */
+    virtual int mem_pool_create(uint64_t va_space_handle, uint64_t size,
+                                uint32_t flags, uint64_t* pool_handle_out) { return -1; }
+
+    /**
+     * @brief 销毁 memory pool (Phase 3.2)
+     * @param pool_handle pool handle
+     * @return 0 成功, -1 失败
+     */
+    virtual int mem_pool_destroy(uint64_t pool_handle) { return -1; }
+
+    /**
+     * @brief 从 pool 同步分配 (Phase 3.2)
+     * @param pool_handle pool handle
+     * @param size 分配字节数
+     * @param[out] va_out 返回的虚拟地址
+     * @return 0 成功, -1 失败
+     */
+    virtual int mem_pool_alloc(uint64_t pool_handle, uint64_t size,
+                               uint64_t* va_out) { return -1; }
+
+    /**
+     * @brief 从 pool 异步分配 (Phase 3.2)
+     * @note F-4 返回约定: <0 = errno, >= (1<<32) = valid sim fence_id
+     * @param pool_handle pool handle
+     * @param size 分配字节数
+     * @param stream_id 目标流
+     * @param[out] va_out 返回的虚拟地址
+     * @return fence_id (>= (1<<32) 表示 sim fence), <0 = errno, -1 = 未实现
+     */
+    virtual int64_t mem_pool_alloc_async(uint64_t pool_handle, uint64_t size,
+                                         uint32_t stream_id, uint64_t* va_out) { return -1; }
+
+    /**
+     * @brief 异步释放 (Phase 3.2)
+     * @note F-4 返回约定: <0 = errno, >= (1<<32) = valid sim fence_id
+     * @param va 要释放的虚拟地址
+     * @param stream_id 目标流
+     * @return fence_id (>= (1<<32) 表示 sim fence), <0 = errno, -1 = 未实现
+     */
+    virtual int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) { return -1; }
+
     /**
      * @brief 虚析构函数 (允许通过基类指针安全 delete)
      */

@@ -551,6 +551,262 @@ public:
         return 0;
     }
 
+    // ============================================================
+    // Phase 3.1 Stream Capture / Graph (10) - IGpuDriver overrides
+    // ============================================================
+    // 实施依据：4-step coordination Step 3, UsrLinuxEmu PR #20 merged
+    // 每个方法 inline ioctl()（参考 wait_fence, free_bo 模式）
+    // F-4: int64_t 返回约定 (<0 = errno, >= (1<<32) = sim fence_id)
+    // F-1: stream_capture_begin 仅接受 mode=0 (GLOBAL); shim 端已 reject
+
+    int stream_capture_status(uint32_t stream_id, uint32_t* status_out) override {
+        if (!is_open()) return -1;
+        if (!status_out) return -EINVAL;
+        gpu_stream_capture_status_args args = {};
+        args.stream_id = stream_id;
+        if (ioctl(fd_, GPU_IOCTL_STREAM_CAPTURE_STATUS, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_STREAM_CAPTURE_STATUS failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        *status_out = args.status_out;
+        return 0;
+    }
+
+    int stream_capture_begin(uint32_t stream_id, uint32_t mode) override {
+        if (!is_open()) return -1;
+        // F-1: shim 端已 reject non-GLOBAL; ioctl 层允许但需要 mode 字段
+        gpu_stream_capture_args args = {};
+        args.stream_id = stream_id;
+        args.mode = mode;
+        if (ioctl(fd_, GPU_IOCTL_STREAM_CAPTURE_BEGIN, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_STREAM_CAPTURE_BEGIN failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return 0;
+    }
+
+    int stream_capture_end(uint32_t stream_id, uint64_t* graph_handle_out) override {
+        if (!is_open()) return -1;
+        if (!graph_handle_out) return -EINVAL;
+        gpu_stream_capture_args args = {};
+        args.stream_id = stream_id;
+        if (ioctl(fd_, GPU_IOCTL_STREAM_CAPTURE_END, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_STREAM_CAPTURE_END failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        *graph_handle_out = args.graph_handle_out;
+        return 0;
+    }
+
+    int graph_create(uint64_t* graph_handle_out) override {
+        if (!is_open()) return -1;
+        if (!graph_handle_out) return -EINVAL;
+        gpu_graph_create_args args = {};  // zero-init OUT fields
+        if (ioctl(fd_, GPU_IOCTL_GRAPH_CREATE, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_GRAPH_CREATE failed"
+                    << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        *graph_handle_out = args.graph_handle_out;
+        return 0;
+    }
+
+    int graph_destroy(uint64_t graph_handle) override {
+        if (!is_open()) return -1;
+        if (graph_handle == 0) return -1;
+        gpu_graph_destroy_args args = {};
+        args.graph_handle = graph_handle;
+        if (ioctl(fd_, GPU_IOCTL_GRAPH_DESTROY, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_GRAPH_DESTROY failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return 0;
+    }
+
+    int graph_add_kernel_node(uint64_t graph_handle, uint32_t kernel_index,
+                              uint32_t grid_x, uint32_t grid_y, uint32_t grid_z,
+                              uint32_t block_x, uint32_t block_y, uint32_t block_z,
+                              uint64_t kernargs_bo_handle) override {
+        if (!is_open()) return -1;
+        if (graph_handle == 0) return -1;
+        // F-3: kernargs_bo_handle=0 表示无 kernargs BO，不校验 BO 表
+        gpu_graph_add_kernel_node_args args = {};
+        args.graph_handle = graph_handle;
+        args.kernel_index = kernel_index;
+        args.grid_x = grid_x;
+        args.grid_y = grid_y;
+        args.grid_z = grid_z;
+        args.block_x = block_x;
+        args.block_y = block_y;
+        args.block_z = block_z;
+        args.kernargs_bo_handle = kernargs_bo_handle;
+        if (ioctl(fd_, GPU_IOCTL_GRAPH_ADD_KERNEL_NODE, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_GRAPH_ADD_KERNEL_NODE failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return 0;
+    }
+
+    int graph_add_memcpy_node(uint64_t graph_handle,
+                              uint64_t src_va, uint64_t dst_va,
+                              uint64_t size, uint32_t is_h2d) override {
+        if (!is_open()) return -1;
+        if (graph_handle == 0) return -1;
+        if (size == 0) return -1;
+        gpu_graph_add_memcpy_node_args args = {};
+        args.graph_handle = graph_handle;
+        args.src_va = src_va;
+        args.dst_va = dst_va;
+        args.size = size;
+        args.is_h2d = is_h2d;
+        if (ioctl(fd_, GPU_IOCTL_GRAPH_ADD_MEMCPY_NODE, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_GRAPH_ADD_MEMCPY_NODE failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return 0;
+    }
+
+    int graph_instantiate(uint64_t graph_handle, uint64_t* exec_handle_out) override {
+        if (!is_open()) return -1;
+        if (graph_handle == 0) return -1;
+        if (!exec_handle_out) return -EINVAL;
+        gpu_graph_instantiate_args args = {};
+        args.graph_handle = graph_handle;
+        if (ioctl(fd_, GPU_IOCTL_GRAPH_INSTANTIATE, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_GRAPH_INSTANTIATE failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        *exec_handle_out = args.exec_handle_out;
+        return 0;
+    }
+
+    int64_t submit_graph(uint64_t graph_exec_handle, uint32_t stream_id) override {
+        if (!is_open()) return -1;
+        if (graph_exec_handle == 0) return -1;
+        // F-4: 返回 ≥ 1<<32 = sim fence_id
+        gpu_graph_launch_args args = {};
+        args.exec_handle = graph_exec_handle;  // 字段名是 exec_handle (而非 graph_exec_handle)
+        args.stream_id = stream_id;
+        if (ioctl(fd_, GPU_IOCTL_GRAPH_LAUNCH, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_GRAPH_LAUNCH failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return args.fence_id_out;
+    }
+
+    int destroy_graph_exec(uint64_t graph_exec_handle) override {
+        if (!is_open()) return -1;
+        if (graph_exec_handle == 0) return -1;
+        gpu_graph_destroy_exec_args args = {};
+        args.exec_handle = graph_exec_handle;
+        if (ioctl(fd_, GPU_IOCTL_GRAPH_DESTROY_EXEC, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_GRAPH_DESTROY_EXEC failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return 0;
+    }
+
+    // ============================================================
+    // Phase 3.2 Memory Pool (5) - IGpuDriver overrides
+    // ============================================================
+    // B-2: Pool VA 范围采用 Option B; D-MP-1 决策
+    // F-4: int64_t 返回 ≥ 1<<32 = sim fence
+
+    int mem_pool_create(uint64_t va_space_handle, uint64_t size,
+                        uint32_t flags, uint64_t* pool_handle_out) override {
+        if (!is_open()) return -1;
+        if (!pool_handle_out) return -EINVAL;
+        if (va_space_handle == 0) {
+            std::cerr << "[GpuDriverClient] mem_pool_create: rejected H-1 sentinel"
+                      << " (va_space_handle=0)" << std::endl;
+            return -1;
+        }
+        gpu_mem_pool_create_args args = {};
+        // B-2: nested struct 访问 — args.props.X 而非 args.X
+        args.props.va_space_handle = va_space_handle;
+        args.props.size = size;
+        args.props.flags = flags;
+        if (ioctl(fd_, GPU_IOCTL_MEM_POOL_CREATE, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_MEM_POOL_CREATE failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        *pool_handle_out = args.pool_handle_out;
+        return 0;
+    }
+
+    int mem_pool_destroy(uint64_t pool_handle) override {
+        if (!is_open()) return -1;
+        if (pool_handle == 0) return -1;
+        gpu_mem_pool_destroy_args args = {};
+        args.pool_handle = pool_handle;
+        if (ioctl(fd_, GPU_IOCTL_MEM_POOL_DESTROY, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_MEM_POOL_DESTROY failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return 0;
+    }
+
+    int mem_pool_alloc(uint64_t pool_handle, uint64_t size, uint64_t* va_out) override {
+        if (!is_open()) return -1;
+        if (!va_out) return -EINVAL;
+        if (pool_handle == 0) return -1;
+        if (size == 0) return -1;
+        gpu_mem_pool_alloc_args args = {};
+        args.pool_handle = pool_handle;
+        args.size = size;
+        if (ioctl(fd_, GPU_IOCTL_MEM_POOL_ALLOC, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_MEM_POOL_ALLOC failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        *va_out = args.va_out;
+        return 0;
+    }
+
+    int64_t mem_pool_alloc_async(uint64_t pool_handle, uint64_t size,
+                                 uint32_t stream_id, uint64_t* va_out) override {
+        if (!is_open()) return -1;
+        if (!va_out) return -EINVAL;
+        if (pool_handle == 0) return -1;
+        // F-4: 同步 alloc + 同步 fence 路径
+        gpu_mem_pool_alloc_async_args args = {};
+        args.pool_handle = pool_handle;
+        args.size = size;
+        args.stream_id = stream_id;
+        if (ioctl(fd_, GPU_IOCTL_MEM_POOL_ALLOC_ASYNC, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_MEM_POOL_ALLOC_ASYNC failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        *va_out = args.va_out;
+        return args.fence_id_out;
+    }
+
+    int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override {
+        if (!is_open()) return -1;
+        // va=0 不一定非法 (零地址释放是合法语义), 不 guard
+        gpu_mem_pool_free_async_args args = {};
+        args.va = va;
+        args.stream_id = stream_id;
+        if (ioctl(fd_, GPU_IOCTL_MEM_POOL_FREE_ASYNC, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_MEM_POOL_FREE_ASYNC failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        return args.fence_id_out;
+    }
+
 private:
     int fd_;                      // 设备文件描述符
     std::string device_path_;      // 设备路径

@@ -46,8 +46,38 @@ TaskRunner/
 ├── tools/
 │   └── docs-audit.sh                 # 文档验证脚本
 ├── UsrLinuxEmu → ../../              # 符号链接，GPU 接口定义（2026-06-19 PR #6 修复路径）
+├── .rddf/wt/                          # Git worktree 目录（项目内约定，已 gitignore）
 └── CMakeLists.txt
 ```
+
+## Git Worktree 约定 (2026-07-06)
+
+**项目内约定**：所有 worktree 必须在项目根目录下 `.rddf/wt/<branch>` 创建，**不再使用** `~/.config/superpowers/worktrees/` 全局目录。
+
+### 创建示例
+
+```bash
+# 新建 worktree（绝对路径必须落在 .rddf/wt/）
+git worktree add .rddf/wt/feature-xyz -b feature-xyz main
+
+# 列出
+git worktree list
+
+# 完成后清理
+git worktree remove .rddf/wt/feature-xyz
+git branch -d feature-xyz
+git worktree prune
+```
+
+### 路径约束
+
+- **允许**：`<repo-root>/.rddf/wt/<branch>/`
+- **禁止**：`~/.config/superpowers/worktrees/<repo>/<branch>/`（旧路径，已废弃）
+- **禁止**：项目根下其他位置（避免污染工作树）
+
+### 历史遗留清理
+
+2026-07-06 清理：`/home/ubuntu/.config/superpowers/worktrees/TaskRunner/phase3-1-igpu-driver-extension`（已 merge 进 main，分支已删）。
 
 ## 构建命令
 

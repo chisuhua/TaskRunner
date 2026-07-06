@@ -33,3 +33,6 @@ UsrLinuxEmu/
 
 # Additional scratch build dir (no underscore prefix)
 build2/
+
+# Git worktrees (project-local convention, see AGENTS.md)
+.rddf/

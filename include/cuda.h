@@ -36,6 +36,7 @@ typedef enum CUresult_enum {
   CUDA_ERROR_OUT_OF_MEMORY                  = 2,
   CUDA_ERROR_NOT_READY                      = 600,
   CUDA_ERROR_INVALID_HANDLE                 = 400,
+  CUDA_ERROR_ILLEGAL_STATE                  = 401,
   CUDA_ERROR_NOT_SUPPORTED                  = 801,
   /* NOTE: NOT_IMPLEMENTED is aliased to NOT_SUPPORTED (both value 801 in CUDA 12.x).
      We define it as a macro alias to avoid duplicate case value errors in switch(). */
@@ -284,6 +285,8 @@ CUresult cuStreamCreateWithFlags(CUstream* phStream, unsigned int flags);
 CUresult cuStreamGetCaptureInfo(CUstream hStream,
                                 CUstreamCaptureStatus* captureStatus,
                                 cuuint64_t* id);
+CUresult cuStreamIsCapturing(CUstream hStream,
+                             CUstreamCaptureStatus* captureStatus);
 CUresult cuEventCreateWithFlags(CUevent* phEvent, unsigned int flags);
 CUresult cuMemsetD16(CUdeviceptr dstDevice, unsigned short us, size_t N);
 CUresult cuProfilerStart(void);

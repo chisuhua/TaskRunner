@@ -31,6 +31,7 @@ add_library(cuda_taskrunner SHARED
     src/umd/libcuda_shim/cu_device.cpp
     src/umd/libcuda_shim/cu_query.cpp
     src/umd/libcuda_shim/cu_stream.cpp
+    src/umd/libcuda_shim/cu_stream_capture.cpp
     src/umd/libcuda_shim/cu_event.cpp
 )
 target_include_directories(cuda_taskrunner PUBLIC

@@ -342,13 +342,17 @@ CUresult cuStreamGetFlags(void);
 __attribute__((weak, visibility("default")))
 CUresult cuStreamGetCaptureInfo(void);
 
-// REAL_IMPL in cu_stream.cpp
+// REAL_IMPL in cu_stream_capture.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuStreamBeginCapture(void);
 
-// REAL_IMPL in cu_stream.cpp
+// REAL_IMPL in cu_stream_capture.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuStreamEndCapture(void);
+
+// REAL_IMPL in cu_stream_capture.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuStreamIsCapturing(void);
 
 // REAL_IMPL in cu_event.cpp
 __attribute__((weak, visibility("default")))

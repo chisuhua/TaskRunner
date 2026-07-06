@@ -92,21 +92,6 @@ extern "C" CUresult cuStreamAddCallback(CUstream hStream,
   return CUDA_SUCCESS;
 }
 
-extern "C" CUresult cuStreamBeginCapture(CUstream hStream,
-                                         CUstreamCaptureMode mode) {
-  (void)hStream;
-  (void)mode;
-  return CUDA_ERROR_NOT_IMPLEMENTED;
-}
-
-extern "C" CUresult cuStreamEndCapture(CUstream hStream, CUgraph* phGraph) {
-  (void)hStream;
-  (void)phGraph;
-  return CUDA_ERROR_NOT_IMPLEMENTED;
-}
-
-// Stream-ordered write value / wait value (used by some CUDA cooperative
-// kernel patterns).
 extern "C" CUresult cuStreamWriteValue32(CUstream hStream, CUdeviceptr addr,
                                          cuuint32_t value,
                                          unsigned int flags) {
@@ -128,7 +113,7 @@ extern "C" CUresult cuStreamWaitValue32(CUstream hStream, CUdeviceptr addr,
 }
 
 // ---------------------------------------------------------------------------
-// Phase 1.7 — A.4: cuStreamCreateWithFlags / cuStreamGetCaptureInfo
+// Phase 1.7 — A.4: cuStreamCreateWithFlags
 // ---------------------------------------------------------------------------
 
 extern "C" CUresult cuStreamCreateWithFlags(CUstream* phStream,
@@ -137,12 +122,23 @@ extern "C" CUresult cuStreamCreateWithFlags(CUstream* phStream,
   return cuStreamCreate(phStream, 0);
 }
 
+// ---------------------------------------------------------------------------
+// Phase 3.1: cuStreamGetCaptureInfo delegates to cu_stream_capture.cpp
+// ---------------------------------------------------------------------------
+//
+// cuStreamGetCaptureInfo lives here (not in cu_stream_capture.cpp) because
+// it is a query on stream state, and the existing cu_stream.cpp already owns
+// cuStreamCreate/cuStreamDestroy handle tracking. It is implemented in terms
+// of the cuStreamIsCapturing REAL_IMPL in cu_stream_capture.cpp so that all
+// capture state transitions go through a single code path.
+
 extern "C" CUresult cuStreamGetCaptureInfo(CUstream hStream,
                                             CUstreamCaptureStatus* captureStatus,
                                             cuuint64_t* id) {
-  (void)hStream;
-  (void)id;
   if (!captureStatus) return CUDA_ERROR_INVALID_VALUE;
-  *captureStatus = CU_STREAM_CAPTURE_STATUS_NONE;
-  return CUDA_SUCCESS;
+  CUresult ret = cuStreamIsCapturing(hStream, captureStatus);
+  if (ret == CUDA_SUCCESS && id != nullptr) {
+    *id = 0;
+  }
+  return ret;
 }

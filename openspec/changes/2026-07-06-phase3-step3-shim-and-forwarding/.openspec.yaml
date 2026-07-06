@@ -1,0 +1,96 @@
+schema: spec-driven
+created: 2026-07-06
+status: PROPOSED
+goal: "Step 3 of 4-step cross-repo coordination: implement GpuDriverClient 15 forwarding overrides (src/test_fixture/gpu_driver_client.cpp) + cuStreamCapture/cuGraph/cuMemPool shim layer (src/umd/libcuda_shim/) + 30+ Phase 3.1 + 25+ Phase 3.2 E2E tests. Unblocks Step 4 (UsrLinuxEmu submodule bump) and final regression test."
+baseline:
+  igpu_driver_methods: 46
+  usr_linux_emu_ioctls_available: 18
+  usr_linux_emu_ioctls_range: "0x50-0x67"
+  usr_linux_emu_sim_modules:
+    - "fence_id (sim fence_id allocator, [1<<32, INT64_MAX])"
+    - "stream_capture (state machine, GLOBAL only)"
+    - "graph (7 functions, returns sim fence_id)"
+    - "mem_pool (8 functions, Option B VA sub-range)"
+  test_baseline: "76+ existing tests passing on TaskRunner main @ 12bed8d"
+  gpu_driver_client_methods_overridden: 31
+  gpu_driver_client_methods_to_add: 15
+prerequisite:
+  - "Step 1: TaskRunner IGpuDriver 31→46 (commit 21f71c9) — MERGED to TaskRunner main @ 12bed8d"
+  - "Step 2: UsrLinuxEmu sim + IOCTL (PR #20 commit 138f15a) — MERGED to UsrLinuxEmu main"
+  - "UsrLinuxEmu submodule pointer: 12bed8d (commit 23691ed bump already done)"
+  - "Symlink UsrLinuxEmu → /workspace/project/UsrLinuxEmu functional (verified gpu_ioctl.h accessible)"
+cross_repo:
+  prerequisite:
+    - "UsrLinuxEmu PR #20 (138f15a) merged to UsrLinuxEmu main"
+    - "TaskRunner Step 1 (21f71c9) merged to TaskRunner main"
+  blocks:
+    - "Step 4: UsrLinuxEmu submodule bump to TaskRunner HEAD post-Step-3 merge"
+    - "openspec archive of 2026-07-05-sim-stream-primitive-support (UsrLinuxEmu side)"
+    - "openspec archive of 2026-07-05-phase3-1-igpu-driver-extension (this PR supersedes)"
+  parallel_with:
+    - "UsrLinuxEmu Stage 2 multi-device (orthogonal, no Phase 3 dependency)"
+    - "TaskRunner Phase 1.7 test coverage completion (independent frontend-only)"
+    - "TaskRunner Phase 3.3 Event/Texture frontend (independent frontend-only)"
+  decision_references:
+    - "B-1: GpuQueueEmu API uses submit(uint64_t, uint32_t)"
+    - "B-2: Pool VA range Option B (sub-range reservation)"
+    - "B-3: fence_id range partition (HAL + sim)"
+    - "F-1: capture mode GLOBAL only"
+    - "F-2: attr value[4] blob layout"
+    - "F-3: kernargs_bo_handle=0 means no BO"
+    - "F-4: int64_t return convention"
+    - "N-3: Step 3 split into 3 commits (override / shim / E2E)"
+    - "N-4: sync plans/sync-plan.md + docs/07-integration/ on each step completion"
+workstreams:
+  - id: 1
+    name: "GpuDriverClient 15 forwarding overrides"
+    effort: "1 day"
+    deliverables: "src/test_fixture/gpu_driver_client.cpp 15 new methods, each forwarding to GPU_IOCTL_* via GpuDriverClient::submit_ioctl (existing pattern)"
+    validation: "Method count 31 → 46 in header; 76+ regression tests pass; new override methods compile and link"
+  - id: 2
+    name: "cuStreamCapture + cuGraph shim"
+    effort: "2 days"
+    deliverables: "src/umd/libcuda_shim/cu_stream_capture.cpp (3 funcs) + cu_graph.cpp (7 funcs) + cu_graph_node.cpp (2 funcs) + cu_graph_exec.cpp (2 funcs)"
+    validation: "cuStreamBeginCapture / cuStreamEndCapture / cuStreamIsCapturing call through to sim_stream_* via GpuDriverClient"
+  - id: 3
+    name: "cuMemPool shim"
+    effort: "2 days"
+    deliverables: "src/umd/libcuda_shim/cu_mem_pool.cpp (8 funcs)"
+    validation: "cuMemPoolCreate/Destroy/Alloc/Free/SetAttr/GetAttr/Trim call through to sim_mem_pool_* via GpuDriverClient"
+  - id: 4
+    name: "E2E test coverage"
+    effort: "2 days"
+    deliverables: "tests/umd/test_cu_stream_capture.cpp (≥30 cases) + test_cu_graph.cpp (≥20 cases) + test_cu_mem_pool.cpp (≥25 cases)"
+    validation: "All new tests PASS; total test count 76+ → 151+"
+  - id: 5
+    name: "Documentation + cross-repo sync"
+    effort: "0.5 day"
+    deliverables: "plans/sync-plan.md updated + docs/07-integration/ new entry + openspec archive of phase3-1-igpu-driver-extension"
+    validation: "sync-plan.md v2.3 reflects Step 3 done; docs/07-integration/phase3-step3.md created"
+related_documents:
+  - "../2026-07-05-phase3-1-igpu-driver-extension/proposal.md"
+  - "../2026-07-05-phase3-1-igpu-driver-extension/design.md"
+  - "../../../docs/superpowers/cross-repo-prs/2026-07-05-phase3-1-stream-mempool-coordination.md"
+  - "../../../docs/superpowers/specs/2026-07-02-phase3-stream-capture-design.md"
+  - "../../../docs/superpowers/specs/2026-07-02-phase3-mempool-design.md"
+  - "../../../docs/superpowers/plans/2026-07-02-phase3-prep-design-notes.md"
+  - "../../../../UsrLinuxEmu/openspec/changes/2026-07-05-sim-stream-primitive-support/accepted-resolution.md"
+  - "../../../../UsrLinuxEmu/openspec/changes/2026-07-05-sim-stream-primitive-support/design.md"
+  - "../../../../UsrLinuxEmu/docs/00_adr/adr-015-gpu-ioctl-unification.md"
+  - "../../../../UsrLinuxEmu/docs/00_adr/adr-032-h2-5-igpu-driver-abstraction.md"
+outcome:
+  scope: shared + umd-evolution
+  estimated_effort: "5-7 working days (all 5 workstreams combined)"
+  expected_test_count: "76 + 30 + 20 + 25 = 151+ (≥75 new cases)"
+  expected_ioctl_forwarding: "15 (10 graph/capture + 5 mempool)"
+  expected_shim_funcs: "22 (3 stream_capture + 11 graph + 8 mempool)"
+  expected_real_impl_count: "102 → 119 (Phase 3.1/3.2 11 graph/capture + 8 mempool + 11 graph aux -2 existing)"
+  expected_stub_count: "42 → 24 (-18 for Phase 3.1 + 3.2 APIs)"
+  expected_audit_checks: "53 (unchanged, no docs-audit false-positive introductions)"
+  cross_repo_code_change: "All TaskRunner-side; UsrLinuxEmu side untouched (no submodule bump in this change)"
+  revision_note: "2026-07-06 self-review: corrected struct field names (gpu_mem_pool_create_args.props, gpu_graph_launch_args.exec_handle); removed fictional submit_ioctl() helper; adopted self-contained shim pattern matching existing cu_stream.cpp/cu_event.cpp/cu_mem.cpp."
+  supersedes:
+    - "openspec/changes/2026-07-05-phase3-1-igpu-driver-extension/ (this change implements what Step 1 declared)"
+  followup_steps:
+    - "Step 4: UsrLinuxEmu submodule bump (target 2026-07-22)"
+    - "Final regression + openspec archive (target 2026-07-25)"

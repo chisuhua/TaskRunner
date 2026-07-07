@@ -226,7 +226,7 @@ caller:                          driver:
 | S5 | ✅ 完成 | 2026-06-19 |
 | **Phase 3.1+3.2 Step 1** | ✅ 完成 | **2026-07-06 (commit e6a34eb)** |
 | **Phase 3.1+3.2 Step 3** | ✅ 完成 | **2026-07-07 (branch phase3-step3-shim-and-forwarding, 7 atomic commits)** |
-| **Phase 4 real-impl-bridge** | 🔄 进行中 | 2026-07-07 |
+| **Phase 4 real-impl-bridge** | ✅ 完成 | **2026-07-07 (PR #8 @ fbcbe44, 270/270 tests pass, 47 methods)** |
 
 ### 5.2 测试基线
 
@@ -254,7 +254,8 @@ caller:                          driver:
 | **Phase 3.1+3.2 Step 1** | IGpuDriver 31→46 扩展 | ✅ 完成 (2026-07-06, e6a34eb) | TADR-301 | Done |
 | **Phase 3.1+3.2 Step 2** | UsrLinuxEmu sim primitives + 18 IOCTL | ✅ 完成 (2026-07-06, 138f15a, PR #20 merged) | ADR-015 | Done |
 | **Phase 3.1+3.2 Step 3** | GpuDriverClient 15 forwarding + shim + E2E | ✅ 完成 (2026-07-07, 7 atomic commits, 225/225 tests) | TADR-301 | Done |
-| **Phase 3.1+3.2 Step 4** | UsrLinuxEmu submodule bump | ⏳ 待 Step 3 merge | ADR-035 | 待 PR merge |
+| **Phase 3.1+3.2 Step 4** | UsrLinuxEmu submodule bump | ✅ 完成 (2026-07-07, commit 458299e) | ADR-035 | Done |
+| **Phase 4 real-impl-bridge** | shim bridge 5 cu* APIs to GpuDriverClient IOCTLs | ✅ 完成 (2026-07-07, PR #8 @ fbcbe44, 270/270 tests, +1 IGpuDriver method = 47) | TADR-301/305 | Done |
 | **Phase 1.7 test coverage** | 25-30 E2E tests (REAL_IMPL 50.5%→≥85%) | 🟢 可立即开始 (独立) | — | PROPOSED |
 | **Phase 3.3 Event+Texture** | Frontend-only (cuEvent + cuTexRef) | 🟢 可立即开始 (独立) | — | DRAFT plan |
 
@@ -267,9 +268,12 @@ caller:                          driver:
 2026-07-06  TaskRunner Step 1 完成 (e6a34eb) ✅
 2026-07-06  UsrLinuxEmu PR #20 merged (138f15a, 36 处 IOCTL 引用) ✅
 2026-07-07  TaskRunner Step 3 完成 (phase3-step3-shim-and-forwarding, 7 atomic commits, 225/225 tests) ✅ ← archived 2026-07-07 (76f14e0)
+2026-07-07  UsrLinuxEmu Step 4 submodule bump (458299e) ✅
+2026-07-07  TaskRunner Phase 4 PR #8 merged (fbcbe44, 270/270 tests, 47 methods) ✅
+2026-07-07  UsrLinuxEmu submodule bump to Phase 4 (5d8c200) ✅
 2026-07-15  🎯 Step 3 PR merge 截止 (TaskRunner owner) → ✅ done 2026-07-07 (PR #7 merge commit 02363b8)
 2026-07-22  🎯 Step 4 submodule bump 截止 (UsrLinuxEmu owner) → ✅ done 2026-07-07 (UsrLinuxEmu commit 458299e)
-2026-07-25  🎯 最终回归 + openspec archive → 🟡 partial: openspec archive done 2026-07-07 (TaskRunner 76f14e0); final regression 待评估
+2026-07-25  🎯 最终回归 + openspec archive → ✅ done (TaskRunner 76f14e0 archive + Phase 4 archive 48a5c34; regression 270/270)
 ```
 
 ### 5.5 决策追踪（D-SC-* / D-MP-*）

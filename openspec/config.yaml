@@ -1,5 +1,11 @@
 schema: spec-driven
 
+# ⚠️ Tooling note: openspec CLI rejects `--change` arguments whose name starts
+#    with a digit (e.g. our `2026-07-06-...` convention). See TOOLING_ISSUES.md
+#    for symptom, impact, and the manual-mv workaround used during archive.
+#    Until upstream is fixed, archive operations bypass `openspec archive`
+#    and use plain `mv` (see commit 76f14e0 on main for a worked example).
+
 # Project context (optional)
 # This is shown to AI when creating artifacts.
 # Add your tech stack, conventions, style guides, domain knowledge, etc.

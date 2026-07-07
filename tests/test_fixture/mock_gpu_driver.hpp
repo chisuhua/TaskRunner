@@ -289,6 +289,18 @@ public:
     }
 
     // ============================================================
+    // Memory Pool Export (1) — Phase 4
+    // ============================================================
+    int mem_pool_export_shareable(uint64_t pool, uint32_t handle_type,
+                                  uint32_t flags, int* fd_out) override {
+        mem_pool_export_shareable_calls++;
+        mem_pool_export_shareable_arg_pool = pool;
+        mem_pool_export_shareable_arg_handle_type = handle_type;
+        if (fd_out) *fd_out = mem_pool_export_shareable_return_fd;
+        return 0;
+    }
+
+    // ============================================================
     // Test API
     // ============================================================
     const std::vector<CallRecord>& history() const { return history_; }
@@ -361,6 +373,12 @@ private:
     mutable std::atomic<uint64_t> next_handle_{1};
     mutable std::atomic<uint64_t> next_fence_id_{1};
     uint64_t current_va_space_handle_{0};
+
+    // Phase 4: mem pool export tracking
+    int mem_pool_export_shareable_calls = 0;
+    uint64_t mem_pool_export_shareable_arg_pool = 0;
+    uint32_t mem_pool_export_shareable_arg_handle_type = 0;
+    int mem_pool_export_shareable_return_fd = 42;
 
     // H-3.5: state tracking for lifecycle methods + guards
     bool is_open_{false};

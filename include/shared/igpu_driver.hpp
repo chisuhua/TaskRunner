@@ -508,6 +508,23 @@ public:
     virtual int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) { return -1; }
 
     /**
+     * @brief 导出 memory pool 的可共享 handle (Phase 4)
+     *
+     * 对应 cuMemPoolExportToShareableHandle。将 pool 导出为 POSIX FD，
+     * 用于跨进程共享。
+     *
+     * @param pool_handle pool handle
+     * @param handle_type 导出类型 (CU_MEM_HANDLE_TYPE_POSIX_FD = 1)
+     * @param flags 保留 (必须为 0)
+     * @param[out] fd_out POSIX 文件描述符 (≥0 有效)
+     * @return 0 成功, -1 失败 (默认: NOT_SUPPORTED)
+     */
+    virtual int mem_pool_export_shareable(uint64_t pool_handle,
+                                          uint32_t handle_type,
+                                          uint32_t flags,
+                                          int* fd_out) { return -1; }
+
+    /**
      * @brief 虚析构函数 (允许通过基类指针安全 delete)
      */
     virtual ~IGpuDriver() = default;

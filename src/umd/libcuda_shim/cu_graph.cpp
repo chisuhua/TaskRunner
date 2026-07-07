@@ -1,14 +1,13 @@
 // SCOPE: UMD-EVOLUTION
-// cu_graph.cpp - CUDA Graph lifecycle + add-node + instantiate + launch (Phase 3.1 REAL_IMPL).
+// cu_graph.cpp - CUDA Graph lifecycle + add-node + instantiate + launch (Phase 3.1+4 REAL bridge).
 //
 // Implements 7 cu* graph APIs with self-contained atomic + map + mutex state
 // tables. Matches the shim-local pattern used by cu_stream.cpp / cu_event.cpp /
 // cu_mem.cpp / cu_stream_capture.cpp.
 //
-// Shim does NOT call GpuDriverClient (D-S3-1 decision). Graph nodes are
-// stored in-memory only; cuGraphLaunch is a PoC no-op (returns SUCCESS
-// without dispatching work). Phase 4+ can bridge shim -> GpuDriverClient
-// for actual graph submission.
+// Phase 4: cuGraphLaunch bridges to g_gpu_client->submit_graph() for actual graph
+// submission. LaunchTrace tracks fence_ids per exec handle. cuGraphExecDestroy
+// cleans up the LaunchTrace entry (Metis S4).
 //
 // Handle convention:
 //   CUgraph     = void*  (atomic counter)
@@ -25,6 +24,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <iostream>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -40,6 +40,20 @@ struct GraphTable {
   std::mutex mu;
 };
 GraphTable g_graphs;
+
+static inline async_task::gpu::IGpuDriver* get_driver_or_log(const char* api_name) {
+  if (!async_task::gpu::g_gpu_client) {
+    std::cerr << "[cu_graph] " << api_name << ": g_gpu_client not initialized\n";
+    return nullptr;
+  }
+  return async_task::gpu::g_gpu_client;
+}
+
+struct LaunchTrace {
+  std::unordered_map<CUgraphExec, std::int64_t> fence_ids;
+  std::mutex mu;
+};
+LaunchTrace g_launches;
 
 }  // namespace
 }  // namespace async_task::umd::shim
@@ -119,17 +133,26 @@ extern "C" CUresult cuGraphInstantiate(CUgraphExec* phGraphExec,
   return CUDA_SUCCESS;
 }
 
-// PoC: cuGraphLaunch is a no-op. Phase 4+ will bridge shim -> GpuDriverClient
-// submit_graph (F-4 fence_id >= 1<<32) to actually dispatch the captured
-// graph to the simulator.
 extern "C" CUresult cuGraphLaunch(CUgraphExec hGraphExec, CUstream hStream) {
   if (!hGraphExec) return CUDA_ERROR_INVALID_VALUE;
-  (void)hStream;
+  auto* driver = async_task::umd::shim::get_driver_or_log("cuGraphLaunch");
+  if (!driver) return CUDA_ERROR_NOT_INITIALIZED;
+  std::int64_t fence = driver->submit_graph(
+      reinterpret_cast<uint64_t>(hGraphExec),
+      static_cast<uint32_t>(reinterpret_cast<uintptr_t>(hStream)));
+  if (fence < 0) return CUDA_ERROR_UNKNOWN;
+  {
+    std::lock_guard<std::mutex> lock(async_task::umd::shim::g_launches.mu);
+    async_task::umd::shim::g_launches.fence_ids[hGraphExec] = fence;
+  }
   return CUDA_SUCCESS;
 }
 
 extern "C" CUresult cuGraphExecDestroy(CUgraphExec hGraphExec) {
   if (!hGraphExec) return CUDA_ERROR_INVALID_VALUE;
-  (void)hGraphExec;
+  {
+    std::lock_guard<std::mutex> lock(async_task::umd::shim::g_launches.mu);
+    async_task::umd::shim::g_launches.fence_ids.erase(hGraphExec);
+  }
   return CUDA_SUCCESS;
 }

@@ -314,6 +314,14 @@ CUresult cuMemPoolTrimTo(void);
 __attribute__((weak, visibility("default")))
 CUresult cuMemPoolExportToShareableHandle(void);
 
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolAllocAsync(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolFreeAsync(void);
+
 // REAL_IMPL in cu_mem.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuMemGetInfo(void);

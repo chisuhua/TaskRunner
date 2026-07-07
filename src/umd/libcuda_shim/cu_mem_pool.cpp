@@ -1,14 +1,15 @@
 // SCOPE: UMD-EVOLUTION
-// cu_mem_pool.cpp - CUDA memory pool API (Phase 3.2 REAL_IMPL).
+// cu_mem_pool.cpp - CUDA memory pool API (Phase 3.2+4 REAL bridge).
 //
-// Implements 8 cuMemPool* APIs with self-contained atomic + map + mutex state.
+// Implements 8+2 cuMemPool* APIs with self-contained atomic + map + mutex state.
 // Matches the shim-local pattern used by cu_stream.cpp / cu_event.cpp / cu_mem.cpp
 // / cu_stream_capture.cpp / cu_graph*.cpp.
 //
-// Shim does NOT call GpuDriverClient (D-S3-1 decision). Pool handles are
-// allocated from a monotonic counter; alloc returns a synthetic VA pointer
-// that is NOT dereferenceable (PoC limitation). Phase 4+ bridges to
-// g_gpu_client->mem_pool_alloc() IOCTL for real VA sub-range reservation.
+// Phase 4: cuMemPoolAlloc bridges to g_gpu_client->mem_pool_alloc(), new
+// cuMemPoolAllocAsync / cuMemPoolFreeAsync bridge to the corresponding async
+// driver methods, cuMemPoolExportToShareableHandle bridges to
+// mem_pool_export_shareable. When g_gpu_client is nullptr, all bridged APIs
+// return CUDA_ERROR_NOT_INITIALIZED.
 //
 // B-2 enforced: cuMemPoolCreate rejects vaSpaceHandle=0 (H-1 sentinel).
 // F-2 enforced: cuMemPoolSetAttribute/GetAttribute accept only RELEASE_THRESHOLD
@@ -22,6 +23,7 @@
 #include <atomic>
 #include <cstdint>
 #include <cstring>
+#include <iostream>
 #include <mutex>
 #include <unordered_map>
 
@@ -35,6 +37,14 @@ struct MemPoolTable {
   std::mutex mu;
 };
 MemPoolTable g_pools;
+
+static inline async_task::gpu::IGpuDriver* get_driver_or_log(const char* api_name) {
+  if (!async_task::gpu::g_gpu_client) {
+    std::cerr << "[cu_mem_pool] " << api_name << ": g_gpu_client not initialized\n";
+    return nullptr;
+  }
+  return async_task::gpu::g_gpu_client;
+}
 
 }  // namespace
 }  // namespace async_task::umd::shim
@@ -61,20 +71,49 @@ extern "C" CUresult cuMemPoolDestroy(CUmemPool pool) {
 
 extern "C" CUresult cuMemPoolAlloc(CUmemPoolPtr* ptr, size_t size,
                                     CUmemPool pool, CUmemPoolProps* props) {
-  if (!ptr || !pool) return CUDA_ERROR_INVALID_VALUE;
-  if (size == 0) return CUDA_ERROR_INVALID_VALUE;
+  if (!ptr || !pool || size == 0) return CUDA_ERROR_INVALID_VALUE;
   (void)props;
-  // PoC: synthetic non-dereferenceable VA = pool_handle | alloc_counter.
-  // Lower bits vary per alloc so each allocation produces a unique handle.
-  // Phase 4+ bridges to g_gpu_client->mem_pool_alloc() IOCTL for real VA.
-  uint64_t aid = async_task::umd::shim::g_pools.next_alloc_id.fetch_add(1);
-  *ptr = reinterpret_cast<CUmemPoolPtr>(static_cast<uintptr_t>(aid));
+  auto* driver = async_task::umd::shim::get_driver_or_log("cuMemPoolAlloc");
+  if (!driver) return CUDA_ERROR_NOT_INITIALIZED;
+  uint64_t va = 0;
+  if (driver->mem_pool_alloc(reinterpret_cast<uint64_t>(pool), size, &va) < 0) {
+    return CUDA_ERROR_UNKNOWN;
+  }
+  *ptr = reinterpret_cast<CUmemPoolPtr>(static_cast<uintptr_t>(va));
   return CUDA_SUCCESS;
 }
 
 extern "C" CUresult cuMemPoolFree(CUmemPoolPtr ptr, CUmemPool pool) {
   if (!ptr) return CUDA_ERROR_INVALID_VALUE;
   if (!pool) return CUDA_ERROR_INVALID_VALUE;
+  return CUDA_SUCCESS;
+}
+
+extern "C" CUresult cuMemPoolAllocAsync(CUmemPoolPtr* ptr, size_t size,
+                                         CUmemPool pool, CUstream hStream,
+                                         CUmemPoolProps* props) {
+  if (!ptr || !pool || size == 0) return CUDA_ERROR_INVALID_VALUE;
+  (void)props;
+  auto* driver = async_task::umd::shim::get_driver_or_log("cuMemPoolAllocAsync");
+  if (!driver) return CUDA_ERROR_NOT_INITIALIZED;
+  uint64_t va = 0;
+  int64_t fence = driver->mem_pool_alloc_async(
+      reinterpret_cast<uint64_t>(pool), size,
+      static_cast<uint32_t>(reinterpret_cast<uintptr_t>(hStream)),
+      &va);
+  if (fence < 0) return CUDA_ERROR_UNKNOWN;
+  *ptr = reinterpret_cast<CUmemPoolPtr>(static_cast<uintptr_t>(va));
+  return CUDA_SUCCESS;
+}
+
+extern "C" CUresult cuMemPoolFreeAsync(CUmemPoolPtr ptr, CUstream hStream, CUmemPool pool) {
+  if (!ptr || !pool) return CUDA_ERROR_INVALID_VALUE;
+  auto* driver = async_task::umd::shim::get_driver_or_log("cuMemPoolFreeAsync");
+  if (!driver) return CUDA_ERROR_NOT_INITIALIZED;
+  int64_t fence = driver->mem_pool_free_async(
+      static_cast<uint64_t>(reinterpret_cast<uintptr_t>(ptr)),
+      static_cast<uint32_t>(reinterpret_cast<uintptr_t>(hStream)));
+  if (fence < 0) return CUDA_ERROR_UNKNOWN;
   return CUDA_SUCCESS;
 }
 
@@ -110,7 +149,18 @@ extern "C" CUresult cuMemPoolExportToShareableHandle(void* shareableHandle,
                                                       CUmemPoolHandleType handleType,
                                                       unsigned int flags) {
   if (!shareableHandle || !pool) return CUDA_ERROR_INVALID_VALUE;
-  (void)handleType;
-  (void)flags;
+  if (handleType != CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR) {
+    return CUDA_ERROR_NOT_SUPPORTED;
+  }
+  auto* driver = async_task::umd::shim::get_driver_or_log("cuMemPoolExportToShareableHandle");
+  if (!driver) return CUDA_ERROR_NOT_INITIALIZED;
+  int fd_out = -1;
+  if (driver->mem_pool_export_shareable(
+          reinterpret_cast<uint64_t>(pool),
+          static_cast<uint32_t>(handleType),
+          flags, &fd_out) < 0) {
+    return CUDA_ERROR_UNKNOWN;
+  }
+  *reinterpret_cast<int*>(shareableHandle) = fd_out;
   return CUDA_SUCCESS;
 }

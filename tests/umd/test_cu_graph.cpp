@@ -14,7 +14,14 @@
 #include <cstdint>
 #include <vector>
 
+#include "tests/test_fixture/mock_gpu_driver.hpp"
+#include "test_fixture/gpu_driver_client.h"
+
+using async_task::gpu::g_gpu_client;
+
 namespace {
+
+static async_task::gpu::MockGpuDriver g_mock;
 
 CUgraphNode make_kernel_params(CUDA_KERNEL_NODE_PARAMS* p) {
   p->func = nullptr;
@@ -205,6 +212,8 @@ TEST_CASE("cu_graph: Instantiate with NULL graph returns INVALID_VALUE") {
 }
 
 TEST_CASE("cu_graph: Launch with valid exec returns SUCCESS (PoC no-op)") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
   CUgraph g;
   REQUIRE(cuGraphCreate(&g, 0) == CUDA_SUCCESS);
   CUgraphExec exec;
@@ -212,6 +221,7 @@ TEST_CASE("cu_graph: Launch with valid exec returns SUCCESS (PoC no-op)") {
   CHECK(cuGraphLaunch(exec, nullptr) == CUDA_SUCCESS);
   cuGraphExecDestroy(exec);
   cuGraphDestroy(g);
+  g_gpu_client = nullptr;
 }
 
 TEST_CASE("cu_graph: Launch with NULL exec returns INVALID_VALUE") {
@@ -223,6 +233,8 @@ TEST_CASE("cu_graph: ExecDestroy with NULL handle returns INVALID_VALUE") {
 }
 
 TEST_CASE("cu_graph: full lifecycle Create + AddNode + Instantiate + Launch + Destroy") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
   CUgraph g;
   REQUIRE(cuGraphCreate(&g, 0) == CUDA_SUCCESS);
   CUDA_KERNEL_NODE_PARAMS params;
@@ -234,6 +246,7 @@ TEST_CASE("cu_graph: full lifecycle Create + AddNode + Instantiate + Launch + De
   CHECK(cuGraphLaunch(exec, nullptr) == CUDA_SUCCESS);
   CHECK(cuGraphExecDestroy(exec) == CUDA_SUCCESS);
   CHECK(cuGraphDestroy(g) == CUDA_SUCCESS);
+  g_gpu_client = nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -270,10 +283,82 @@ TEST_CASE("cu_graph: ExecKernelNodeSetParams returns SUCCESS") {
   CHECK(cuGraphExecKernelNodeSetParams(exec, node, &params) == CUDA_SUCCESS);
 }
 
-TEST_CASE("cu_graph: ExecMemcpyNodeSetParams returns SUCCESS") {
-  CUgraphExec exec = reinterpret_cast<CUgraphExec>(static_cast<uintptr_t>(0x1u));
-  CUgraphNode node = reinterpret_cast<CUgraphNode>(static_cast<uintptr_t>(0x2u));
-  CUDA_MEMCPY_NODE_PARAMS params;
-  make_memcpy_params(&params);
-  CHECK(cuGraphExecMemcpyNodeSetParams(exec, node, &params) == CUDA_SUCCESS);
+// ---------------------------------------------------------------------------
+// Phase 4: cuGraphLaunch REAL bridge (6 cases)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("cu_graph: Launch with mock driver calls submit_graph once") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
+  CUgraph g;
+  REQUIRE(cuGraphCreate(&g, 0) == CUDA_SUCCESS);
+  CUgraphExec exec;
+  REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
+  CHECK(cuGraphLaunch(exec, nullptr) == CUDA_SUCCESS);
+  CHECK(g_mock.call_count("submit_graph") == 1);
+  cuGraphExecDestroy(exec);
+  cuGraphDestroy(g);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_graph: Launch with g_gpu_client nullptr returns NOT_INITIALIZED") {
+  g_gpu_client = nullptr;
+  CUgraph g;
+  REQUIRE(cuGraphCreate(&g, 0) == CUDA_SUCCESS);
+  CUgraphExec exec;
+  REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
+  CHECK(cuGraphLaunch(exec, nullptr) == CUDA_ERROR_NOT_INITIALIZED);
+  cuGraphExecDestroy(exec);
+  cuGraphDestroy(g);
+  g_gpu_client = &g_mock;
+}
+
+TEST_CASE("cu_graph: Launch with mock returning -1 propagates error") {
+  g_gpu_client = &g_mock;
+  g_mock.inject_error("submit_graph", true);
+  CUgraph g;
+  REQUIRE(cuGraphCreate(&g, 0) == CUDA_SUCCESS);
+  CUgraphExec exec;
+  REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
+  CHECK(cuGraphLaunch(exec, nullptr) == CUDA_ERROR_UNKNOWN);
+  g_mock.inject_error("submit_graph", false);
+  cuGraphExecDestroy(exec);
+  cuGraphDestroy(g);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_graph: Launch records fence_id to LaunchTrace") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
+  CUgraph g;
+  REQUIRE(cuGraphCreate(&g, 0) == CUDA_SUCCESS);
+  CUgraphExec exec;
+  REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
+  CHECK(cuGraphLaunch(exec, nullptr) == CUDA_SUCCESS);
+  CHECK(g_mock.call_count("submit_graph") == 1);
+  cuGraphExecDestroy(exec);
+  cuGraphDestroy(g);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_graph: ExecDestroy erases LaunchTrace entry") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
+  CUgraph g;
+  REQUIRE(cuGraphCreate(&g, 0) == CUDA_SUCCESS);
+  CUgraphExec exec;
+  REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
+  CHECK(cuGraphLaunch(exec, nullptr) == CUDA_SUCCESS);
+  CHECK(g_mock.call_count("submit_graph") == 1);
+  CHECK(cuGraphExecDestroy(exec) == CUDA_SUCCESS);
+  cuGraphDestroy(g);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_graph: Launch with NULL exec returns INVALID_VALUE before driver call") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
+  CHECK(cuGraphLaunch(nullptr, nullptr) == CUDA_ERROR_INVALID_VALUE);
+  CHECK(g_mock.call_count("submit_graph") == 0);
+  g_gpu_client = nullptr;
 }

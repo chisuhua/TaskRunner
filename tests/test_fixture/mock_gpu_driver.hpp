@@ -289,14 +289,55 @@ public:
     }
 
     // ============================================================
-    // Memory Pool Export (1) — Phase 4
+    // Phase 3.1 Graph (1 needed for shim bridge tests)
     // ============================================================
-    int mem_pool_export_shareable(uint64_t pool, uint32_t handle_type,
+
+    int64_t submit_graph(uint64_t graph_exec_handle, uint32_t stream_id) override {
+        record("submit_graph", {graph_exec_handle, stream_id});
+        if (injected_errors_["submit_graph"]) return -1;
+        int64_t canned = static_cast<int64_t>(canned_u64("submit_graph", 0));
+        if (canned != 0) return canned;
+        return static_cast<int64_t>((1ull << 32) + next_fence_id_.fetch_add(1, std::memory_order_relaxed));
+    }
+
+    // ============================================================
+    // Phase 3.2 Memory Pool (4 needed for shim bridge tests)
+    // ============================================================
+
+    int mem_pool_alloc(uint64_t pool_handle, uint64_t size, uint64_t* va_out) override {
+        record("mem_pool_alloc", {pool_handle, size});
+        if (injected_errors_["mem_pool_alloc"]) return -1;
+        if (!va_out) return -1;
+        uint64_t seq = mem_pool_alloc_seq_.fetch_add(1, std::memory_order_relaxed);
+        *va_out = pool_handle * 0x100000ULL + seq * 0x1000ULL;
+        return 0;
+    }
+
+    int64_t mem_pool_alloc_async(uint64_t pool_handle, uint64_t size,
+                                 uint32_t stream_id, uint64_t* va_out) override {
+        record("mem_pool_alloc_async", {pool_handle, size, stream_id});
+        if (injected_errors_["mem_pool_alloc_async"]) return -1;
+        if (!va_out) return -1;
+        uint64_t seq = mem_pool_alloc_seq_.fetch_add(1, std::memory_order_relaxed);
+        *va_out = pool_handle * 0x100000ULL + seq * 0x1000ULL;
+        return static_cast<int64_t>((1ull << 32) + next_fence_id_.fetch_add(1, std::memory_order_relaxed));
+    }
+
+    int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override {
+        record("mem_pool_free_async", {va, stream_id});
+        if (injected_errors_["mem_pool_free_async"]) return -1;
+        return static_cast<int64_t>((1ull << 32) + next_fence_id_.fetch_add(1, std::memory_order_relaxed));
+    }
+
+    // ============================================================
+    // Phase 3.B Export (1)
+    // ============================================================
+
+    int mem_pool_export_shareable(uint64_t pool_handle, uint32_t handle_type,
                                   uint32_t flags, int* fd_out) override {
-        mem_pool_export_shareable_calls++;
-        mem_pool_export_shareable_arg_pool = pool;
-        mem_pool_export_shareable_arg_handle_type = handle_type;
-        if (fd_out) *fd_out = mem_pool_export_shareable_return_fd;
+        record("mem_pool_export_shareable", {pool_handle, handle_type, flags});
+        if (injected_errors_["mem_pool_export_shareable"]) return -1;
+        if (fd_out) *fd_out = static_cast<int>(next_export_fd_.fetch_add(1, std::memory_order_relaxed));
         return 0;
     }
 
@@ -374,16 +415,14 @@ private:
     mutable std::atomic<uint64_t> next_fence_id_{1};
     uint64_t current_va_space_handle_{0};
 
-    // Phase 4: mem pool export tracking
-    int mem_pool_export_shareable_calls = 0;
-    uint64_t mem_pool_export_shareable_arg_pool = 0;
-    uint32_t mem_pool_export_shareable_arg_handle_type = 0;
-    int mem_pool_export_shareable_return_fd = 42;
-
     // H-3.5: state tracking for lifecycle methods + guards
     bool is_open_{false};
     bool stub_mode_{false};
     bool initialized_{false};
+
+    // Phase 3.2/3.B tracking
+    mutable std::atomic<uint64_t> mem_pool_alloc_seq_{0};
+    mutable std::atomic<uint64_t> next_export_fd_{1};
 };
 
 }  // namespace gpu

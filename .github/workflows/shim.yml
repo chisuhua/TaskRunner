@@ -8,6 +8,14 @@
 #
 # Author: TaskRunner owner (Sisyphus-H5 session)
 # Created: 2026-07-03
+# Updated: 2026-07-07 — Fix CI symlink (UsrLinuxEmu: dangling symlink → fresh checkout)
+#
+# CI symlink fix: TaskRunner root has a tracked `UsrLinuxEmu` symlink (mode 120000
+# blob) pointing to /workspace/project/UsrLinuxEmu — only valid on dev workstation.
+# CI runner has no /workspace/project/UsrLinuxEmu, so the symlink is dangling and
+# `#include "UsrLinuxEmu/plugins/gpu_driver/shared/gpu_ioctl.h"` fails to resolve.
+# Fix: After the initial checkout (which creates the dangling symlink), remove it
+# and re-checkout the UsrLinuxEmu 仓 into the same path so include resolution works.
 
 name: TaskRunner-Shim-CI
 
@@ -27,6 +35,15 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Setup UsrLinuxEmu symlink target (CI fix)
+        run: rm -f UsrLinuxEmu
+
+      - uses: actions/checkout@v4
+        with:
+          repository: chisuhua/UsrLinuxEmu
+          ref: main
+          path: UsrLinuxEmu
+
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake g++
 
       - run: cmake -B "$BUILD_DIR" -DTASKRUNNER_BUILD_MODE=umd-evolution
@@ -43,6 +60,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Setup UsrLinuxEmu symlink target (CI fix)
+        run: rm -f UsrLinuxEmu
+
+      - uses: actions/checkout@v4
+        with:
+          repository: chisuhua/UsrLinuxEmu
+          ref: main
+          path: UsrLinuxEmu
 
       - run: bash tools/docs-audit.sh
 
@@ -64,6 +90,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+
+      - name: Setup UsrLinuxEmu symlink target (CI fix)
+        run: rm -f UsrLinuxEmu
+
+      - uses: actions/checkout@v4
+        with:
+          repository: chisuhua/UsrLinuxEmu
+          ref: main
+          path: UsrLinuxEmu
 
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake g++
 

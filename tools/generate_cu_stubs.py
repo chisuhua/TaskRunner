@@ -146,6 +146,8 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     "cuMemPoolGetAttribute": "cu_mem_pool.cpp",
     "cuMemPoolTrimTo": "cu_mem_pool.cpp",
     "cuMemPoolExportToShareableHandle": "cu_mem_pool.cpp",
+    "cuMemPoolAllocAsync": "cu_mem_pool.cpp",
+    "cuMemPoolFreeAsync": "cu_mem_pool.cpp",
     # Light stubs — Phase 1.7 A.4
     "cuMemsetD16": "cu_mem.cpp",
     "cuProfilerStart": "cu_mem.cpp",
@@ -196,6 +198,7 @@ CUDA_DRIVER_APIS = [
     "cuStreamBeginCapture", "cuStreamEndCapture", "cuStreamIsCapturing",
     "cuMemPoolCreate", "cuMemPoolDestroy",
     "cuMemPoolAlloc", "cuMemPoolFree",
+    "cuMemPoolAllocAsync", "cuMemPoolFreeAsync",
     "cuMemPoolSetAttribute", "cuMemPoolGetAttribute",
     "cuMemPoolTrimTo", "cuMemPoolExportToShareableHandle",
     "cuEventCreate", "cuEventDestroy", "cuEventRecord",

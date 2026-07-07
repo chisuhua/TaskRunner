@@ -14,7 +14,14 @@
 #include <cstdint>
 #include <vector>
 
+#include "tests/test_fixture/mock_gpu_driver.hpp"
+#include "test_fixture/gpu_driver_client.h"
+
+using async_task::gpu::g_gpu_client;
+
 namespace {
+
+static async_task::gpu::MockGpuDriver g_mock;
 
 CUmemPoolProps make_props(uint64_t va_handle, size_t max_size) {
   CUmemPoolProps p{};
@@ -65,6 +72,7 @@ TEST_CASE("cu_mem_pool: cuMemPoolCreate with NULL props returns INVALID_VALUE") 
 // ---------------------------------------------------------------------------
 
 TEST_CASE("cu_mem_pool: cuMemPoolAlloc returns non-null ptr") {
+  g_gpu_client = &g_mock;
   CUmemPool pool;
   CUmemPoolProps props = make_props(1, 1024 * 1024);
   REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
@@ -72,6 +80,7 @@ TEST_CASE("cu_mem_pool: cuMemPoolAlloc returns non-null ptr") {
   CHECK(cuMemPoolAlloc(&ptr, 4096, pool, nullptr) == CUDA_SUCCESS);
   CHECK(ptr != nullptr);
   cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
 }
 
 TEST_CASE("cu_mem_pool: cuMemPoolAlloc with size=0 returns INVALID_VALUE") {
@@ -96,6 +105,7 @@ TEST_CASE("cu_mem_pool: cuMemPoolAlloc with NULL ptr returns INVALID_VALUE") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("cu_mem_pool: cuMemPoolAlloc + cuMemPoolFree round-trip") {
+  g_gpu_client = &g_mock;
   CUmemPool pool;
   CUmemPoolProps props = make_props(1, 1024 * 1024);
   REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
@@ -103,9 +113,12 @@ TEST_CASE("cu_mem_pool: cuMemPoolAlloc + cuMemPoolFree round-trip") {
   REQUIRE(cuMemPoolAlloc(&ptr, 4096, pool, nullptr) == CUDA_SUCCESS);
   CHECK(cuMemPoolFree(ptr, pool) == CUDA_SUCCESS);
   cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
 }
 
 TEST_CASE("cu_mem_pool: cuMemPoolAlloc multiple from same pool produces unique ptrs") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
   CUmemPool pool;
   CUmemPoolProps props = make_props(1, 1024 * 1024);
   REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
@@ -121,9 +134,11 @@ TEST_CASE("cu_mem_pool: cuMemPoolAlloc multiple from same pool produces unique p
     }
   }
   cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
 }
 
 TEST_CASE("cu_mem_pool: cuMemPoolAlloc from different pools produces unique ptrs") {
+  g_gpu_client = &g_mock;
   CUmemPool pool1, pool2;
   CUmemPoolProps props1 = make_props(1, 1024 * 1024);
   CUmemPoolProps props2 = make_props(1, 1024 * 1024);
@@ -135,6 +150,7 @@ TEST_CASE("cu_mem_pool: cuMemPoolAlloc from different pools produces unique ptrs
   CHECK(p1 != p2);
   cuMemPoolDestroy(pool1);
   cuMemPoolDestroy(pool2);
+  g_gpu_client = nullptr;
 }
 
 TEST_CASE("cu_mem_pool: cuMemPoolDestroy accepts zero pool as INVALID_VALUE") {
@@ -174,18 +190,20 @@ TEST_CASE("cu_mem_pool: pool with large maxSize accepted") {
   cuMemPoolDestroy(pool);
 }
 
-TEST_CASE("cu_mem_pool: alloc returns unique synthetic VA per call (PoC)") {
+TEST_CASE("cu_mem_pool: alloc returns unique synthetic VA per call (mock bridge)") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
   CUmemPool pool;
   CUmemPoolProps props = make_props(1, 1024 * 1024);
   REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
   CUmemPoolPtr p1, p2;
   REQUIRE(cuMemPoolAlloc(&p1, 4096, pool, nullptr) == CUDA_SUCCESS);
   REQUIRE(cuMemPoolAlloc(&p2, 4096, pool, nullptr) == CUDA_SUCCESS);
-  // PoC encoding uses alloc_counter so same size yields unique ptrs.
   CHECK(p1 != p2);
   CHECK(reinterpret_cast<uintptr_t>(p1) > 0);
   CHECK(reinterpret_cast<uintptr_t>(p2) > 0);
   cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -240,6 +258,7 @@ TEST_CASE("cu_mem_pool: TrimTo with NULL pool returns INVALID_VALUE") {
 }
 
 TEST_CASE("cu_mem_pool: TrimTo after Alloc-Free cycle") {
+  g_gpu_client = &g_mock;
   CUmemPool pool;
   CUmemPoolProps props = make_props(1, 1024 * 1024);
   REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
@@ -248,6 +267,7 @@ TEST_CASE("cu_mem_pool: TrimTo after Alloc-Free cycle") {
   REQUIRE(cuMemPoolFree(ptr, pool) == CUDA_SUCCESS);
   CHECK(cuMemPoolTrimTo(pool, 0) == CUDA_SUCCESS);
   cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
 }
 
 // ---------------------------------------------------------------------------
@@ -255,6 +275,7 @@ TEST_CASE("cu_mem_pool: TrimTo after Alloc-Free cycle") {
 // ---------------------------------------------------------------------------
 
 TEST_CASE("cu_mem_pool: ExportToShareableHandle with POSIX_FD type returns SUCCESS") {
+  g_gpu_client = &g_mock;
   CUmemPool pool;
   CUmemPoolProps props = make_props(1, 1024 * 1024);
   REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
@@ -263,6 +284,7 @@ TEST_CASE("cu_mem_pool: ExportToShareableHandle with POSIX_FD type returns SUCCE
                                          CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR,
                                          0) == CUDA_SUCCESS);
   cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
 }
 
 TEST_CASE("cu_mem_pool: ExportToShareableHandle with NULL handle returns INVALID_VALUE") {
@@ -306,6 +328,7 @@ TEST_CASE("cu_mem_pool: GetAttribute with NULL value returns INVALID_VALUE") {
 }
 
 TEST_CASE("cu_mem_pool: full lifecycle Create + Alloc + SetAttr + GetAttr + Trim + Export + Destroy") {
+  g_gpu_client = &g_mock;
   CUmemPool pool;
   CUmemPoolProps props = make_props(1, 1024 * 1024);
   REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
@@ -324,4 +347,126 @@ TEST_CASE("cu_mem_pool: full lifecycle Create + Alloc + SetAttr + GetAttr + Trim
                                            0) == CUDA_SUCCESS);
   REQUIRE(cuMemPoolFree(ptr, pool) == CUDA_SUCCESS);
   CHECK(cuMemPoolDestroy(pool) == CUDA_SUCCESS);
+  g_gpu_client = nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: REAL bridge tests (8 cases)
+// ---------------------------------------------------------------------------
+
+TEST_CASE("cu_mem_pool: Alloc calls mem_pool_alloc and writes mock VA") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
+  CUmemPool pool;
+  CUmemPoolProps props = make_props(1, 1024 * 1024);
+  REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
+  CUmemPoolPtr ptr = nullptr;
+  CHECK(cuMemPoolAlloc(&ptr, 4096, pool, nullptr) == CUDA_SUCCESS);
+  CHECK(ptr != nullptr);
+  CHECK(g_mock.call_count("mem_pool_alloc") == 1);
+  cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_mem_pool: Alloc with mock returning error propagates") {
+  g_gpu_client = &g_mock;
+  g_mock.inject_error("mem_pool_alloc", true);
+  CUmemPool pool;
+  CUmemPoolProps props = make_props(1, 1024 * 1024);
+  REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
+  CUmemPoolPtr ptr = nullptr;
+  CHECK(cuMemPoolAlloc(&ptr, 4096, pool, nullptr) == CUDA_ERROR_UNKNOWN);
+  g_mock.inject_error("mem_pool_alloc", false);
+  cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_mem_pool: AllocAsync calls mem_pool_alloc_async and writes VA") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
+  CUmemPool pool;
+  CUmemPoolProps props = make_props(1, 1024 * 1024);
+  REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
+  CUmemPoolPtr ptr = nullptr;
+  CHECK(cuMemPoolAllocAsync(&ptr, 4096, pool, nullptr, nullptr) == CUDA_SUCCESS);
+  CHECK(ptr != nullptr);
+  CHECK(g_mock.call_count("mem_pool_alloc_async") == 1);
+  cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_mem_pool: FreeAsync calls mem_pool_free_async with correct VA") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
+  CUmemPool pool;
+  CUmemPoolProps props = make_props(1, 1024 * 1024);
+  REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
+  CUmemPoolPtr ptr = nullptr;
+  REQUIRE(cuMemPoolAlloc(&ptr, 4096, pool, nullptr) == CUDA_SUCCESS);
+  CHECK(cuMemPoolFreeAsync(ptr, nullptr, pool) == CUDA_SUCCESS);
+  CHECK(g_mock.call_count("mem_pool_free_async") == 1);
+  cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_mem_pool: FreeAsync with NULL ptr returns INVALID_VALUE") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
+  CUmemPool pool;
+  CUmemPoolProps props = make_props(1, 1024 * 1024);
+  REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
+  CHECK(cuMemPoolFreeAsync(nullptr, nullptr, pool) == CUDA_ERROR_INVALID_VALUE);
+  CHECK(g_mock.call_count("mem_pool_free_async") == 0);
+  cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_mem_pool: ExportToShareableHandle with POSIX_FD calls mem_pool_export_shareable and writes FD") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
+  CUmemPool pool;
+  CUmemPoolProps props = make_props(1, 1024 * 1024);
+  REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
+  int fd_out = -1;
+  CHECK(cuMemPoolExportToShareableHandle(&fd_out, pool,
+                                         CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR,
+                                         0) == CUDA_SUCCESS);
+  CHECK(fd_out >= 0);
+  CHECK(g_mock.call_count("mem_pool_export_shareable") == 1);
+  cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_mem_pool: ExportToShareableHandle with Win32 returns NOT_SUPPORTED") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
+  CUmemPool pool;
+  CUmemPoolProps props = make_props(1, 1024 * 1024);
+  REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
+  int fd_out;
+  CHECK(cuMemPoolExportToShareableHandle(&fd_out, pool,
+                                         static_cast<CUmemPoolHandleType>(2),
+                                         0) == CUDA_ERROR_NOT_SUPPORTED);
+  CHECK(g_mock.call_count("mem_pool_export_shareable") == 0);
+  cuMemPoolDestroy(pool);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_mem_pool: All 5 REAL-bridged APIs return NOT_INITIALIZED when g_gpu_client null") {
+  g_gpu_client = nullptr;
+  CUmemPool pool;
+  CUmemPoolProps props = make_props(1, 1024 * 1024);
+  REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
+
+  CUmemPoolPtr ptr = reinterpret_cast<CUmemPoolPtr>(static_cast<uintptr_t>(0x1000));
+  CHECK(cuMemPoolAlloc(&ptr, 4096, pool, nullptr) == CUDA_ERROR_NOT_INITIALIZED);
+  CHECK(cuMemPoolAllocAsync(&ptr, 4096, pool, nullptr, nullptr) == CUDA_ERROR_NOT_INITIALIZED);
+  CHECK(cuMemPoolFreeAsync(ptr, nullptr, pool) == CUDA_ERROR_NOT_INITIALIZED);
+  int fd_out;
+  CHECK(cuMemPoolExportToShareableHandle(&fd_out, pool,
+                                         CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR,
+                                         0) == CUDA_ERROR_NOT_INITIALIZED);
+
+  cuMemPoolDestroy(pool);
+  g_gpu_client = &g_mock;
 }

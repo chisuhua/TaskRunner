@@ -807,6 +807,16 @@ public:
         return args.fence_id_out;
     }
 
+    int mem_pool_export_shareable(uint64_t pool_handle, uint32_t handle_type,
+                                  uint32_t flags, int* fd_out) override {
+        // TODO Phase 4: replace with sim_mem_pool_export_shareable call once UsrLinuxEmu 91ea76c is merged
+        (void)pool_handle;
+        (void)handle_type;
+        (void)flags;
+        (void)fd_out;
+        return -1;  // NOT_SUPPORTED
+    }
+
 private:
     int fd_;                      // 设备文件描述符
     std::string device_path_;      // 设备路径
@@ -816,7 +826,7 @@ private:
 /**
  * 全局 GPU 客户端实例（用于 CLI 模式）
  */
-extern GpuDriverClient* g_gpu_client;
+extern IGpuDriver* g_gpu_client;  // Phase 4 (M1): changed from GpuDriverClient* to allow MockGpuDriver injection
 
 /**
  * 初始化全局 GPU 客户端

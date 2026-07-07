@@ -35,6 +35,7 @@ typedef enum CUresult_enum {
   CUDA_ERROR_INVALID_VALUE                  = 1,
   CUDA_ERROR_OUT_OF_MEMORY                  = 2,
   CUDA_ERROR_NOT_READY                      = 600,
+  CUDA_ERROR_NOT_INITIALIZED               = 700,  // Phase 4 (S5): returned when driver not bound
   CUDA_ERROR_INVALID_HANDLE                 = 400,
   CUDA_ERROR_ILLEGAL_STATE                  = 401,
   CUDA_ERROR_NOT_SUPPORTED                  = 801,
@@ -363,7 +364,11 @@ CUresult cuMemPoolCreate(CUmemPool* pool, const CUmemPoolProps* poolProps);
 CUresult cuMemPoolDestroy(CUmemPool pool);
 CUresult cuMemPoolAlloc(CUmemPoolPtr* ptr, size_t size, CUmemPool pool,
                         CUmemPoolProps* props);
+CUresult cuMemPoolAllocAsync(CUmemPoolPtr* ptr, size_t size, CUmemPool pool,
+                              CUstream hStream, CUmemPoolProps* props);  // Phase 4 (S6)
 CUresult cuMemPoolFree(CUmemPoolPtr ptr, CUmemPool pool);
+CUresult cuMemPoolFreeAsync(CUmemPoolPtr ptr, CUstream hStream,
+                             CUmemPool pool);  // Phase 4 (S6)
 CUresult cuMemPoolSetAttribute(CUmemPool pool, CUmemPoolAttribute attr,
                                 const void* value);
 CUresult cuMemPoolGetAttribute(CUmemPool pool, CUmemPoolAttribute attr,

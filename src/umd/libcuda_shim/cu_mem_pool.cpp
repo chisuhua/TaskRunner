@@ -16,6 +16,9 @@
 
 #include <cuda.h>
 
+// Phase 4 (M2): expose g_gpu_client global + IGpuDriver interface
+#include "test_fixture/gpu_driver_client.h"
+
 #include <atomic>
 #include <cstdint>
 #include <cstring>

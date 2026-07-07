@@ -8,7 +8,7 @@
 namespace async_task {
 namespace gpu {
 
-GpuDriverClient* g_gpu_client = nullptr;
+IGpuDriver* g_gpu_client = nullptr;  // Phase 4 (M1)
 
 int init_gpu_client() {
     if (g_gpu_client) {

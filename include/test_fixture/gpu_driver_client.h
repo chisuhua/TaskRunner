@@ -816,7 +816,7 @@ private:
 /**
  * 全局 GPU 客户端实例（用于 CLI 模式）
  */
-extern GpuDriverClient* g_gpu_client;
+extern IGpuDriver* g_gpu_client;  // Phase 4 (M1): changed from GpuDriverClient* to allow MockGpuDriver injection
 
 /**
  * 初始化全局 GPU 客户端

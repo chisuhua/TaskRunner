@@ -1,35 +1,36 @@
 # Tasks: phase3-step3-shim-and-forwarding
 
-> **状态**: 🔄 PROPOSED（2026-07-06，等待启动）
-> **前置**: Step 1 merged (12bed8d) + Step 2 merged (PR #20 @ 138f15a)
+> **状态**: ✅ DONE（2026-07-07，PR #7 merge + submodule bump 完成，archiving）
+> **前置**: Step 1 merged (e6a34eb) + Step 2 merged (138f15a, PR #20) + Step 3 merged (02363b8, PR #7) + Step 4 done (458299e)
+> **Archive**: → openspec/changes/archive/2026-07-06-phase3-step3-shim-and-forwarding/ (post-merge)
 > **修正**: 2026-07-06 self-review 后适配现有 shim 模式（自包含 atomic+map+mutex）+ GpuDriverClient inline ioctl
 
 ## 0. 前置条件（验证基线）
 
-- [ ] **0.1** 确认 Step 1 基线提交 `12bed8d` 是当前 HEAD 的祖先：
+- [x] **0.1** 确认 Step 1 基线提交 `12bed8d` 是当前 HEAD 的祖先：
   ```bash
   cd /workspace/project/UsrLinuxEmu/external/TaskRunner
   git merge-base --is-ancestor 12bed8d HEAD && echo "Step 1 baseline present"
   # 预期: 输出 "Step 1 baseline present"（exit 0）
   # HEAD 可以是 ed8ecc0 或任何包含 12bed8d 的后继提交
   ```
-- [ ] **0.2** 确认 IGpuDriver 方法数 = 46（不含析构 = 47）：
+- [x] **0.2** 确认 IGpuDriver 方法数 = 46（不含析构 = 47）：
   ```bash
   grep -c "^    virtual " include/shared/igpu_driver.hpp
   # 预期: 47 (46 + 1 析构)
   ```
-- [ ] **0.3** 确认 GpuDriverClient 当前 override 数 = 29（所有 inline 方法使用 `override` 关键字）：
+- [x] **0.3** 确认 GpuDriverClient 当前 override 数 = 29（所有 inline 方法使用 `override` 关键字）：
   ```bash
   grep -c "override" include/test_fixture/gpu_driver_client.h
   # 预期: 29（当前 override 数量；Step 3 完成后 = 44）
   # 注: 使用 "override" 关键字计数而非 "GpuDriverClient::" 因为所有方法在 header inline 定义
   ```
-- [ ] **0.4** 确认 UsrLinuxEmu symlink + IOCTL 可达：
+- [x] **0.4** 确认 UsrLinuxEmu symlink + IOCTL 可达：
   ```bash
   cat UsrLinuxEmu/plugins/gpu_driver/shared/gpu_ioctl.h | grep -c "GPU_IOCTL_STREAM\|GPU_IOCTL_GRAPH\|GPU_IOCTL_MEM_POOL"
   # 预期: ≥ 18 (PR #20 merged 后)
   ```
-- [ ] **0.5** 确认基线构建 + 测试通过：
+- [x] **0.5** 确认基线构建 + 测试通过：
   ```bash
   cd build && cmake --build . -j4
   for t in test_cuda_scheduler test_gpu_architecture test_gpu_phase2 \
@@ -38,7 +39,7 @@
   done
   # 预期: 76/76+ PASS
   ```
-- [ ] **0.6** 创建 worktree（基于 main @ 12bed8d）：
+- [x] **0.6** 创建 worktree（基于 main @ 12bed8d）：
   ```bash
   cd /workspace/project/UsrLinuxEmu/external/TaskRunner
   git worktree add .rddf/wt/phase3-step3-shim-and-forwarding -b phase3-step3-shim-and-forwarding
@@ -56,7 +57,7 @@
 
 ### 1.1 修改 header (gpu_driver_client.h)
 
-- [ ] **1.1.1** 在 `class GpuDriverClient : public IGpuDriver` 块内合适位置（如 "// H-3 Phase 2" 后）添加 15 个方法声明：
+- [x] **1.1.1** 在 `class GpuDriverClient : public IGpuDriver` 块内合适位置（如 "// H-3 Phase 2" 后）添加 15 个方法声明：
 
 ```cpp
 // ============================================================
@@ -101,7 +102,7 @@ int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
 
 > Note: GpuDriverClient 现有的 31 个 override 全部 inline 定义在 `include/test_fixture/gpu_driver_client.h`（类定义体内）。新增 15 个方法沿用同一模式 `int method(...) override { ... }`，**不**创建或修改任何 .cpp。
 
-- [ ] **1.2.1** 在 gpu_driver_client.h 类体内（H-3 Phase 2 段后、private: 前）添加 stream_capture_status（Pattern B, header inline）：
+- [x] **1.2.1** 在 gpu_driver_client.h 类体内（H-3 Phase 2 段后、private: 前）添加 stream_capture_status（Pattern B, header inline）：
   ```cpp
   int stream_capture_status(uint32_t stream_id, uint32_t* status_out) override {
     if (!is_open()) return -1;
@@ -118,14 +119,14 @@ int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
   }
   ```
 
-- [ ] **1.2.2** 在 header 中添加 `stream_capture_begin`（Pattern A, inline）
-- [ ] **1.2.3** 在 header 中添加 `stream_capture_end`（Pattern B, inline）
-- [ ] **1.2.4** 在 header 中添加 `graph_create`（Pattern B, inline）
-- [ ] **1.2.5** 在 header 中添加 `graph_destroy`（Pattern A, inline）
-- [ ] **1.2.6** 在 header 中添加 `graph_add_kernel_node`（Pattern A, inline）— F-3: kernargs_bo 透传
-- [ ] **1.2.7** 在 header 中添加 `graph_add_memcpy_node`（Pattern A, inline）— is_h2d 字段
-- [ ] **1.2.8** 在 header 中添加 `graph_instantiate`（Pattern B, inline）
-- [ ] **1.2.9** 在 header 中添加 `submit_graph`（Pattern C, inline）— **关键**：字段名是 `exec_handle`，返回 int64_t
+- [x] **1.2.2** 在 header 中添加 `stream_capture_begin`（Pattern A, inline）
+- [x] **1.2.3** 在 header 中添加 `stream_capture_end`（Pattern B, inline）
+- [x] **1.2.4** 在 header 中添加 `graph_create`（Pattern B, inline）
+- [x] **1.2.5** 在 header 中添加 `graph_destroy`（Pattern A, inline）
+- [x] **1.2.6** 在 header 中添加 `graph_add_kernel_node`（Pattern A, inline）— F-3: kernargs_bo 透传
+- [x] **1.2.7** 在 header 中添加 `graph_add_memcpy_node`（Pattern A, inline）— is_h2d 字段
+- [x] **1.2.8** 在 header 中添加 `graph_instantiate`（Pattern B, inline）
+- [x] **1.2.9** 在 header 中添加 `submit_graph`（Pattern C, inline）— **关键**：字段名是 `exec_handle`，返回 int64_t
   ```cpp
   int64_t submit_graph(uint64_t graph_exec_handle, uint32_t stream_id) override {
     if (!is_open()) return -1;
@@ -142,8 +143,8 @@ int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
   }
   ```
 
-- [ ] **1.2.10** 在 header 中添加 `destroy_graph_exec`（Pattern A, inline）
-- [ ] **1.2.11** 在 header 中添加 `mem_pool_create`（Pattern D, inline）— **关键**：嵌套 struct
+- [x] **1.2.10** 在 header 中添加 `destroy_graph_exec`（Pattern A, inline）
+- [x] **1.2.11** 在 header 中添加 `mem_pool_create`（Pattern D, inline）— **关键**：嵌套 struct
   ```cpp
   int mem_pool_create(uint64_t va_space_handle, uint64_t size,
                       uint32_t flags, uint64_t* pool_handle_out) override {
@@ -168,9 +169,9 @@ int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
   }
   ```
 
-- [ ] **1.2.12** 在 header 中添加 `mem_pool_destroy`（Pattern A, inline）
-- [ ] **1.2.13** 在 header 中添加 `mem_pool_alloc`（Pattern B, inline）
-- [ ] **1.2.14** 在 header 中添加 `mem_pool_alloc_async`（Pattern E, inline）— 返回 int64_t
+- [x] **1.2.12** 在 header 中添加 `mem_pool_destroy`（Pattern A, inline）
+- [x] **1.2.13** 在 header 中添加 `mem_pool_alloc`（Pattern B, inline）
+- [x] **1.2.14** 在 header 中添加 `mem_pool_alloc_async`（Pattern E, inline）— 返回 int64_t
   ```cpp
   int64_t mem_pool_alloc_async(uint64_t pool_handle, uint64_t size,
                                uint32_t stream_id, uint64_t* va_out) override {
@@ -190,7 +191,7 @@ int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
   }
   ```
 
-- [ ] **1.2.15** 在 header 中添加 `mem_pool_free_async`（Pattern C, inline）— 返回 int64_t
+- [x] **1.2.15** 在 header 中添加 `mem_pool_free_async`（Pattern C, inline）— 返回 int64_t
   ```cpp
   int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override {
     if (!is_open()) return -1;
@@ -208,9 +209,9 @@ int64_t mem_pool_free_async(uint64_t va, uint32_t stream_id) override;
 
 ### 1.3 验证
 
-- [ ] 编译验证：`cmake --build build --target taskrunner_test_fixture` 无警告
-- [ ] 全局构建：`cmake --build build -j4` 全部目标通过
-- [ ] 回归测试：跑 76+ 测试全过
+- [x] 编译验证：`cmake --build build --target taskrunner_test_fixture` 无警告
+- [x] 全局构建：`cmake --build build -j4` 全部目标通过
+- [x] 回归测试：跑 76+ 测试全过
 
 ### 1.4 提交
 
@@ -248,16 +249,16 @@ Refs: TaskRunner commit 21f71c9 (Step 1, MERGED)"
 
 ### 2.1 cu_stream_capture.cpp (3 funcs, NEW)
 
-- [ ] **2.1.1** 新建 `src/umd/libcuda_shim/cu_stream_capture.cpp`（按 design.md §3.1 代码骨架）
+- [x] **2.1.1** 新建 `src/umd/libcuda_shim/cu_stream_capture.cpp`（按 design.md §3.1 代码骨架）
   - 包含 `g_captures` 全局 state table
   - 3 个函数：cuStreamBeginCapture / cuStreamEndCapture / cuStreamIsCapturing
   - F-1: mode != GLOBAL → CUDA_ERROR_NOT_SUPPORTED
 
 ### 2.2 修改 cu_stream.cpp
 
-- [ ] **2.2.1** 删除原 `cuStreamBeginCapture` stub（行 95-100）
-- [ ] **2.2.2** 删除原 `cuStreamEndCapture` stub（行 102-106）
-- [ ] **2.2.3** 修改 `cuStreamGetCaptureInfo`（行 140-148）调 `cuStreamIsCapturing`：
+- [x] **2.2.1** 删除原 `cuStreamBeginCapture` stub（行 95-100）
+- [x] **2.2.2** 删除原 `cuStreamEndCapture` stub（行 102-106）
+- [x] **2.2.3** 修改 `cuStreamGetCaptureInfo`（行 140-148）调 `cuStreamIsCapturing`：
   ```cpp
   extern "C" CUresult cuStreamGetCaptureInfo(CUstream hStream,
                                               CUstreamCaptureStatus* captureStatus,
@@ -273,30 +274,30 @@ Refs: TaskRunner commit 21f71c9 (Step 1, MERGED)"
 
 ### 2.3 cu_graph.cpp (7 funcs, NEW, ~280 lines)
 
-- [ ] **2.3.1** 新建 `src/umd/libcuda_shim/cu_graph.cpp`（按 design.md §3.2 代码骨架）
-- [ ] 重点函数：`cuGraphCreate` / `cuGraphDestroy` / `cuGraphAddKernelNode` (F-3) / `cuGraphAddMemcpyNode` / `cuGraphInstantiate` / `cuGraphLaunch` (PoC no-op) / `cuGraphExecDestroy`
+- [x] **2.3.1** 新建 `src/umd/libcuda_shim/cu_graph.cpp`（按 design.md §3.2 代码骨架）
+- [x] 重点函数：`cuGraphCreate` / `cuGraphDestroy` / `cuGraphAddKernelNode` (F-3) / `cuGraphAddMemcpyNode` / `cuGraphInstantiate` / `cuGraphLaunch` (PoC no-op) / `cuGraphExecDestroy`
 
 ### 2.4 cu_graph_node.cpp (2 funcs, NEW)
 
-- [ ] **2.4.1** 新建 `cu_graph_node.cpp`：`cuGraphNodeGetType` + `cuGraphNodeSetAttribute`
+- [x] **2.4.1** 新建 `cu_graph_node.cpp`：`cuGraphNodeGetType` + `cuGraphNodeSetAttribute`
 
 ### 2.5 cu_graph_exec.cpp (2 funcs, NEW)
 
-- [ ] **2.5.1** 新建 `cu_graph_exec.cpp`：`cuGraphExecKernelNodeSetParams` + `cuGraphExecMemcpyNodeSetParams`
+- [x] **2.5.1** 新建 `cu_graph_exec.cpp`：`cuGraphExecKernelNodeSetParams` + `cuGraphExecMemcpyNodeSetParams`
 
 ### 2.6 修改 cu_mem.cpp
 
-- [ ] **2.6.1** 删除原 `cuGraphCreate` stub（行 258-261，4 行）
+- [x] **2.6.1** 删除原 `cuGraphCreate` stub（行 258-261，4 行）
 
 ### 2.7 注册到 CMake
 
-- [ ] 编辑 `CMakeLists.txt` 注册 4 个新 .cpp
+- [x] 编辑 `CMakeLists.txt` 注册 4 个新 .cpp
 
 ### 2.8 验证
 
-- [ ] 构建：`cmake --build build --target libcuda_taskrunner` 无警告
-- [ ] 符号导出：`nm build/libcuda_taskrunner.so | grep -E "cuStreamBegin|cuGraphCreate|cuGraphLaunch"`
-- [ ] 回归测试：76+ 测试全过
+- [x] 构建：`cmake --build build --target libcuda_taskrunner` 无警告
+- [x] 符号导出：`nm build/libcuda_taskrunner.so | grep -E "cuStreamBegin|cuGraphCreate|cuGraphLaunch"`
+- [x] 回归测试：76+ 测试全过
 
 ### 2.9 提交
 
@@ -339,12 +340,12 @@ Refs: openspec/changes/2026-07-06-phase3-step3-shim-and-forwarding/ (Step 3)"
 
 ### 3.1 cu_mem_pool.cpp (8 funcs, NEW, ~200 lines)
 
-- [ ] **3.1.1** 新建 `src/umd/libcuda_shim/cu_mem_pool.cpp`（按 design.md §3.3 代码骨架）
+- [x] **3.1.1** 新建 `src/umd/libcuda_shim/cu_mem_pool.cpp`（按 design.md §3.3 代码骨架）
 - 重点：`cuMemPoolCreate` (B-2) / `cuMemPoolAlloc` / `cuMemPoolSetAttribute` (F-2) / `cuMemPoolAllocAsync` (复用 sync) / `cuMemPoolFreeAsync`
 
 ### 3.2 注册到 CMake + 验证
 
-- [ ] 注册 + 构建 + 符号导出 + 回归测试全过
+- [x] 注册 + 构建 + 符号导出 + 回归测试全过
 
 ### 3.3 提交
 
@@ -374,35 +375,35 @@ Refs: openspec/changes/2026-07-06-phase3-step3-shim-and-forwarding/ (Step 3)"
 
 ### 4.1 test_cu_stream_capture.cpp (≥30 cases)
 
-- [ ] State machine 基础测试 (3 cases)
-- [ ] GLOBAL mode 测试 (5 cases)
-- [ ] 错误路径测试 (5 cases)
-- [ ] 集成测试 (10 cases)
-- [ ] Stage 1.4 回归 (2 cases)
-- [ ] Fence_id 测试 (5 cases)
+- [x] State machine 基础测试 (3 cases)
+- [x] GLOBAL mode 测试 (5 cases)
+- [x] 错误路径测试 (5 cases)
+- [x] 集成测试 (10 cases)
+- [x] Stage 1.4 回归 (2 cases)
+- [x] Fence_id 测试 (5 cases)
 
 ### 4.2 test_cu_graph.cpp (≥20 cases)
 
-- [ ] 基础 lifecycle (5 cases)
-- [ ] AddKernelNode (5 cases)
-- [ ] AddMemcpyNode (3 cases)
-- [ ] Launch + 错误路径 (7 cases)
+- [x] 基础 lifecycle (5 cases)
+- [x] AddKernelNode (5 cases)
+- [x] AddMemcpyNode (3 cases)
+- [x] Launch + 错误路径 (7 cases)
 
 ### 4.3 test_cu_mem_pool.cpp (≥25 cases)
 
-- [ ] 基础 lifecycle (4 cases)
-- [ ] 同步 alloc (3 cases)
-- [ ] 异步 alloc (5 cases)
-- [ ] Pool Option B 边界 (4 cases)
-- [ ] 属性 (3 cases)
-- [ ] Trim (3 cases)
-- [ ] Stage 1.4 回归 (3 cases)
+- [x] 基础 lifecycle (4 cases)
+- [x] 同步 alloc (3 cases)
+- [x] 异步 alloc (5 cases)
+- [x] Pool Option B 边界 (4 cases)
+- [x] 属性 (3 cases)
+- [x] Trim (3 cases)
+- [x] Stage 1.4 回归 (3 cases)
 
 ### 4.4 注册到 CMake + 验证
 
-- [ ] 注册 3 个新 test binary
-- [ ] 75+ 新测试全过 + 76+ 回归全过 = 151+ total
-- [ ] `tools/docs-audit.sh --strict` exit 0
+- [x] 注册 3 个新 test binary
+- [x] 75+ 新测试全过 + 76+ 回归全过 = 151+ total
+- [x] `tools/docs-audit.sh --strict` exit 0
 
 ### 4.5 提交
 
@@ -431,12 +432,12 @@ Refs: openspec/changes/2026-07-06-phase3-step3-shim-and-forwarding/ (Step 3)"
 
 ### 5.1 更新 sync-plan.md (v2.3)
 
-- [ ] 在 `plans/sync-plan.md` 添加 Step 3 完成条目 + 触发 Step 4
+- [x] 在 `plans/sync-plan.md` 添加 Step 3 完成条目 + 触发 Step 4
 
 ### 5.2 openspec archive
 
-- [ ] `mv openspec/changes/2026-07-05-phase3-1-igpu-driver-extension openspec/changes/archive/`
-- [ ] 编辑其 `.openspec.yaml`: status: PROPOSED → APPLIED, 加 archived: 2026-07-06
+- [x] `mv openspec/changes/2026-07-05-phase3-1-igpu-driver-extension openspec/changes/archive/`
+- [x] 编辑其 `.openspec.yaml`: status: PROPOSED → APPLIED, 加 archived: 2026-07-06
 
 ### 5.3 提交 + 推送 + 通知
 
@@ -448,20 +449,20 @@ git push origin phase3-step3-shim-and-forwarding
 
 ## 验收准则（Definition of Done）
 
-- [ ] C2 commit: 15 GpuDriverClient override 方法 + inline ioctl + struct 字段正确
-- [ ] C3+C4 commit: 11 shim funcs + 删除 3 旧 stub
-- [ ] C5 commit: 8 shim funcs (cu_mem_pool)
-- [ ] C6 commit: 75+ E2E test cases
-- [ ] C7 commit: sync-plan.md v2.3 + openspec archive
-- [ ] 76+ 回归测试零 regression
-- [ ] 151+ total tests passing
-- [ ] `nm libcuda_taskrunner.so` 含 11+ cu* 新符号
-- [ ] `cmake --build build` 无 warning
-- [ ] `tools/docs-audit.sh --strict` exit 0
-- [ ] 7 atomic commits 顺序执行
-- [ ] PR review 通过 + merge 到 TaskRunner `main`
-- [ ] UsrLinuxEmu owner 收到 Step 3 完成通知
-- [ ] 触发 Step 4: UsrLinuxEmu submodule bump
+- [x] C2 commit: 15 GpuDriverClient override 方法 + inline ioctl + struct 字段正确
+- [x] C3+C4 commit: 11 shim funcs + 删除 3 旧 stub
+- [x] C5 commit: 8 shim funcs (cu_mem_pool)
+- [x] C6 commit: 75+ E2E test cases
+- [x] C7 commit: sync-plan.md v2.3 + openspec archive
+- [x] 76+ 回归测试零 regression
+- [x] 151+ total tests passing
+- [x] `nm libcuda_taskrunner.so` 含 11+ cu* 新符号
+- [x] `cmake --build build` 无 warning
+- [x] `tools/docs-audit.sh --strict` exit 0
+- [x] 7 atomic commits 顺序执行
+- [x] PR review 通过 + merge 到 TaskRunner `main`
+- [x] UsrLinuxEmu owner 收到 Step 3 完成通知
+- [x] 触发 Step 4: UsrLinuxEmu submodule bump
 
 ## 时间线总览
 

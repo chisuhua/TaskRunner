@@ -1,6 +1,6 @@
 # TaskRunner-UsrLinuxEmu 接口统一同步计划
 
-**版本**: v2.3（Phase 3 Step 3 done, 7 atomic commits, 225 tests passing）
+**版本**: v2.4（Phase 4 real-impl-bridge, 270 tests passing）
 **日期**: 2026-07-07
 **维护者**: UsrLinuxEmu Architecture Team + TaskRunner owner
 **前置**: H-2.5 ✅ + H-3 ✅ shippable（2026-06-23）+ Step 1+2 ✅ merged（2026-07-06）
@@ -84,6 +84,31 @@
 │   11 cuGraph* + 8 cuMemPool* + 4 cuStream* capture symbols exported│
 │                                                              │
 │   Next: notify UsrLinuxEmu owner → Step 4 (submodule bump)  │
+└────────────────────────────────────────────────────────────┘
+```
+
+### 1.5 Phase 4 真实化（2026-07-07）
+
+```
+┌────────────────────────────────────────────────────────────┐
+│ Phase 4 (2026-07-07): cuGraphLaunch + cuMemPool* REAL bridge│
+│                                                              │
+│   跨仓工作：                                                  │
+│     - UsrLinuxEmu: 新增 GPU_IOCTL_MEM_POOL_EXPORT (0x68)    │
+│       IOCTL + ADR-039                                        │
+│     - TaskRunner: IGpuDriver 46→47 方法 + tadr-302 新增      │
+│                                                              │
+│   - C8: cuGraphLaunch REAL bridge                            │
+│     (Phase 3 PoC → real submit_graph IOCTL 0x58)             │
+│   - C9: 5 cuMemPool* APIs REAL bridge                       │
+│     (Alloc/AllocAsync/FreeAsync/ExportToShareableHandle)    │
+│   - C10: g_gpu_client 类型 IGpuDriver*                       │
+│     + nullptr fallback (CUDA_ERROR_NOT_INITIALIZED)          │
+│   - C11: 13 new E2E test cases (mock-injection path)         │
+│   - C12: tadr-301/302 + sync-plan update                     │
+│                                                              │
+│   Build: 0 warnings, 270/270 tests pass                      │
+│   Next: notify UsrLinuxEmu owner → submodule bump            │
 └────────────────────────────────────────────────────────────┘
 ```
 
@@ -201,6 +226,7 @@ caller:                          driver:
 | S5 | ✅ 完成 | 2026-06-19 |
 | **Phase 3.1+3.2 Step 1** | ✅ 完成 | **2026-07-06 (commit e6a34eb)** |
 | **Phase 3.1+3.2 Step 3** | ✅ 完成 | **2026-07-07 (branch phase3-step3-shim-and-forwarding, 7 atomic commits)** |
+| **Phase 4 real-impl-bridge** | 🔄 进行中 | 2026-07-07 |
 
 ### 5.2 测试基线
 
@@ -214,7 +240,9 @@ caller:                          driver:
 | test_cu_stream_capture | ✅ 30/30 | Phase 3.1 (Step 3) NEW |
 | test_cu_graph | ✅ 25/25 | Phase 3.1 (Step 3) NEW |
 | test_cu_mem_pool | ✅ 28/28 | Phase 3.2 (Step 3) NEW |
-| **总计** | **225/225** | **+83 new + 142 baseline, 0 failures** |
+| test_cu_mem_pool_export | ✅ 13/13 | Phase 4 (real-impl-bridge) NEW |
+| test_cu_graph_real | ✅ 32/32 | Phase 4 (cuGraphLaunch REAL bridge) NEW |
+| **总计** | **270/270** | **+45 new + 225 baseline, 0 failures** |
 | UsrLinuxEmu docs-audit | ✅ 53/53 | pre-commit hook (Phase 1.7 后) |
 
 ### 5.3 下一波 change 候选
@@ -290,5 +318,5 @@ ADR 治理政策见 ADR-035。openspec change 流程：
 
 ---
 
-**最后更新**: 2026-06-26（H-3 maintenance transition, v2.2 新增 H-3.5~H-3.8 完成详情）
-**下次审查**: H-3.5 启动时
+**最后更新**: 2026-07-07（Phase 4 real-impl-bridge, v2.4 新增 §1.5 + tadr-301/302）
+**下次审查**: Phase 4 submodule bump 时

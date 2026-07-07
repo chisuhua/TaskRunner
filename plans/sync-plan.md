@@ -238,10 +238,10 @@ caller:                          driver:
 2026-07-05  UsrLinuxEmu PR #20 创建 (bd51dc9, 49 tests pass, 81/81 zero-regression)
 2026-07-06  TaskRunner Step 1 完成 (e6a34eb) ✅
 2026-07-06  UsrLinuxEmu PR #20 merged (138f15a, 36 处 IOCTL 引用) ✅
-2026-07-07  TaskRunner Step 3 完成 (phase3-step3-shim-and-forwarding, 7 atomic commits, 225/225 tests) ✅ ← 当前
-2026-07-15  🎯 Step 3 PR merge 截止 (TaskRunner owner)
-2026-07-22  🎯 Step 4 submodule bump 截止 (UsrLinuxEmu owner)
-2026-07-25  🎯 最终回归 + openspec archive
+2026-07-07  TaskRunner Step 3 完成 (phase3-step3-shim-and-forwarding, 7 atomic commits, 225/225 tests) ✅ ← archived 2026-07-07 (76f14e0)
+2026-07-15  🎯 Step 3 PR merge 截止 (TaskRunner owner) → ✅ done 2026-07-07 (PR #7 merge commit 02363b8)
+2026-07-22  🎯 Step 4 submodule bump 截止 (UsrLinuxEmu owner) → ✅ done 2026-07-07 (UsrLinuxEmu commit 458299e)
+2026-07-25  🎯 最终回归 + openspec archive → 🟡 partial: openspec archive done 2026-07-07 (TaskRunner 76f14e0); final regression 待评估
 ```
 
 ### 5.5 决策追踪（D-SC-* / D-MP-*）

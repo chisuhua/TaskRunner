@@ -13,7 +13,14 @@
 #include <cstdint>
 #include <vector>
 
+#include "tests/test_fixture/mock_gpu_driver.hpp"
+#include "test_fixture/gpu_driver_client.h"
+
+using async_task::gpu::g_gpu_client;
+
 namespace {
+
+static async_task::gpu::MockGpuDriver g_mock;
 
 // Helper: create a unique CUstream handle per test by varying pointer address.
 CUstream make_stream(uint32_t id) {
@@ -332,14 +339,16 @@ TEST_CASE("cu_stream_capture: INVALIDATED state persists across queries") {
 }
 
 TEST_CASE("cu_stream_capture: cuGraphLaunch on exec from captured graph returns SUCCESS") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();
   CUstream s = make_stream(64);
   REQUIRE(cuStreamBeginCapture(s, CU_STREAM_CAPTURE_MODE_GLOBAL) == CUDA_SUCCESS);
   CUgraph g;
   REQUIRE(cuStreamEndCapture(s, &g) == CUDA_SUCCESS);
   CUgraphExec exec;
   REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
-  // PoC: cuGraphLaunch is no-op (returns SUCCESS without dispatching).
   CHECK(cuGraphLaunch(exec, s) == CUDA_SUCCESS);
   CHECK(cuGraphExecDestroy(exec) == CUDA_SUCCESS);
   CHECK(cuGraphDestroy(g) == CUDA_SUCCESS);
+  g_gpu_client = nullptr;
 }

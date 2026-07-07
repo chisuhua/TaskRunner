@@ -282,6 +282,38 @@ CUresult cuMemExportToShareableHandle(void);
 __attribute__((weak, visibility("default")))
 CUresult cuMemImportFromShareableHandle(void);
 
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolCreate(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolDestroy(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolAlloc(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolFree(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolSetAttribute(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolGetAttribute(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolTrimTo(void);
+
+// REAL_IMPL in cu_mem_pool.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuMemPoolExportToShareableHandle(void);
+
 // REAL_IMPL in cu_mem.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuMemGetInfo(void);
@@ -342,13 +374,17 @@ CUresult cuStreamGetFlags(void);
 __attribute__((weak, visibility("default")))
 CUresult cuStreamGetCaptureInfo(void);
 
-// REAL_IMPL in cu_stream.cpp
+// REAL_IMPL in cu_stream_capture.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuStreamBeginCapture(void);
 
-// REAL_IMPL in cu_stream.cpp
+// REAL_IMPL in cu_stream_capture.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuStreamEndCapture(void);
+
+// REAL_IMPL in cu_stream_capture.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuStreamIsCapturing(void);
 
 // REAL_IMPL in cu_event.cpp
 __attribute__((weak, visibility("default")))
@@ -446,15 +482,15 @@ CUresult cuArrayDestroy(void);
 __attribute__((weak, visibility("default")))
 CUresult cuArray3DCreate(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphCreate(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphDestroy(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphInstantiate(void);
 
@@ -462,7 +498,7 @@ CUresult cuGraphInstantiate(void);
 __attribute__((weak, visibility("default")))
 CUresult cuGraphInstantiateWithFlags(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphLaunch(void);
 
@@ -470,11 +506,11 @@ CUresult cuGraphLaunch(void);
 __attribute__((weak, visibility("default")))
 CUresult cuGraphUpload(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphAddKernelNode(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphAddMemcpyNode(void);
 
@@ -494,7 +530,7 @@ CUresult cuGraphAddEmptyNode(void);
 __attribute__((weak, visibility("default")))
 CUresult cuGraphExecLaunch(void);
 
-// STUB
+// REAL_IMPL in cu_graph.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphExecDestroy(void);
 
@@ -502,9 +538,21 @@ CUresult cuGraphExecDestroy(void);
 __attribute__((weak, visibility("default")))
 CUresult cuGraphExecUpdate(void);
 
-// STUB
+// REAL_IMPL in cu_graph_exec.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuGraphExecKernelNodeSetParams(void);
+
+// REAL_IMPL in cu_graph_exec.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuGraphExecMemcpyNodeSetParams(void);
+
+// REAL_IMPL in cu_graph_node.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuGraphNodeGetType(void);
+
+// REAL_IMPL in cu_graph_node.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuGraphNodeSetAttribute(void);
 
 // STUB
 __attribute__((weak, visibility("default")))

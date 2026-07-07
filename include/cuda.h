@@ -36,6 +36,7 @@ typedef enum CUresult_enum {
   CUDA_ERROR_OUT_OF_MEMORY                  = 2,
   CUDA_ERROR_NOT_READY                      = 600,
   CUDA_ERROR_INVALID_HANDLE                 = 400,
+  CUDA_ERROR_ILLEGAL_STATE                  = 401,
   CUDA_ERROR_NOT_SUPPORTED                  = 801,
   /* NOTE: NOT_IMPLEMENTED is aliased to NOT_SUPPORTED (both value 801 in CUDA 12.x).
      We define it as a macro alias to avoid duplicate case value errors in switch(). */
@@ -144,8 +145,74 @@ typedef int CUlimit;
 #define CU_LIMIT_STACK_SIZE 0
 #define CU_LIMIT_PRINTF_FIFO_SIZE 1
 #define CU_LIMIT_MALLOC_HEAP_SIZE 2
-typedef int CUgraphExec;
-typedef int CUgraphNode;
+typedef void* CUgraphExec;
+typedef void* CUgraphNode;
+typedef enum CUgraphNodeType_enum {
+  CU_GRAPH_NODE_TYPE_KERNEL     = 0,
+  CU_GRAPH_NODE_TYPE_MEMCPY     = 1,
+  CU_GRAPH_NODE_TYPE_MEMSET     = 2,
+  CU_GRAPH_NODE_TYPE_HOST       = 3,
+  CU_GRAPH_NODE_TYPE_GRAPH      = 4,
+  CU_GRAPH_NODE_TYPE_EMPTY      = 5,
+  CU_GRAPH_NODE_TYPE_WAIT_EVENT = 6
+} CUgraphNodeType;
+
+// Phase 3.1 PoC: minimal node parameter structs. Fields expanded in Phase 4+.
+typedef struct CUDA_KERNEL_NODE_PARAMS_st {
+  CUfunction func;
+  void** kernelParams;
+  void** extra;
+  int gridDimX; int gridDimY; int gridDimZ;
+  int blockDimX; int blockDimY; int blockDimZ;
+  int sharedMemBytes;
+} CUDA_KERNEL_NODE_PARAMS;
+
+typedef struct CUDA_MEMCPY_NODE_PARAMS_st {
+  int copyKind;
+  CUdeviceptr src;
+  CUdeviceptr dst;
+  size_t byteCount;
+} CUDA_MEMCPY_NODE_PARAMS;
+
+typedef struct CUgraphNodeParams_st {
+  char reserved[64];
+} CUgraphNodeParams;
+
+// Phase 3.2 PoC: minimal mempool types. Expanded in Phase 4+.
+typedef void* CUmemPool;
+typedef void* CUmemPoolPtr;
+typedef void* CUmemAllocationHandle;
+
+typedef enum CUmemAllocationType_enum {
+  CU_MEM_ALLOCATION_TYPE_INVALID = 0,
+  CU_MEM_ALLOCATION_TYPE_PINNED  = 1
+} CUmemAllocationType;
+
+typedef enum CUmemPoolHandleType_enum {
+  CU_MEM_HANDLE_TYPE_NONE                  = 0,
+  CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR = 1
+} CUmemPoolHandleType;
+
+typedef struct CUmemLocation_st {
+  int type;
+  int id;
+} CUmemLocation;
+
+typedef enum CUmemPoolAttribute_enum {
+  CU_MEMPOOL_ATTR_RELEASE_THRESHOLD               = 1,
+  CU_MEMPOOL_ATTR_REUSE_FOLLOW_EVENT_DEPENDENCIES  = 3,
+  CU_MEMPOOL_ATTR_REUSE_ALLOW_OPPORTUNISTIC        = 4,
+  CU_MEMPOOL_ATTR_REUSE_ALLOW_INTERNAL_DEPENDENCIES = 5
+} CUmemPoolAttribute;
+
+typedef struct CUmemPoolProps_st {
+  CUmemAllocationType allocType;
+  CUmemPoolHandleType handleType;
+  CUmemLocation location;
+  size_t maxSize;
+  unsigned long long vaSpaceHandle;
+  unsigned int reserved[4];
+} CUmemPoolProps;
 
 /* --- Function prototypes for libcuda_taskrunner.so --- */
 CUresult cuInit(unsigned int Flags);
@@ -284,6 +351,40 @@ CUresult cuStreamCreateWithFlags(CUstream* phStream, unsigned int flags);
 CUresult cuStreamGetCaptureInfo(CUstream hStream,
                                 CUstreamCaptureStatus* captureStatus,
                                 cuuint64_t* id);
+CUresult cuStreamIsCapturing(CUstream hStream,
+                             CUstreamCaptureStatus* captureStatus);
+CUresult cuGraphNodeGetType(CUgraphNode hNode, CUgraphNodeType* type);
+CUresult cuGraphNodeSetAttribute(CUgraphNode hNode, CUgraphNodeParams* nodeParams);
+CUresult cuGraphExecKernelNodeSetParams(CUgraphExec hGraphExec, CUgraphNode hNode,
+                                        const CUDA_KERNEL_NODE_PARAMS* nodeParams);
+CUresult cuGraphExecMemcpyNodeSetParams(CUgraphExec hGraphExec, CUgraphNode hNode,
+                                        const CUDA_MEMCPY_NODE_PARAMS* nodeParams);
+CUresult cuMemPoolCreate(CUmemPool* pool, const CUmemPoolProps* poolProps);
+CUresult cuMemPoolDestroy(CUmemPool pool);
+CUresult cuMemPoolAlloc(CUmemPoolPtr* ptr, size_t size, CUmemPool pool,
+                        CUmemPoolProps* props);
+CUresult cuMemPoolFree(CUmemPoolPtr ptr, CUmemPool pool);
+CUresult cuMemPoolSetAttribute(CUmemPool pool, CUmemPoolAttribute attr,
+                                const void* value);
+CUresult cuMemPoolGetAttribute(CUmemPool pool, CUmemPoolAttribute attr,
+                                void* value);
+CUresult cuMemPoolTrimTo(CUmemPool pool, size_t minBytesToKeep);
+CUresult cuMemPoolExportToShareableHandle(void* shareableHandle, CUmemPool pool,
+                                           CUmemPoolHandleType handleType,
+                                           unsigned int flags);
+CUresult cuGraphCreate(CUgraph* phGraph, unsigned int flags);
+CUresult cuGraphDestroy(CUgraph hGraph);
+CUresult cuGraphAddKernelNode(CUgraphNode* phGraphNode, CUgraph hGraph,
+                                CUgraphNode* dependencies, size_t numDependencies,
+                                const CUDA_KERNEL_NODE_PARAMS* nodeParams);
+CUresult cuGraphAddMemcpyNode(CUgraphNode* phGraphNode, CUgraph hGraph,
+                                CUgraphNode* dependencies, size_t numDependencies,
+                                const CUDA_MEMCPY_NODE_PARAMS* nodeParams);
+CUresult cuGraphInstantiate(CUgraphExec* phGraphExec, CUgraph hGraph,
+                              CUgraphNode* phErrorNode, char* logBuffer,
+                              size_t bufferSize);
+CUresult cuGraphLaunch(CUgraphExec hGraphExec, CUstream hStream);
+CUresult cuGraphExecDestroy(CUgraphExec hGraphExec);
 CUresult cuEventCreateWithFlags(CUevent* phEvent, unsigned int flags);
 CUresult cuMemsetD16(CUdeviceptr dstDevice, unsigned short us, size_t N);
 CUresult cuProfilerStart(void);

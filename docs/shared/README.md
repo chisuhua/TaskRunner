@@ -16,7 +16,7 @@ The TaskRunner `include/shared/` layer is the **TaskRunner-side implementation**
 
 | TaskRunner side | UsrLinuxEmu side | Contract role |
 |---|---|---|
-| `include/shared/igpu_driver.hpp` | `plugins/gpu_driver/shared/gpu_ioctl.h` (via UsrLinuxEmu symlink) | IGpuDriver 28-method interface ↔ ioctl 派发表 |
+| `include/shared/igpu_driver.hpp` | `plugins/gpu_driver/shared/gpu_ioctl.h` (via UsrLinuxEmu symlink) | IGpuDriver 46-method interface ↔ ioctl 派发表 (28 baseline + 3 H-3.5 + 15 Phase 3.1+3.2) |
 | `include/shared/sync_primitives.hpp` | (no direct counterpart) | TaskRunner-internal cross-cutting sync primitives |
 | `include/shared/error_handling.hpp` (H-5 placeholder) | (no direct counterpart) | Result<T> + ErrorCode enum |
 | `include/shared/memory_manager.hpp` (H-5 v2) | (no direct counterpart) | Memory manager shared by test-fixture and umd-evolution |
@@ -25,7 +25,7 @@ The TaskRunner `include/shared/` layer is the **TaskRunner-side implementation**
 
 ## In Scope
 
-- `IGpuDriver` interface contract (28 methods) — see `adr/tadr-301-igpu-driver-contract.md`
+- `IGpuDriver` interface contract (**46 methods**, H-2.5: 28 → H-3.5: 31 → Phase 3.1+3.2: 46) — see `adr/tadr-301-igpu-driver-contract.md`
 - Sync primitives (MPSC queue, atomic counter, mutex wrappers) — see `adr/tadr-302-sync-primitives.md`
 - Error handling abstractions (Result<T> + ErrorCode enum) — see `adr/tadr-303-error-handling.md`
 - Memory manager (H-5 v2 addition, used by `cuda_scheduler`) — see `../../include/shared/memory_manager.hpp`

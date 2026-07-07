@@ -44,7 +44,7 @@ TaskRunner TADR 分为 3 个 scope：
 |------|------|------|----------|
 | tadr-107 | shared 边界规则 | ACCEPTED | ADR-036 |
 | tadr-108 | build mode selection | ACCEPTED | ADR-035, ADR-036 |
-| tadr-301 | IGpuDriver 28→31 方法契约 | ACCEPTED | ADR-032, tadr-109 |
+| tadr-301 | IGpuDriver 28→46 方法契约 (H-5 新增, H-3.5 + Phase 3 扩展) | ACCEPTED | ADR-032, tadr-109 |
 | tadr-302 | Sync Primitives 抽象 | ACCEPTED | — |
 | tadr-303 | Error Handling 基础（Result\<T\>）| ACCEPTED | — |
 | tadr-304 | Error Handling 策略层 | ACCEPTED | tadr-303 |

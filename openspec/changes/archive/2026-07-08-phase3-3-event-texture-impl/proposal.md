@@ -1,6 +1,6 @@
 # Change: phase3-3-event-texture-impl
 
-> **Status**: 🔄 PROPOSED（2026-07-08, kicked off via worktree phase3-3-event-texture）
+> **Status**: ✅ APPLIED（2026-07-08, merged to main @ 498265c）
 > **Type**: UMD-EVOLUTION sub-system（implementation workstream）
 > **Phase**: 3.3
 > **Subplans**: 3.3a (Event timing precision, 1w) + 3.3b (Texture/Surface frontend, 2w)

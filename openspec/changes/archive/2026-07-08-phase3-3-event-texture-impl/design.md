@@ -1,6 +1,6 @@
 # Design: phase3-3-event-texture-impl
 
-> **Status**: 🔄 PROPOSED（2026-07-08, kicked off via worktree phase3-3-event-texture）
+> **Status**: ✅ APPLIED（2026-07-08, merged to main @ 498265c）
 > **Phase**: 3.3 (2 sub-plans)
 > **Scope**: Frontend-only shim improvements
 > **Backend dependency**: None (CudaStub clock sufficient)

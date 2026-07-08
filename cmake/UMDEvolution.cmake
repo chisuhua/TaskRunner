@@ -87,3 +87,10 @@ add_executable(test_cu_mem_pool
 )
 target_link_libraries(test_cu_mem_pool PRIVATE cuda_taskrunner)
 add_test(NAME test_cu_mem_pool COMMAND test_cu_mem_pool)
+
+# Phase 3.3a: Event timing precision
+add_executable(test_event_timing
+    tests/umd/test_event_timing.cpp
+)
+target_link_libraries(test_event_timing PRIVATE cuda_taskrunner)
+add_test(NAME test_event_timing COMMAND test_event_timing)

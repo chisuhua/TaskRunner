@@ -438,15 +438,15 @@ CUresult cuLaunchHostFunc(void);
 __attribute__((weak, visibility("default")))
 CUresult cuLaunchCooperativeKernel(void);
 
-// STUB
+// REAL_IMPL in cu_texref.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuTexRefCreate(void);
 
-// STUB
+// REAL_IMPL in cu_texref.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuTexRefDestroy(void);
 
-// STUB
+// REAL_IMPL in cu_texref.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuTexRefSetAddress(void);
 
@@ -454,17 +454,25 @@ CUresult cuTexRefSetAddress(void);
 __attribute__((weak, visibility("default")))
 CUresult cuTexRefSetAddress2D(void);
 
-// STUB
+// REAL_IMPL in cu_texref.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuTexRefSetFormat(void);
 
-// STUB
+// REAL_IMPL in cu_texref.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuTexRefGetAddress(void);
 
-// STUB
+// REAL_IMPL in cu_texref.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuTexRefGetArray(void);
+
+// REAL_IMPL in cu_texref.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuTexRefSetArray(void);
+
+// REAL_IMPL in cu_texref.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuTexRefSetFlags(void);
 
 // STUB
 __attribute__((weak, visibility("default")))
@@ -478,13 +486,17 @@ CUresult cuSurfRefDestroy(void);
 __attribute__((weak, visibility("default")))
 CUresult cuSurfRefSetFormat(void);
 
-// STUB
+// REAL_IMPL in cu_array.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuArrayCreate(void);
 
-// STUB
+// REAL_IMPL in cu_array.cpp
 __attribute__((weak, visibility("default")))
 CUresult cuArrayDestroy(void);
+
+// REAL_IMPL in cu_array.cpp
+__attribute__((weak, visibility("default")))
+CUresult cuArrayGetDescriptor(void);
 
 // STUB
 __attribute__((weak, visibility("default")))

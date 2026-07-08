@@ -148,6 +148,18 @@ CRITICAL_APIS_IMPL_REQUIRED = {
     "cuMemPoolExportToShareableHandle": "cu_mem_pool.cpp",
     "cuMemPoolAllocAsync": "cu_mem_pool.cpp",
     "cuMemPoolFreeAsync": "cu_mem_pool.cpp",
+    # Texture/Surface — Phase 3.3b
+    "cuTexRefCreate": "cu_texref.cpp",
+    "cuTexRefDestroy": "cu_texref.cpp",
+    "cuTexRefSetArray": "cu_texref.cpp",
+    "cuTexRefSetAddress": "cu_texref.cpp",
+    "cuTexRefSetFormat": "cu_texref.cpp",
+    "cuTexRefSetFlags": "cu_texref.cpp",
+    "cuTexRefGetAddress": "cu_texref.cpp",
+    "cuTexRefGetArray": "cu_texref.cpp",
+    "cuArrayCreate": "cu_array.cpp",
+    "cuArrayGetDescriptor": "cu_array.cpp",
+    "cuArrayDestroy": "cu_array.cpp",
     # Light stubs — Phase 1.7 A.4
     "cuMemsetD16": "cu_mem.cpp",
     "cuProfilerStart": "cu_mem.cpp",
@@ -207,12 +219,12 @@ CUDA_DRIVER_APIS = [
     # Kernel Launch
     "cuLaunchKernel", "cuLaunchKernelEx", "cuLaunchHostFunc",
     "cuLaunchCooperativeKernel",
-    # Texture/Surface
+# Texture/Surface — Phase 3.3b
     "cuTexRefCreate", "cuTexRefDestroy", "cuTexRefSetAddress",
-    "cuTexRefSetAddress2D", "cuTexRefSetFormat",
+    "cuTexRefSetAddress2D", "cuTexRefSetFormat", "cuTexRefSetFlags",
+    "cuTexRefSetArray",
     "cuTexRefGetAddress", "cuTexRefGetArray",
-    "cuSurfRefCreate", "cuSurfRefDestroy", "cuSurfRefSetFormat",
-    "cuArrayCreate", "cuArrayDestroy", "cuArray3DCreate",
+    "cuArrayCreate", "cuArrayGetDescriptor", "cuArrayDestroy", "cuArray3DCreate",
     # Graph
     "cuGraphCreate", "cuGraphDestroy", "cuGraphInstantiate",
     "cuGraphInstantiateWithFlags",

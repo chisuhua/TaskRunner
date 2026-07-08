@@ -37,6 +37,8 @@ add_library(cuda_taskrunner SHARED
     src/umd/libcuda_shim/cu_graph_exec.cpp
     src/umd/libcuda_shim/cu_mem_pool.cpp
     src/umd/libcuda_shim/cu_event.cpp
+    src/umd/libcuda_shim/cu_array.cpp
+    src/umd/libcuda_shim/cu_texref.cpp
 )
 target_include_directories(cuda_taskrunner PUBLIC
     ${CMAKE_SOURCE_DIR}
@@ -87,3 +89,17 @@ add_executable(test_cu_mem_pool
 )
 target_link_libraries(test_cu_mem_pool PRIVATE cuda_taskrunner)
 add_test(NAME test_cu_mem_pool COMMAND test_cu_mem_pool)
+
+# Phase 3.3a: Event timing precision
+add_executable(test_event_timing
+    tests/umd/test_event_timing.cpp
+)
+target_link_libraries(test_event_timing PRIVATE cuda_taskrunner)
+add_test(NAME test_event_timing COMMAND test_event_timing)
+
+# Phase 3.3b: Texture/Surface frontend
+add_executable(test_texture_surface
+    tests/umd/test_texture_surface.cpp
+)
+target_link_libraries(test_texture_surface PRIVATE cuda_taskrunner)
+add_test(NAME test_texture_surface COMMAND test_texture_surface)

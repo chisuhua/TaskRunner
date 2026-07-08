@@ -24,6 +24,25 @@ typedef void* CUgraph;
 typedef void* CUtexref;
 typedef void* CUsurfref;
 typedef void* CUarray;
+
+/* --- Texture/Surface types (Phase 3.3b) --- */
+typedef enum CUarray_format_enum {
+  CU_AD_FORMAT_UNSIGNED_INT8  = 0x01,
+  CU_AD_FORMAT_UNSIGNED_INT16 = 0x02,
+  CU_AD_FORMAT_UNSIGNED_INT32 = 0x03,
+  CU_AD_FORMAT_SIGNED_INT8    = 0x08,
+  CU_AD_FORMAT_SIGNED_INT16   = 0x09,
+  CU_AD_FORMAT_SIGNED_INT32   = 0x0a,
+  CU_AD_FORMAT_HALF           = 0x10,
+  CU_AD_FORMAT_FLOAT          = 0x20
+} CUarray_format;
+
+typedef struct CUDA_ARRAY_DESCRIPTOR_st {
+  size_t Width;
+  size_t Height;
+  CUarray_format Format;
+  unsigned int NumChannels;
+} CUDA_ARRAY_DESCRIPTOR;
 typedef int   CUdevice;
 typedef unsigned long long CUdeviceptr;
 typedef uint32_t cuuint32_t;
@@ -38,6 +57,7 @@ typedef enum CUresult_enum {
   CUDA_ERROR_NOT_INITIALIZED               = 700,  // Phase 4 (S5): returned when driver not bound
   CUDA_ERROR_INVALID_HANDLE                 = 400,
   CUDA_ERROR_ILLEGAL_STATE                  = 401,
+  CUDA_ERROR_NOT_PERMITTED                  = 800,
   CUDA_ERROR_NOT_SUPPORTED                  = 801,
   /* NOTE: NOT_IMPLEMENTED is aliased to NOT_SUPPORTED (both value 801 in CUDA 12.x).
      We define it as a macro alias to avoid duplicate case value errors in switch(). */
@@ -214,6 +234,12 @@ typedef struct CUmemPoolProps_st {
   unsigned long long vaSpaceHandle;
   unsigned int reserved[4];
 } CUmemPoolProps;
+
+/* --- Event flags (CUDA 12.x) --- */
+#define CU_EVENT_DEFAULT           0x0
+#define CU_EVENT_BLOCKING_SYNC     0x1
+#define CU_EVENT_DISABLE_TIMING    0x2
+#define CU_EVENT_INTERPROCESS      0x4
 
 /* --- Function prototypes for libcuda_taskrunner.so --- */
 CUresult cuInit(unsigned int Flags);
@@ -398,9 +424,20 @@ CUresult cuProfilerInitialize(const char* configFile, const char* outputFile,
                               unsigned int outputMode);
 
 /* --- Phase 1.7 STUB sanity API (cuArrayCreate/cuGraphCreate/etc) --- */
-CUresult cuArrayCreate(CUarray* pHandle, const void* allocSize);
+CUresult cuArrayCreate(CUarray* pHandle, const CUDA_ARRAY_DESCRIPTOR* pAllocateArray);
+CUresult cuArrayGetDescriptor(CUDA_ARRAY_DESCRIPTOR* pArrayDescriptor, CUarray hArray);
+CUresult cuArrayDestroy(CUarray hArray);
 CUresult cuGraphCreate(CUgraph* phGraph, unsigned int flags);
 CUresult cuTexRefCreate(CUtexref* pTexRef);
+CUresult cuTexRefDestroy(CUtexref hTexRef);
+CUresult cuTexRefSetArray(CUtexref hTexRef, CUarray hArray, unsigned int Flags);
+CUresult cuTexRefSetAddress(size_t* ByteOffset, CUtexref hTexRef,
+                             CUdeviceptr dptr, size_t bytes);
+CUresult cuTexRefSetFormat(CUtexref hTexRef, CUarray_format fmt,
+                            int NumPackedComponents);
+CUresult cuTexRefSetFlags(CUtexref hTexRef, unsigned int Flags);
+CUresult cuTexRefGetAddress(CUdeviceptr* pdptr, CUtexref hTexRef);
+CUresult cuTexRefGetArray(CUarray* phArray, CUtexref hTexRef);
 CUresult cuMemHostRegister(void* p, size_t bytesize, unsigned int Flags);
 
 CUresult cuGetErrorName(CUresult error, const char** pstr);

@@ -250,16 +250,6 @@ extern "C" CUresult cuProfilerInitialize(const char* configFile,
 // declarations live in include/cuda.h for E2E testing.
 // ---------------------------------------------------------------------------
 
-extern "C" CUresult cuArrayCreate(CUarray* pHandle, const void* allocSize) {
-  (void)pHandle; (void)allocSize;
-  return CUDA_ERROR_NOT_IMPLEMENTED;
-}
-
-extern "C" CUresult cuTexRefCreate(CUtexref* pTexRef) {
-  (void)pTexRef;
-  return CUDA_ERROR_NOT_IMPLEMENTED;
-}
-
 extern "C" CUresult cuMemHostRegister(void* p, size_t bytesize,
                                        unsigned int Flags) {
   (void)p; (void)bytesize; (void)Flags;

@@ -256,7 +256,7 @@ caller:                          driver:
 | **Phase 3.1+3.2 Step 3** | GpuDriverClient 15 forwarding + shim + E2E | ✅ 完成 (2026-07-07, 7 atomic commits, 225/225 tests) | TADR-301 | Done |
 | **Phase 3.1+3.2 Step 4** | UsrLinuxEmu submodule bump | ✅ 完成 (2026-07-07, commit 458299e) | ADR-035 | Done |
 | **Phase 4 real-impl-bridge** | shim bridge 5 cu* APIs to GpuDriverClient IOCTLs | ✅ 完成 (2026-07-07, PR #8 @ fbcbe44, 270/270 tests, +1 IGpuDriver method = 47) | TADR-301/305 | Done |
-| **Phase 1.7 test coverage** | 25-30 E2E tests (REAL_IMPL 50.5%→≥85%) | 🟢 可立即开始 (独立) | — | PROPOSED |
+| **Phase 1.7 test coverage** | (superseded by Phase 3.1+3.2+4) | ✅ Done 2026-07-08 | — | Done |
 | **Phase 3.3 Event+Texture** | Frontend-only (cuEvent + cuTexRef) | 🟢 可立即开始 (独立) | — | DRAFT plan |
 
 ### 5.4 Phase 3 跨仓协调时间线
@@ -322,5 +322,5 @@ ADR 治理政策见 ADR-035。openspec change 流程：
 
 ---
 
-**最后更新**: 2026-07-07（Phase 4 real-impl-bridge, v2.4 新增 §1.5 + tadr-301/302）
-**下次审查**: Phase 4 submodule bump 时
+**最后更新**: 2026-07-08（Phase 1.7 close via audit-supersede; v2.4.1 housekeeping）
+**下次审查**: Phase 3.3 Event+Texture 启动时

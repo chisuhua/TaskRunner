@@ -39,6 +39,13 @@ EventTable g_events;
 
 extern "C" CUresult cuEventCreate(CUevent* phEvent, unsigned int Flags) {
   if (!phEvent) return CUDA_ERROR_INVALID_VALUE;
+  // CUDA 12.x spec: reserved flag bits must be 0.
+  constexpr unsigned int kValidFlags = CU_EVENT_DEFAULT
+                                      | CU_EVENT_BLOCKING_SYNC
+                                      | CU_EVENT_DISABLE_TIMING
+                                      | CU_EVENT_INTERPROCESS;
+  if (Flags & ~kValidFlags) return CUDA_ERROR_INVALID_VALUE;
+
   auto& table = async_task::umd::shim::g_events;
   std::lock_guard<std::mutex> lock(table.mu);
   *phEvent = reinterpret_cast<CUevent>(
@@ -49,7 +56,6 @@ extern "C" CUresult cuEventCreate(CUevent* phEvent, unsigned int Flags) {
       .recorded_at = std::nullopt,
       .is_destroyed = false,
   };
-  (void)Flags;
   return CUDA_SUCCESS;
 }
 
@@ -57,36 +63,45 @@ extern "C" CUresult cuEventDestroy(CUevent hEvent) {
   if (!hEvent) return CUDA_ERROR_INVALID_VALUE;
   auto& table = async_task::umd::shim::g_events;
   std::lock_guard<std::mutex> lock(table.mu);
-  table.events.erase(hEvent);
+  auto it = table.events.find(hEvent);
+  if (it == table.events.end()) return CUDA_ERROR_INVALID_HANDLE;
+  if (it->second.is_destroyed) return CUDA_ERROR_INVALID_HANDLE;
+  it->second.is_destroyed = true;
+  table.events.erase(it);
   return CUDA_SUCCESS;
 }
 
 extern "C" CUresult cuEventRecord(CUevent hEvent, CUstream hStream) {
   if (!hEvent) return CUDA_ERROR_INVALID_VALUE;
-  // Phase 2 PoC: record the current time as the event timestamp.
+  // Phase 3.3a: write recorded_at (NOT created_at — Phase 2 PoC bug fix).
   auto& table = async_task::umd::shim::g_events;
   std::lock_guard<std::mutex> lock(table.mu);
   auto it = table.events.find(hEvent);
   if (it == table.events.end()) return CUDA_ERROR_INVALID_HANDLE;
-  it->second = async_task::umd::shim::EventRecord{
-      .flags = it->second.flags,
-      .created_at = std::chrono::steady_clock::now(),
-      .recorded_at = std::nullopt,
-      .is_destroyed = false,
-  };
-  (void)hStream;
+  if (it->second.is_destroyed) return CUDA_ERROR_INVALID_HANDLE;
+  it->second.recorded_at = std::chrono::steady_clock::now();
+  (void)hStream;  // Phase 3.3a: stream no-op (CudaStub synchronous)
   return CUDA_SUCCESS;
 }
 
 extern "C" CUresult cuEventSynchronize(CUevent hEvent) {
-  // Phase 2 PoC: no-op (synchronous semantics — event recorded synchronously).
+  // Phase 3.3a: no-op (synchronous semantics — event recorded synchronously).
   if (!hEvent) return CUDA_ERROR_INVALID_VALUE;
-  (void)hEvent;
+  auto& table = async_task::umd::shim::g_events;
+  std::lock_guard<std::mutex> lock(table.mu);
+  auto it = table.events.find(hEvent);
+  if (it == table.events.end()) return CUDA_ERROR_INVALID_HANDLE;
+  if (it->second.is_destroyed) return CUDA_ERROR_INVALID_HANDLE;
   return CUDA_SUCCESS;
 }
 
 extern "C" CUresult cuEventQuery(CUevent hEvent) {
-  (void)hEvent;
+  if (!hEvent) return CUDA_ERROR_INVALID_VALUE;
+  auto& table = async_task::umd::shim::g_events;
+  std::lock_guard<std::mutex> lock(table.mu);
+  auto it = table.events.find(hEvent);
+  if (it == table.events.end()) return CUDA_ERROR_INVALID_HANDLE;
+  if (it->second.is_destroyed) return CUDA_ERROR_INVALID_HANDLE;
   return CUDA_SUCCESS;
 }
 
@@ -102,9 +117,17 @@ extern "C" CUresult cuEventElapsedTime(float* pMilliseconds, CUevent hStart,
       end_it == table.events.end()) {
     return CUDA_ERROR_INVALID_HANDLE;
   }
+  if (start_it->second.is_destroyed || end_it->second.is_destroyed)
+    return CUDA_ERROR_INVALID_HANDLE;
+
+  // Phase 3.3a strict semantics: both events must be recorded.
+  if (!start_it->second.recorded_at.has_value() ||
+      !end_it->second.recorded_at.has_value()) {
+    return CUDA_ERROR_NOT_PERMITTED;
+  }
 
   auto diff_us = std::chrono::duration_cast<std::chrono::microseconds>(
-      end_it->second.created_at - start_it->second.created_at);
+      *end_it->second.recorded_at - *start_it->second.recorded_at);
   *pMilliseconds = static_cast<float>(diff_us.count()) / 1000.0f;
 
   // CUDA spec: negative time is not allowed (indicates wrong order).
@@ -119,6 +142,5 @@ extern "C" CUresult cuEventElapsedTime(float* pMilliseconds, CUevent hStart,
 
 extern "C" CUresult cuEventCreateWithFlags(CUevent* phEvent,
                                             unsigned int flags) {
-  (void)flags;
-  return cuEventCreate(phEvent, 0);
+  return cuEventCreate(phEvent, flags);
 }

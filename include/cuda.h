@@ -38,6 +38,7 @@ typedef enum CUresult_enum {
   CUDA_ERROR_NOT_INITIALIZED               = 700,  // Phase 4 (S5): returned when driver not bound
   CUDA_ERROR_INVALID_HANDLE                 = 400,
   CUDA_ERROR_ILLEGAL_STATE                  = 401,
+  CUDA_ERROR_NOT_PERMITTED                  = 800,
   CUDA_ERROR_NOT_SUPPORTED                  = 801,
   /* NOTE: NOT_IMPLEMENTED is aliased to NOT_SUPPORTED (both value 801 in CUDA 12.x).
      We define it as a macro alias to avoid duplicate case value errors in switch(). */
@@ -214,6 +215,12 @@ typedef struct CUmemPoolProps_st {
   unsigned long long vaSpaceHandle;
   unsigned int reserved[4];
 } CUmemPoolProps;
+
+/* --- Event flags (CUDA 12.x) --- */
+#define CU_EVENT_DEFAULT           0x0
+#define CU_EVENT_BLOCKING_SYNC     0x1
+#define CU_EVENT_DISABLE_TIMING    0x2
+#define CU_EVENT_INTERPROCESS      0x4
 
 /* --- Function prototypes for libcuda_taskrunner.so --- */
 CUresult cuInit(unsigned int Flags);

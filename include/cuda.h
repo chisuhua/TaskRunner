@@ -24,6 +24,25 @@ typedef void* CUgraph;
 typedef void* CUtexref;
 typedef void* CUsurfref;
 typedef void* CUarray;
+
+/* --- Texture/Surface types (Phase 3.3b) --- */
+typedef enum CUarray_format_enum {
+  CU_AD_FORMAT_UNSIGNED_INT8  = 0x01,
+  CU_AD_FORMAT_UNSIGNED_INT16 = 0x02,
+  CU_AD_FORMAT_UNSIGNED_INT32 = 0x03,
+  CU_AD_FORMAT_SIGNED_INT8    = 0x08,
+  CU_AD_FORMAT_SIGNED_INT16   = 0x09,
+  CU_AD_FORMAT_SIGNED_INT32   = 0x0a,
+  CU_AD_FORMAT_HALF           = 0x10,
+  CU_AD_FORMAT_FLOAT          = 0x20
+} CUarray_format;
+
+typedef struct CUDA_ARRAY_DESCRIPTOR_st {
+  size_t Width;
+  size_t Height;
+  CUarray_format Format;
+  unsigned int NumChannels;
+} CUDA_ARRAY_DESCRIPTOR;
 typedef int   CUdevice;
 typedef unsigned long long CUdeviceptr;
 typedef uint32_t cuuint32_t;
@@ -405,9 +424,20 @@ CUresult cuProfilerInitialize(const char* configFile, const char* outputFile,
                               unsigned int outputMode);
 
 /* --- Phase 1.7 STUB sanity API (cuArrayCreate/cuGraphCreate/etc) --- */
-CUresult cuArrayCreate(CUarray* pHandle, const void* allocSize);
+CUresult cuArrayCreate(CUarray* pHandle, const CUDA_ARRAY_DESCRIPTOR* pAllocateArray);
+CUresult cuArrayGetDescriptor(CUDA_ARRAY_DESCRIPTOR* pArrayDescriptor, CUarray hArray);
+CUresult cuArrayDestroy(CUarray hArray);
 CUresult cuGraphCreate(CUgraph* phGraph, unsigned int flags);
 CUresult cuTexRefCreate(CUtexref* pTexRef);
+CUresult cuTexRefDestroy(CUtexref hTexRef);
+CUresult cuTexRefSetArray(CUtexref hTexRef, CUarray hArray, unsigned int Flags);
+CUresult cuTexRefSetAddress(size_t* ByteOffset, CUtexref hTexRef,
+                             CUdeviceptr dptr, size_t bytes);
+CUresult cuTexRefSetFormat(CUtexref hTexRef, CUarray_format fmt,
+                            int NumPackedComponents);
+CUresult cuTexRefSetFlags(CUtexref hTexRef, unsigned int Flags);
+CUresult cuTexRefGetAddress(CUdeviceptr* pdptr, CUtexref hTexRef);
+CUresult cuTexRefGetArray(CUarray* phArray, CUtexref hTexRef);
 CUresult cuMemHostRegister(void* p, size_t bytesize, unsigned int Flags);
 
 CUresult cuGetErrorName(CUresult error, const char** pstr);

@@ -37,6 +37,8 @@ add_library(cuda_taskrunner SHARED
     src/umd/libcuda_shim/cu_graph_exec.cpp
     src/umd/libcuda_shim/cu_mem_pool.cpp
     src/umd/libcuda_shim/cu_event.cpp
+    src/umd/libcuda_shim/cu_array.cpp
+    src/umd/libcuda_shim/cu_texref.cpp
 )
 target_include_directories(cuda_taskrunner PUBLIC
     ${CMAKE_SOURCE_DIR}

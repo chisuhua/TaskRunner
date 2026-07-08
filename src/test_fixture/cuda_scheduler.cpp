@@ -30,6 +30,13 @@ CudaScheduler::CudaScheduler(async_task::gpu::IGpuDriver* driver) {
 
 CudaScheduler::~CudaScheduler() {
     shutdown();
+    // ASan leak fix: shutdown() returns early if !initialized_, so we still
+    // need to release any driver_ we own (allocated in ctor).
+    if (owns_driver_ && driver_) {
+        delete driver_;
+        driver_ = nullptr;
+        owns_driver_ = false;
+    }
 }
 
 int CudaScheduler::initialize(bool stub_mode) {

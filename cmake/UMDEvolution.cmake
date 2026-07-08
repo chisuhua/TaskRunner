@@ -96,3 +96,10 @@ add_executable(test_event_timing
 )
 target_link_libraries(test_event_timing PRIVATE cuda_taskrunner)
 add_test(NAME test_event_timing COMMAND test_event_timing)
+
+# Phase 3.3b: Texture/Surface frontend
+add_executable(test_texture_surface
+    tests/umd/test_texture_surface.cpp
+)
+target_link_libraries(test_texture_surface PRIVATE cuda_taskrunner)
+add_test(NAME test_texture_surface COMMAND test_texture_surface)

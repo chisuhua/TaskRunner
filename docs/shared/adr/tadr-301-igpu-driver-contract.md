@@ -8,7 +8,7 @@ DECISION_DATE: 2026-07-07
 
 ## Context
 
-`IGpuDriver` is the **47-method (current)** abstract interface that decouples TaskRunner from specific GPU implementations. It was introduced in H-2.5 at 28 methods (基线), extended to 31 in H-3.5 (Phase 2 + 3 调度方法；详见 [tadr-109 IGpuDriver 31 方法扩展 + CudaScheduler 抽象泄漏修复](../test-fixture/adr/tadr-109-igpu-driver-uniform-scheduling.md))，and further expanded to **46** in Phase 3.1+3.2 (10 stream_capture/graph + 5 mempool methods, per Step 1 commit `21f71c9` and Step 3 PR #7 forwarding override), then to **47** in Phase 4 (mem_pool_export_shareable added, per tadr-302)。It must remain ABI-stable for both test-fixture (current) and umd-evolution (future) consumers.
+`IGpuDriver` is the **47-method (current)** abstract interface that decouples TaskRunner from specific GPU implementations. It was introduced in H-2.5 at 28 methods (基线), extended to 31 in H-3.5 (Phase 2 + 3 调度方法；详见 [tadr-109 IGpuDriver 31 方法扩展 + CudaScheduler 抽象泄漏修复](../test-fixture/adr/tadr-109-igpu-driver-uniform-scheduling.md))，and further expanded to **46** in Phase 3.1+3.2 (10 stream_capture/graph + 5 mempool methods, per Step 1 commit `21f71c9` and Step 3 PR #7 forwarding override), then to **47** in Phase 4 (mem_pool_export_shareable added, per tadr-305)。It must remain ABI-stable for both test-fixture (current) and umd-evolution (future) consumers.
 
 ## Decision
 
@@ -50,4 +50,4 @@ DECISION_DATE: 2026-07-07
 - H-3 tadr-103 (Phase 2 5 方法 initial proposal)
 - H-3.5 tadr-109 (31-method baseline)
 - Phase 3.1+3.2 Step 1 (commit `21f71c9`) + Step 3 ([PR #7](https://github.com/chisuhua/TaskRunner/pull/7)) for 46-method expansion
-- Phase 4 tadr-302 (mem_pool_export_shareable contract, 47-method expansion)
+- Phase 4 tadr-305 (mem_pool_export_shareable contract, 47-method expansion)

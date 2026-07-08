@@ -48,6 +48,7 @@ TaskRunner TADR 分为 3 个 scope：
 | tadr-302 | Sync Primitives 抽象 | ACCEPTED | — |
 | tadr-303 | Error Handling 基础（Result\<T\>）| ACCEPTED | — |
 | tadr-304 | Error Handling 策略层 | ACCEPTED | tadr-303 |
+| tadr-305 | IGpuDriver::memPoolExportShareable 契约 (Phase 4 新增 47 方法) | ACCEPTED | tadr-301 |
 
 ## 维护政策
 

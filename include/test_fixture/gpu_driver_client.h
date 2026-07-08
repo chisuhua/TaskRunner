@@ -809,12 +809,19 @@ public:
 
     int mem_pool_export_shareable(uint64_t pool_handle, uint32_t handle_type,
                                   uint32_t flags, int* fd_out) override {
-        // TODO Phase 4: replace with sim_mem_pool_export_shareable call once UsrLinuxEmu 91ea76c is merged
-        (void)pool_handle;
-        (void)handle_type;
-        (void)flags;
-        (void)fd_out;
-        return -1;  // NOT_SUPPORTED
+        if (!is_open()) return -1;
+        if (!fd_out) return -EINVAL;
+        gpu_mem_pool_export_args args = {};
+        args.pool_handle = pool_handle;
+        args.handle_type = handle_type;
+        args.flags = flags;
+        if (ioctl(fd_, GPU_IOCTL_MEM_POOL_EXPORT, &args) < 0) {
+            std::cerr << "GpuDriverClient: GPU_IOCTL_MEM_POOL_EXPORT failed"
+                      << " (errno=" << errno << ")\n";
+            return -1;
+        }
+        *fd_out = static_cast<int>(args.fd_out);
+        return 0;
     }
 
 private:

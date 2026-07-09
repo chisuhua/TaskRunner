@@ -1,0 +1,34 @@
+schema: spec-driven
+created: 2026-07-09
+name: l1-l2-bridge-e2e-test-skeleton
+status: PROPOSED
+scope: [umd-evolution, test-fixture]
+goal: Provide a skeleton E2E test in tests/umd/ that exercises cuGraphLaunch + cuStreamSynchronize via real GpuDriverClient (not MockGpuDriver). This is the bridge between L1 (UMD shim) and L2 (real plugin IOCTL). The skeleton compiles, defines the RealGpuFixture, and ships a placeholder test; full real test code lives in UsrLinuxEmu side.
+follows: g-gpu-client-default-stub-init, umd-evolution-build-default-on
+blocks:
+  - umd-evolution-acceptance-promotion-adr
+baseline:
+  L1↔L2 bridge test: NONE
+  coverage gap: cuStreamSynchronize in shim + real GpuDriverClient + real plugin never tested together
+target:
+  RealGpuFixture class: defined with plugin-load + /dev/gpgpu0-open stubs
+  test_cu_graph_e2e_standalone: compiles in umd-evolution mode
+  placeholder test: 1 case that compiles and runs (SKIP if /dev/gpgpu0 unavailable)
+  forward-compat: UsrLinuxEmu side can fill in real assertions without further TaskRunner changes
+non_goals:
+  - Implementing the full real test (lives in UsrLinuxEmu tests/test_cu_graph_e2e_standalone.cpp)
+  - Replacing the existing L1 (mock) test_cu_graph.cpp 32/32 tests
+  - Building a real device file infrastructure (that's UsrLinuxEmu VFS work)
+risk_level: medium
+cross_repo:
+  - UsrLinuxEmu follow-up required (real test code in UsrLinuxEmu/tests/test_cu_graph_e2e_standalone.cpp)
+  - No submodule pointer bump from this change (TaskRunner-side skeleton only)
+estimated_loc_change: ~80-150 lines in tests/umd/test_cu_graph_e2e_standalone.cpp (new) + ~5 lines in CMakeLists.txt
+acceptance:
+  - tests/umd/test_cu_graph_e2e_standalone.cpp exists and compiles
+  - RealGpuFixture is defined with clear contract: setup/teardown for plugin + GpuDriverClient
+  - At least 1 placeholder TEST_CASE that exercises cuGraphLaunch via real GpuDriverClient
+  - Placeholder test gracefully SKIPs when /dev/gpgpu0 is not available
+  - Existing 318 tests still pass (no regression in L1 or test-fixture)
+  - CMake target registered in cmake/UMDEvolution.cmake
+  - docs-audit.sh passes (no new SCOPE/STATUS violations)

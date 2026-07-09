@@ -225,6 +225,7 @@ public:
     // ============================================================
     int wait_fence(uint64_t fence_id, uint32_t timeout_ms, uint32_t* status_out) override {
         record("wait_fence", {fence_id, timeout_ms});
+        last_wait_fence_id_ = fence_id;
         if (injected_errors_["wait_fence"]) return -1;
         if (status_out) *status_out = 1;
         return canned_int("wait_fence", 0);
@@ -296,8 +297,12 @@ public:
         record("submit_graph", {graph_exec_handle, stream_id});
         if (injected_errors_["submit_graph"]) return -1;
         int64_t canned = static_cast<int64_t>(canned_u64("submit_graph", 0));
-        if (canned != 0) return canned;
-        return static_cast<int64_t>((1ull << 32) + next_fence_id_.fetch_add(1, std::memory_order_relaxed));
+        int64_t ret = (canned != 0) ? canned
+            : static_cast<int64_t>((1ull << 32) + next_fence_id_.fetch_add(1, std::memory_order_relaxed));
+        last_submit_graph_fence_  = ret;
+        last_submit_graph_exec_   = graph_exec_handle;
+        last_submit_graph_stream_ = stream_id;
+        return ret;
     }
 
     // ============================================================
@@ -365,6 +370,19 @@ public:
 
     size_t total_calls() const { return history_.size(); }
 
+    // Phase 4: fence + submit_graph parameter tracking getters
+    int64_t  get_last_submit_graph_fence()   const { return last_submit_graph_fence_; }
+    uint64_t get_last_submit_graph_exec()    const { return last_submit_graph_exec_; }
+    uint32_t get_last_submit_graph_stream()  const { return last_submit_graph_stream_; }
+    uint64_t get_last_wait_fence_id()        const { return last_wait_fence_id_; }
+    size_t   get_wait_fence_call_count()     const { return call_count("wait_fence"); }
+    void     reset_fence_tracking() {
+        last_submit_graph_fence_  = -1;
+        last_submit_graph_exec_   = 0;
+        last_submit_graph_stream_ = 0;
+        last_wait_fence_id_       = 0;
+    }
+
 private:
     void record(const std::string& method,
                 const std::vector<uint64_t>& args = {}) const {
@@ -414,6 +432,12 @@ private:
     mutable std::atomic<uint64_t> next_handle_{1};
     mutable std::atomic<uint64_t> next_fence_id_{1};
     uint64_t current_va_space_handle_{0};
+
+    // Phase 4 coverage: fence + submit_graph param tracking
+    mutable int64_t  last_submit_graph_fence_{-1};
+    mutable uint64_t last_submit_graph_exec_{0};
+    mutable uint32_t last_submit_graph_stream_{0};
+    mutable uint64_t last_wait_fence_id_{0};
 
     // H-3.5: state tracking for lifecycle methods + guards
     bool is_open_{false};

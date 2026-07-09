@@ -22,6 +22,9 @@
 // Phase 4 (M2): expose g_gpu_client global + IGpuDriver interface
 #include "test_fixture/gpu_driver_client.h"
 
+// Phase 4: stream fence registry for cuStreamSynchronize bridge
+#include "stream_fence_registry.hpp"
+
 #include <atomic>
 #include <cstdint>
 #include <iostream>
@@ -145,6 +148,8 @@ extern "C" CUresult cuGraphLaunch(CUgraphExec hGraphExec, CUstream hStream) {
     std::lock_guard<std::mutex> lock(async_task::umd::shim::g_launches.mu);
     async_task::umd::shim::g_launches.fence_ids[hGraphExec] = fence;
   }
+  // Phase 4: record fence for cuStreamSynchronize stream-lookup
+  async_task::umd::shim::record_stream_fence(hStream, static_cast<uint64_t>(fence));
   return CUDA_SUCCESS;
 }
 

@@ -1,0 +1,28 @@
+schema: spec-driven
+created: 2026-07-09
+name: test-cu-graph-coverage-fixes
+status: PROPOSED
+scope: [umd-evolution, test-fixture]
+goal: Close 3 critical cuGraph coverage gaps (cuStreamSynchronize no-op fix, F-4 sim fence range assertion, sync-plan documentation drift) without modifying the shared IGpuDriver interface.
+follow_up_to: UsrLinuxEmu/phase4-sim-graph-launch-real-impl
+baseline:
+  test_cu_graph: 30/30 PASS
+  test_cu_graph_real: null  # binary does not exist in cmake/UMDEvolution.cmake; was a false reference at sync-plan.md:244
+target:
+  test_cu_graph: 32/32 PASS
+changes:
+  - 2 existing TEST_CASE enhanced (F-4 assertion + submit_graph param verification)
+  - 2 new TEST_CASE added (async lifecycle E2E + wait_fence error propagation)
+non_goals:
+  - Adding new virtual methods to IGpuDriver
+  - Modifying include/shared/
+  - Adding cuda_graph_* CLI commands
+  - Modifying UsrLinuxEmu production code
+out_of_scope_files:
+  - include/shared/igpu_driver.hpp  # reused, not modified
+  - UsrLinuxEmu/**  # cross-repo coordination only, no code
+risk_level: medium  # post-Metis/Oracle review (downgraded from initial HIGH)
+cross_repo:
+  - TaskRunner self: commit + push origin main
+  - UsrLinuxEmu: bump external/TaskRunner submodule pointer
+  - UsrLinuxEmu: open tracking issue (notification only)

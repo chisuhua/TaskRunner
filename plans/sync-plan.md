@@ -238,11 +238,10 @@ caller:                          driver:
 | test_cuda_shim | ✅ 103/103 | Phase 1.7 (commit defd272) |
 | test_cuda_runtime_api | ✅ 8/8 | Phase 1 CudaRuntimeApi |
 | test_cu_stream_capture | ✅ 30/30 | Phase 3.1 (Step 3) NEW |
-| test_cu_graph | ✅ 25/25 | Phase 3.1 (Step 3) NEW |
+| test_cu_graph | ✅ 30/30 (本 change 后 32/32) | Phase 3.1 (Step 3) + Phase 4 cuGraph |
 | test_cu_mem_pool | ✅ 28/28 | Phase 3.2 (Step 3) NEW |
 | test_cu_mem_pool_export | ✅ 13/13 | Phase 4 (real-impl-bridge) NEW |
-| test_cu_graph_real | ✅ 32/32 | Phase 4 (cuGraphLaunch REAL bridge) NEW |
-| **总计** | **270/270** | **+45 new + 225 baseline, 0 failures** |
+| **总计** | **245/245** | **-32(虚假 test_cu_graph_real) + 7(test_cu_graph 25→32)** |
 | UsrLinuxEmu docs-audit | ✅ 53/53 | pre-commit hook (Phase 1.7 后) |
 
 ### 5.3 下一波 change 候选

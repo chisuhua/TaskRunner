@@ -6,6 +6,10 @@
 
 #include <cuda.h>
 
+// Phase 4: cuStreamSynchronize uses g_gpu_client->wait_fence + stream fence registry
+#include "test_fixture/gpu_driver_client.h"
+#include "stream_fence_registry.hpp"
+
 #include <atomic>
 #include <cstdint>
 #include <mutex>
@@ -44,8 +48,18 @@ extern "C" CUresult cuStreamDestroy(CUstream hStream) {
 }
 
 extern "C" CUresult cuStreamSynchronize(CUstream hStream) {
-  (void)hStream;
-  return CUDA_SUCCESS;
+  // 先查 fence：无 pending fence → SUCCESS（向后兼容无 driver、无 graph launch 场景）
+  uint64_t fence_id = async_task::umd::shim::get_stream_last_fence(hStream);
+  if (fence_id == 0) return CUDA_SUCCESS;
+  // 有 pending fence 但无 driver → 无法等待，报错
+  auto* driver = async_task::gpu::g_gpu_client;
+  if (!driver) return CUDA_ERROR_NOT_INITIALIZED;
+  uint32_t status = 0;
+  int ret = driver->wait_fence(fence_id, 0, &status);
+  if (ret != 0)    return CUDA_ERROR_UNKNOWN;
+  if (status == 1) return CUDA_SUCCESS;
+  if (status == static_cast<uint32_t>(-1)) return CUDA_ERROR_UNKNOWN;
+  return CUDA_ERROR_UNKNOWN;
 }
 
 extern "C" CUresult cuStreamQuery(CUstream hStream) {
@@ -142,3 +156,31 @@ extern "C" CUresult cuStreamGetCaptureInfo(CUstream hStream,
   }
   return ret;
 }
+
+// ---------------------------------------------------------------------------
+// Phase 4: stream fence registry — bridges cu_graph.cpp → cuStreamSynchronize
+// ---------------------------------------------------------------------------
+
+namespace async_task::umd::shim {
+namespace {
+
+struct StreamFenceRegistry {
+  std::unordered_map<CUstream, uint64_t> last_fence;
+  std::mutex mu;
+};
+StreamFenceRegistry g_stream_fences;
+
+}  // namespace
+
+void record_stream_fence(void* stream, uint64_t fence_id) {
+  std::lock_guard<std::mutex> lock(g_stream_fences.mu);
+  g_stream_fences.last_fence[stream] = fence_id;
+}
+
+uint64_t get_stream_last_fence(void* stream) {
+  std::lock_guard<std::mutex> lock(g_stream_fences.mu);
+  auto it = g_stream_fences.last_fence.find(stream);
+  return (it != g_stream_fences.last_fence.end()) ? it->second : 0;
+}
+
+}  // namespace async_task::umd::shim

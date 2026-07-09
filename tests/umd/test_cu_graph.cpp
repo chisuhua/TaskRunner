@@ -296,6 +296,9 @@ TEST_CASE("cu_graph: Launch with mock driver calls submit_graph once") {
   REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
   CHECK(cuGraphLaunch(exec, nullptr) == CUDA_SUCCESS);
   CHECK(g_mock.call_count("submit_graph") == 1);
+  // Phase 4: parameter verification
+  CHECK(g_mock.get_last_submit_graph_exec() == reinterpret_cast<uint64_t>(exec));
+  CHECK(g_mock.get_last_submit_graph_stream() == 0u);  // CU_STREAM_LEGACY
   cuGraphExecDestroy(exec);
   cuGraphDestroy(g);
   g_gpu_client = nullptr;
@@ -336,6 +339,9 @@ TEST_CASE("cu_graph: Launch records fence_id to LaunchTrace") {
   REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
   CHECK(cuGraphLaunch(exec, nullptr) == CUDA_SUCCESS);
   CHECK(g_mock.call_count("submit_graph") == 1);
+  // F-4 contract: sim fence_id >= 1<<32
+  int64_t fence = g_mock.get_last_submit_graph_fence();
+  CHECK(fence >= static_cast<int64_t>(1ull << 32));
   cuGraphExecDestroy(exec);
   cuGraphDestroy(g);
   g_gpu_client = nullptr;
@@ -360,5 +366,42 @@ TEST_CASE("cu_graph: Launch with NULL exec returns INVALID_VALUE before driver c
   g_mock.clear_history();
   CHECK(cuGraphLaunch(nullptr, nullptr) == CUDA_ERROR_INVALID_VALUE);
   CHECK(g_mock.call_count("submit_graph") == 0);
+  g_gpu_client = nullptr;
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4: async fence lifecycle (E2E) + error propagation
+// ---------------------------------------------------------------------------
+
+TEST_CASE("cu_graph: Launch + cuStreamSynchronize polls fence") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();  g_mock.reset_fence_tracking();
+  CUstream stream;
+  REQUIRE(cuStreamCreate(&stream, 0) == CUDA_SUCCESS);
+  CUgraph g;  CUgraphExec exec;
+  REQUIRE(cuGraphCreate(&g, 0) == CUDA_SUCCESS);
+  REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
+  REQUIRE(cuGraphLaunch(exec, stream) == CUDA_SUCCESS);
+  int64_t fence = g_mock.get_last_submit_graph_fence();
+  REQUIRE(fence >= static_cast<int64_t>(1ull << 32));
+  CHECK(cuStreamSynchronize(stream) == CUDA_SUCCESS);
+  CHECK(g_mock.get_wait_fence_call_count() == 1);
+  CHECK(g_mock.get_last_wait_fence_id() == static_cast<uint64_t>(fence));
+  cuStreamDestroy(stream);  cuGraphExecDestroy(exec);  cuGraphDestroy(g);
+  g_gpu_client = nullptr;
+}
+
+TEST_CASE("cu_graph: cuStreamSynchronize error propagation") {
+  g_gpu_client = &g_mock;
+  g_mock.clear_history();  g_mock.reset_fence_tracking();
+  g_mock.set_canned_return("wait_fence", 1);   // 非 0 = 失败
+  CUstream stream;  REQUIRE(cuStreamCreate(&stream, 0) == CUDA_SUCCESS);
+  CUgraph g;  CUgraphExec exec;
+  REQUIRE(cuGraphCreate(&g, 0) == CUDA_SUCCESS);
+  REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
+  REQUIRE(cuGraphLaunch(exec, stream) == CUDA_SUCCESS);
+  CHECK(cuStreamSynchronize(stream) == CUDA_ERROR_UNKNOWN);
+  g_mock.set_canned_return("wait_fence", 0);   // 恢复默认
+  cuStreamDestroy(stream);  cuGraphExecDestroy(exec);  cuGraphDestroy(g);
   g_gpu_client = nullptr;
 }

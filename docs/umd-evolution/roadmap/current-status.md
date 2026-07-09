@@ -1,13 +1,14 @@
 ---
 SCOPE: UMD-EVOLUTION
 STATUS: ACTIVE
-LAST_UPDATED: 2026-07-08
-HEAD_COMMIT: 498265c (TaskRunner) + 7c274ab (UsrLinuxEmu submodule bump)
-TESTS: 318 total (8 scheduler + 11 architecture + 12 phase2 + 8 runtime_api + 103 shim + 30 stream_capture + 25 graph + 36 mem_pool + 32 graph_real + 13 mem_pool_export + 23 event_timing + 25 texture_surface - 10 dup)
+LAST_UPDATED: 2026-07-09
+HEAD_COMMIT: e3cc24b (TaskRunner) + 4252c0f (UsrLinuxEmu submodule bump)
+TESTS: 318 total (per-suite breakdown unchanged from 2026-07-08)
 AUDIT: docs-audit 53/54 PASS + 1 FAIL (false-positive on cuFunc* promotion — see §Known Issues)
+PROMOTION-TO-ACCEPTED: 4 PROPOSED changes + 1 cross-repo follow-up + 1 time-based window (see §"Forward Roadmap")
 ---
 
-# Current Status (2026-07-08)
+# Current Status (2026-07-09)
 
 ## TL;DR
 
@@ -231,3 +232,81 @@ If something is broken:
 3. **Phase 3.3b** Texture/Surface (2 w, no backend deps)
 4. **跨仓协调**: Phase 3.1 Stream/MemPool 需要 UsrLinuxEmu sim 原语
 5. **roadmap 治理**: Phase 3 启动后将 `phase-3-deferred.md` 改为 `phase-3-active.md`
+
+## Forward Roadmap: UMD-EVOLUTION → ACCEPTED Promotion
+
+`docs/umd-evolution/README.md` STATUS: PROPOSED with the hard rule:
+
+> `STATUS: ACCEPTED` is FORBIDDEN for unimplemented features.
+
+The scope can be promoted to ACCEPTED when **5 entry conditions** are met. This section tracks the 4 dedicated openspec changes + the time-based CI stability window.
+
+### Promotion Checklist (5 entries)
+
+| # | Entry condition | Change | Status (2026-07-09) |
+|---|----------------|--------|---------------------|
+| 1 | `umd-evolution-build-default-on` (UMD code default-on, build-mode gate released) | `openspec/changes/umd-evolution-build-default-on/` | 📋 **PROPOSED** (commit `7515b26`) |
+| 2 | `g-gpu-client-default-stub-init` (shim works without explicit setup) | `openspec/changes/g-gpu-client-default-stub-init/` | 📋 **PROPOSED** (commit `ac8129e`) |
+| 3 | `l1-l2-bridge-e2e-test-skeleton` (E2E test via real GpuDriverClient + real plugin) | `openspec/changes/l1-l2-bridge-e2e-test-skeleton/` | 📋 **PROPOSED** (commit `c9c5505`) |
+| 3b | UsrLinuxEmu 端实装真实 L1↔L2 test (cross-repo follow-up to entry 3) | (UsrLinuxEmu repo) | ⏳ **PENDING** (TaskRunner skeleton shipped, real test in UsrLinuxEmu) |
+| 4 | 1-2 w CI stability window (no SIGSEGV / sanitizer failure from #1-#3) | (time-based) | ⏰ **PENDING** (starts after #3 merged) |
+| 5 | Dual sign-off (TaskRunner owner + UsrLinuxEmu owner) + TADR-401 + STATUS field change | `openspec/changes/umd-evolution-acceptance-promotion-adr/` | 📋 **PROPOSED** (commit `e3cc24b`) |
+| 5b | Cross-repo mirror: add `tadr-401` to `UsrLinuxEmu/docs/00_adr/README.md` table | (UsrLinuxEmu repo, at actual promotion) | ⏳ **PENDING** |
+
+### Dependency Graph
+
+```
+[1] build-default-on      ──┐
+[2] g-gpu-client default  ──┤
+                             ├──→ [3] l1-l2-bridge skeleton (TaskRunner)
+                             │         │
+                             │         └──→ [3b] UsrLinuxEmu 端实装真实 L1↔L2 test
+                             │                       │
+                             │                       └──→ ⏰ 1-2 w CI stability [#4]
+                             │                                              │
+                             │                                              ▼
+                             └────────────────────────→ [5] TADR-401 + dual sign-off
+                                                                                  │
+                                                                                  ▼
+                                                                       🏁 STATUS: ACCEPTED
+                                                                       + [5b] UsrLinuxEmu mirror
+```
+
+### How to Update This Section (per change merge)
+
+After each entry is completed, update the status cell:
+
+| Status | Meaning |
+|--------|---------|
+| 📋 **PROPOSED** | Skeleton committed; awaiting implementation |
+| 🔨 **IN PROGRESS** | Implementation started (PR opened) |
+| ✅ **MERGED** | Change merged to TaskRunner `main` |
+| ⏰ **PENDING** | Not yet started; depends on others or time |
+| 🏁 **DONE** | Final step (STATUS change, mirror entry) |
+
+When updating, append the merge commit SHA and date: `✅ MERGED <short-sha> (<YYYY-MM-DD>)`.
+
+### Estimated Timeline
+
+Assuming 1 week per "step" with no blockers:
+
+| Step | Effort | Calendar |
+|------|--------|----------|
+| Change 1 (build-default-on) | 0.5-1 d | Week 1 |
+| Change 2 (g-gpu-client default) | 0.5 d | Week 1 |
+| Change 3 (L1↔L2 bridge skeleton) | 1-2 d | Week 2 |
+| UsrLinuxEmu 端真实 L1↔L2 test | 1-2 d | Week 2-3 (cross-repo) |
+| CI stability window | 1-2 w | Week 3-5 |
+| Change 5 (TADR-401 + dual sign-off) | 0.5 d + coordination | Week 5-6 |
+| STATUS field change + mirror | 0.5 d | Week 6 |
+
+**Total**: ~6 weeks from 2026-07-09 to UMD-EVOLUTION → ACCEPTED.
+
+### Post-Completion State
+
+When all 7 checklist items are DONE:
+- `docs/umd-evolution/README.md` STATUS: PROPOSED → **ACCEPTED**
+- `UsrLinuxEmu/docs/00_adr/README.md` mirror table has `tadr-401 | promote-umd-evolution-to-accepted | ACCEPTED | ...`
+- AGENTS.md H-5 3-scope rules no longer require build-mode gate for UMD code
+- New cu* APIs added to UMD are no longer "experimental vision" but production code
+- L1↔L2 bridge test is the regression gate for future UMD changes

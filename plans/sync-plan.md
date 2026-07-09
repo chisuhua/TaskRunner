@@ -257,6 +257,8 @@ caller:                          driver:
 | **Phase 4 real-impl-bridge** | shim bridge 5 cu* APIs to GpuDriverClient IOCTLs | ✅ 完成 (2026-07-07, PR #8 @ fbcbe44, 270/270 tests, +1 IGpuDriver method = 47) | TADR-301/305 | Done |
 | **Phase 1.7 test coverage** | (superseded by Phase 3.1+3.2+4) | ✅ Done 2026-07-08 | — | Done |
 | **Phase 3.3 Event+Texture** | Frontend-only (cuEvent + cuTexRef) | ✅ Done 2026-07-08 (5 commits @ 498265c, 318/318 tests, +48 new) | TADR-301 | Done |
+| **mem-pool-async-fence-coverage** (follow-up) | test_gpu_plugin.cpp MEM_POOL_ALLOC_ASYNC/FREE_ASYNC 加 GPU_IOCTL_WAIT_FENCE 验证 signaled | ✅ Done 2026-07-09 (UsrLinuxEmu commit `a035e7b`, 86/86 ctest pass) | ADR-040 | Done |
+| **L1↔L2 cross-bridge E2E** (`cuStreamSynchronize` 经真实 `GpuDriverClient`) | 跨 L1（UMD shim）+ L2（plugin IOCTL）测试 gap | 2-3 w | TADR-301/305 | 📋 **UMD-EVOLUTION → ACCEPTED 阶段前置**，需要先做 §6.1-6.3 准入工作 |
 
 ### 5.4 Phase 3 跨仓协调时间线
 

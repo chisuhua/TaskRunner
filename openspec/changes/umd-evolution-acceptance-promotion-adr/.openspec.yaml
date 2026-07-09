@@ -1,0 +1,36 @@
+schema: spec-driven
+created: 2026-07-09
+name: umd-evolution-acceptance-promotion-adr
+status: PROPOSED
+scope: [umd-evolution, shared]
+goal: Document the UMD-EVOLUTION → ACCEPTED promotion criteria as an ADR. The ADR is the governance gate that promotes umd-evolution from PROPOSED (vision-only, build-mode-gated) to ACCEPTED (default-on, cross L1↔L2 verified, stable in CI). Includes a checklist of prerequisites and the cross-repo mirror requirement.
+follows:
+  - umd-evolution-build-default-on
+  - g-gpu-client-default-stub-init
+  - l1-l2-bridge-e2e-test-skeleton
+  - 1-2 w CI stability window post-skeleton
+blocks: []
+baseline:
+  docs/umd-evolution/README.md STATUS: PROPOSED
+  docs/umd-evolution/roadmap/README.md STATUS: ACTIVE
+  docs/00_adr/README.md mirror table: does not include TADR for promotion yet
+target:
+  ADR-NNN document: exists in docs/umd-evolution/adr/ in PROPOSED state
+  Promotion checklist: covers all 5 entry conditions
+  Cross-repo mirror: noted as required (mirror entry in UsrLinuxEmu docs/00_adr/README.md)
+  STATUS field change: documented as a manual step after checklist completion (NOT done in this change)
+non_goals:
+  - Actually changing STATUS to ACCEPTED (only document the criteria)
+  - Implementing any of the prerequisite changes
+  - Forcing 1-2 w CI stability window (this change proposes criteria, not enforces time)
+risk_level: low
+cross_repo:
+  - UsrLinuxEmu mirror entry required (UsrLinuxEmu/docs/00_adr/README.md update) at actual promotion time
+  - Coordination with UsrLinuxEmu owner for dual sign-off (per AGENTS.md H-5 3-scope: shared requires dual review)
+estimated_loc_change: ~80-150 lines in new ADR document
+acceptance:
+  - ADR-NNN exists with: Context, Status (initial), Decision, Consequences, Promotion Checklist sections
+  - Checklist covers all 5 entry conditions: build-default-on, g-gpu-client default, L1↔L2 bridge, 1-2 w stability, dual reviewer sign-off
+  - Cross-repo mirror requirement is explicit (UsrLinuxEmu docs/00_adr/README.md must be updated at actual promotion)
+  - STATUS field in docs/umd-evolution/README.md is NOT changed by this change (only the criteria document exists)
+  - ADR links to all 3 prerequisite openspec changes in TaskRunner

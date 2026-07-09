@@ -1,11 +1,40 @@
 ---
 SCOPE: UMD-EVOLUTION
 STATUS: ACTIVE
-LAST_UPDATED: 2026-07-05
-HEAD_COMMIT: ba16139
-TESTS: 142 total (8 scheduler + 11 architecture + 12 phase2 + 8 runtime_api + 103 shim)
+LAST_UPDATED: 2026-07-08
+HEAD_COMMIT: 498265c (TaskRunner) + 7c274ab (UsrLinuxEmu submodule bump)
+TESTS: 318 total (8 scheduler + 11 architecture + 12 phase2 + 8 runtime_api + 103 shim + 30 stream_capture + 25 graph + 36 mem_pool + 32 graph_real + 13 mem_pool_export + 23 event_timing + 25 texture_surface - 10 dup)
 AUDIT: docs-audit 53/54 PASS + 1 FAIL (false-positive on cuFunc* promotion — see §Known Issues)
 ---
+
+# Current Status (2026-07-08)
+
+## TL;DR
+
+UMD-EVOLUTION redesign complete through **Phase 3.3** (Event timing + Texture/Surface).
+**Phase 3.1+3.2** (Stream async + Memory pool) and **Phase 4** (real-impl-bridge) all completed.
+
+下一步候选 (从 sync-plan.md §5.3 + UsrLinuxEmu 端 openspec):
+- **UsrLinuxEmu 端 8 active openspec** (Stage 3.2 hotpath, Stage 3.2 perf, Phase 4 cu-mempool-alloc-real-va, 等)
+- **Stage 3 v1.0 (Issue #24)**: 3.1 CI 全平台 ✅(ubuntu-22.04), 3.3 错误处理 ✅(PR #26+28), 3.2 性能待办
+- **KFD multi-file integration** (1-3 月 sub-project)
+
+For continuation, see phase-specific roadmap files:
+- [`phase-1-6-7-extensions-complete.md`](phase-1-6-7-extensions-complete.md) — Phase 1.5/1.6/1.7 follow-ups
+- [`phase-2-complete.md`](phase-2-complete.md) — Phase 2 baseline (79 cu\* symbols, 37 tests)
+- [`phase-3-3-complete.md`](phase-3-3-complete.md) — **Phase 3.3 (Event timing + Texture/Surface) complete**
+- [`phase-3-deferred.md`](phase-3-deferred.md) — historical deferred status (superseded by ACTIVE prep notes)
+- [`../../superpowers/plans/2026-07-02-phase3-prep-design-notes.md`](../../superpowers/plans/2026-07-02-phase3-prep-design-notes.md) — Phase 3 design (ACTIVE)
+- [`../../superpowers/plans/2026-07-05-umd-phase3.3-event-texture.md`](../../superpowers/plans/2026-07-05-umd-phase3.3-event-texture.md) — Phase 3.3 plan (ACCEPTED 2026-07-08)
+
+## Branch & Commit State
+
+```
+TaskRunner:  main @ 498265c (Phase 3.3 merge) + 5d95005 (archive) + 6e8c810 (sync-plan v2.4.2) + 21bd415 (stub-table sync) + 8c1d7ba (CudaScheduler leak fix) + 28f1790 (sanitizer options)
+UsrLinuxEmu: main @ 7c274ab (submodule bump 5d95005)
+```
+
+## Test Status (10 binaries, 318 cases)
 
 # Current Status (2026-07-05)
 

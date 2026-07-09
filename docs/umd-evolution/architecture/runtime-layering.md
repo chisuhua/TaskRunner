@@ -1,12 +1,14 @@
 ---
 SCOPE: UMD-EVOLUTION
 STATUS: ACCEPTED
-DATE: 2026-06-30
+DATE: 2026-07-08 (last updated for Phase 3.3)
+ORIGINAL_DATE: 2026-06-30
 RELATED_DESIGN: ../../superpowers/specs/2026-06-30-umd-evolution-redesign.md
 RELATED_ADR: ../adr/tadr-201, ../adr/tadr-202, ../adr/tadr-203
+RELATED_PLAN: ../../superpowers/plans/2026-07-05-umd-phase3.3-event-texture.md
 ---
 
-# Runtime Layering Design (Phase 1 + Phase 2)
+# Runtime Layering Design (Phase 1 + Phase 2 + Phase 3.3)
 
 ## Rationale (per Oracle architectural review 2026-06-30)
 
@@ -193,3 +195,61 @@ All Phase 2 prerequisites met:
 5. **CLI scheduler is standalone**: `cmd_cuda.cpp` creates its own CudaStub + CudaScheduler (not via TaskRunner::getScheduler()) to avoid doctest.h dependency.
 
 These limitations are intentional per Phase 1 scope; documented in design spec §Known Limitations (Phase 1).
+
+## Phase 3.3 Extension (Status: ✅ Implemented, 2026-07-08)
+
+Phase 3.3 extends the shim with **Event timing precision** (3.3a) and **Texture/Surface frontend** (3.3b) — both frontend-only, no UsrLinuxEmu backend dependency.
+
+### 3.3a — Event Timing Precision
+
+**Files**: `src/umd/libcuda_shim/cu_event.cpp` (refactored to use `EventRecord` struct)
+
+- `cuEventCreate` rejects reserved flag bits (`CU_EVENT_DEFAULT`/`BLOCKING_SYNC`/`DISABLE_TIMING`/`INTERPROCESS` per CUDA 12.x spec)
+- `cuEventCreateWithFlags` delegates to `cuEventCreate` with proper flag pass-through
+- `cuEventRecord` writes `recorded_at` (NOT overwrites `created_at` — Phase 2 PoC bug fix)
+- `cuEventElapsedTime` strict semantics: unrecorded events return `CUDA_ERROR_NOT_PERMITTED` (CUDA 12.x spec)
+- All accessors check `is_destroyed` flag → return `CUDA_ERROR_INVALID_HANDLE` for double-destroy
+- `cuEventQuery` / `cuEventSynchronize` remain no-op (CudaStub synchronous)
+
+### 3.3b — Texture/Surface Frontend
+
+**Files**: `src/umd/libcuda_shim/cu_array.cpp` (NEW) + `cu_texref.cpp` (NEW)
+
+11 STUB → REAL_IMPL:
+- `cuArrayCreate` — `ArrayDescriptor` + virtual backing memory
+- `cuArrayGetDescriptor` — returns creation-time descriptor (Width/Height/Format/NumChannels)
+- `cuArrayDestroy` — erases + marks destroyed
+- `cuTexRefCreate` / `cuTexRefDestroy` — handle alloc + cleanup
+- `cuTexRefSetArray` — binds CUarray to texref
+- `cuTexRefSetAddress` — binds BO + offset
+- `cuTexRefSetFormat` / `cuTexRefSetFlags` — set format descriptor / flags
+- `cuTexRefGetAddress` / `cuTexRefGetArray` — return bound handles
+
+**Not implemented** (deferred):
+- `cuTexRefSetAddress2D` (3D addressing, complex)
+- `cuTexRefSetBorderColor` / `cuTexRefSetFilterMode` (CUDA Runtime API)
+- `cuArray3DCreate` (3D arrays)
+- `cuSurfRef*` (surface references, not in scope)
+- Real GPU sampling (requires D-3 ELF parsing)
+
+### Phase 3.3 Verification
+
+- **Commits**: 5 atomic (A.1 + A.2+A.3+A.4 + A.5 + B.1+B.2+B.3 + B.4)
+- **Tests**: 48 new (23 event timing + 25 texture/surface)
+- **Total tests**: 270 → 318 (+48, 0 regression)
+- **REAL_IMPL**: 113 → 123 (+10 documented; actual REAL_IMPL including Phase 4 bridge is 125)
+- **STUB**: 45 → 37 (-8)
+- **merged to main**: commit `498265c`
+- **openspec archive**: `archive/2026-07-08-phase3-3-event-texture-impl/`
+
+### Phase 3.3 Known Limitations (Phase 3.3 scope)
+
+1. **Texture 3D addressing not supported**: `cuTexRefSetAddress2D` returns `CUDA_ERROR_NOT_IMPLEMENTED`.
+2. **Surface references not supported**: `cuSurfRefCreate/Destroy/SetFormat` all return `CUDA_ERROR_NOT_IMPLEMENTED`.
+3. **3D arrays not supported**: `cuArray3DCreate` returns `CUDA_ERROR_NOT_IMPLEMENTED`.
+4. **Real GPU sampling not supported**: shim only manages texture metadata, no actual GPU texture sampler logic.
+5. **No 2D format / mipmap support**: only basic 1D/2D arrays with `CUarray_format` enum.
+6. **Single-context textures**: texture references are not bound to specific contexts.
+
+These limitations are intentional per Phase 3.3 scope (frontend state machine only, no GPU execution).
+

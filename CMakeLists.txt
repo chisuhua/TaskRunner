@@ -5,6 +5,40 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# Sanitizer options (mutually exclusive: ASan vs TSan).
+# CI workflow consumes these via -DSANITIZER_ADDRESS=ON etc.
+# ASan + UBSan can be combined; TSan must be standalone.
+option(SANITIZER_ADDRESS "Enable AddressSanitizer (ASan)" OFF)
+option(SANITIZER_UNDEFINED "Enable UndefinedBehaviorSanitizer (UBSan)" OFF)
+option(SANITIZER_THREAD "Enable ThreadSanitizer (TSan)" OFF)
+
+if(SANITIZER_ADDRESS AND SANITIZER_THREAD)
+    message(FATAL_ERROR
+        "ASan (SANITIZER_ADDRESS) and TSan (SANITIZER_THREAD) cannot be "
+        "enabled simultaneously (LLVM limitation). Use them in separate "
+        "builds.")
+endif()
+
+if(SANITIZER_ADDRESS OR SANITIZER_UNDEFINED OR SANITIZER_THREAD)
+    message(STATUS "TaskRunner: sanitizer mode active "
+        "(ASan=${SANITIZER_ADDRESS} UBSan=${SANITIZER_UNDEFINED} TSan=${SANITIZER_THREAD})")
+endif()
+
+if(SANITIZER_ADDRESS)
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=address)
+endif()
+
+if(SANITIZER_UNDEFINED)
+    add_compile_options(-fsanitize=undefined -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=undefined)
+endif()
+
+if(SANITIZER_THREAD)
+    add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g)
+    add_link_options(-fsanitize=thread)
+endif()
+
 # Build mode option
 set(TASKRUNNER_BUILD_MODE "test-fixture" CACHE STRING
     "Build mode: test-fixture (default) | umd-evolution")

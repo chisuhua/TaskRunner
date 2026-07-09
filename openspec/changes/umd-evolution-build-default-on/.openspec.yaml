@@ -1,0 +1,33 @@
+schema: spec-driven
+created: 2026-07-09
+name: umd-evolution-build-default-on
+status: PROPOSED
+scope: [umd-evolution]
+goal: Release the TASKRUNNER_BUILD_MODE=umd-evolution build-mode gate so UMD shim code compiles by default. This is prerequisite entry 1/5 for UMD-EVOLUTION → ACCEPTED promotion.
+follows: roadmap/README.md §"Phase 3.1+3.2" (currently requires explicit build-mode toggle)
+blocks:
+  - l1-l2-bridge-e2e-test-skeleton
+  - umd-evolution-acceptance-promotion-adr
+baseline:
+  cmake default build: builds test-fixture only
+  umd-evolution build: builds test-fixture + umd (test 318/318)
+  test count: 318
+target:
+  cmake default build: builds test-fixture + umd
+  umd-evolution build: still works (kept for vision experimentation)
+  test count: 318 (no change in count; UMD is now default-on)
+non_goals:
+  - Removing the umd-evolution build mode entirely (kept as experimental escape hatch)
+  - Modifying UsrLinuxEmu side
+  - Adding new cu* APIs
+risk_level: low
+cross_repo:
+  - None (TaskRunner-only)
+  - No UsrLinuxEmu submodule bump required
+estimated_loc_change: ~10-20 lines in CMakeLists.txt + cmake/UMDEvolution.cmake
+acceptance:
+  - cmake -B build (no env var) compiles src/umd/libcuda_shim/*.cpp
+  - All 318 existing tests pass via ctest
+  - TASKRUNNER_BUILD_MODE=test-fixture still produces a working test-fixture-only build
+  - TASKRUNNER_BUILD_MODE=umd-evolution still works (no regression)
+  - docs-audit.sh passes

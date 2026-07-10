@@ -1,6 +1,10 @@
 # cmake/UMDEvolution.cmake
 # SCOPE: umd-evolution
-# umd-evolution scope：UMD stub skeleton (experimental, not for production)
+# UMD shim skeleton — built by default (since 2026-07-09; see
+# openspec/changes/umd-evolution-build-default-on which supersedes tadr-108).
+# "experimental" refers to FEATURE COMPLETENESS (see tadr-205 roadmap), NOT
+# to build-mode coupling. For pure CLI / test-fixture-only builds, use
+# TASKRUNNER_BUILD_MODE=test-fixture.
 #
 # Phase 1: depends on the test-fixture CudaScheduler (wrapped by CudaRuntimeApi).
 # Future phases will remove this dependency as the UMD gains self-contained dispatch.

@@ -1,10 +1,27 @@
 ---
 SCOPE: SHARED
-STATUS: ACCEPTED
+STATUS: SUPERSEDED
 DECISION_DATE: 2026-06-25
+SUPERSEDED_BY: openspec/changes/umd-evolution-build-default-on
+SUPERSEDED_DATE: 2026-07-09
 ---
 
 # ADR: Build Mode Selection (H-5)
+
+> ## ⚠️ SUPERSEDE NOTICE (2026-07-09)
+>
+> This ADR is **SUPERSEDED** by `openspec/changes/umd-evolution-build-default-on`.
+> The original decision ("default = test-fixture") is reversed: the new default
+> is **umd-evolution** (i.e., `cmake -B build` now builds the UMD shim and
+> tests/umd/ by default). `TASKRUNNER_BUILD_MODE=test-fixture` is preserved as
+> an explicit opt-out.
+>
+> **Underlying technical rationale remains valid** — the analysis of CMake
+> option design, opt-in/opt-out semantics, and shared-scope coupling in this
+> ADR still applies. Only the choice of which mode is the *default* is
+> reversed, driven by the UMD-EVOLUTION → ACCEPTED promotion track.
+>
+> See `openspec/changes/umd-evolution-build-default-on/` for full rationale.
 
 ## Context
 
@@ -14,19 +31,24 @@ H-5 引入三 scope 分离（test-fixture / shared / umd-evolution）。`umd-evo
 
 ## Decision
 
+> **STATUS: SUPERSEDED** (see top-of-file notice). The decision below is preserved
+> for historical reference; the **current behavior** is in
+> `openspec/changes/umd-evolution-build-default-on/`.
+
 `CMakeLists.txt` 暴露单一 CMake option `TASKRUNNER_BUILD_MODE`，二选一字符串：
 
 | 值 | 行为 | 默认 |
 |----|------|------|
-| `test-fixture` | 编译 `src/test_fixture/` + `include/test_fixture/` + `src/shared/` + `include/shared/` + `tests/test_fixture/` | ✅ 是 |
-| `umd-evolution` | 在 `test-fixture` 基础上**额外**编译 `src/umd/` + `include/umd/` + `tests/umd/`（opt-in） | ❌ 否 |
+| `test-fixture` | 编译 `src/test_fixture/` + `include/test_fixture/` + `src/shared/` + `include/shared/` + `tests/test_fixture/` | ✅ 是（变更前）/ ❌ opt-out（变更后） |
+| `umd-evolution` | 在 `test-fixture` 基础上**额外**编译 `src/umd/` + `include/umd/` + `tests/umd/` | ❌ 否（变更前）/ ✅ **默认**（变更后，2026-07-09 起） |
 
 **关键规则：**
 
-1. **default = `test-fixture`**：保证 `cmake -B build && cmake --build build` 不引入 umd-evolution 任何占位代码污染
-2. **explicit opt-in 语法**：`cmake -B build -DTASKRUNNER_BUILD_MODE=umd-evolution` 才编译 umd-evolution 骨架
-3. **shared-scope 始终编译**：与 `TASKRUNNER_BUILD_MODE` 无关（shared 是 test-fixture 和 umd-evolution 的共同依赖）
-4. **范围检查**：未知值必须 `FATAL_ERROR` 拒绝（如 `cmake -DTASKRUNNER_BUILD_MODE=foo` 应 fail）
+1. ~~**default = `test-fixture`**~~ → **default = `umd-evolution`**（2026-07-09 反转，见 openspec/changes/umd-evolution-build-default-on）
+2. `TASKRUNNER_BUILD_MODE=test-fixture` 是显式 opt-out，用于不需要 shim 的用户
+3. `TASKRUNNER_BUILD_MODE=umd-evolution` 现为默认的别名（保留向后兼容）
+4. **shared-scope 始终编译**：与 `TASKRUNNER_BUILD_MODE` 无关（shared 是 test-fixture 和 umd-evolution 的共同依赖）
+5. **范围检查**：未知值必须 `FATAL_ERROR` 拒绝（如 `cmake -DTASKRUNNER_BUILD_MODE=foo` 应 fail）
 
 **CMake 实现示意**（canonical 在 `CMakeLists.txt`）：
 

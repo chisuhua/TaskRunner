@@ -2,13 +2,14 @@
 # Workstream B.2: CI/Build Infrastructure for TaskRunner shim layer
 #
 # Jobs:
-#   1. build-and-test   — UMD-evolution mode, all test binaries via ctest
-#   2. docs-audit       — Run docs-audit.sh to validate H-5 3-scope structure
-#   3. sanitizer        — Matrix: ASan / UBSan / TSan (mutually exclusive, each single)
+#   1. build-and-test             — UMD-evolution mode, all test binaries via ctest
+#   2. default-mode-build-and-test — Same, but WITHOUT -DTASKRUNNER_BUILD_MODE (validates new default)
+#   3. docs-audit                 — Run docs-audit.sh to validate H-5 3-scope structure
+#   4. sanitizer                  — Matrix: ASan / UBSan / TSan (mutually exclusive, each single)
 #
 # Author: TaskRunner owner (Sisyphus-H5 session)
 # Created: 2026-07-03
-# Updated: 2026-07-07 — Fix CI symlink (UsrLinuxEmu: dangling symlink → fresh checkout)
+# Updated: 2026-07-09 — Add default-mode-build-and-test (TaskRunner CMake default = umd-evolution)
 #
 # CI symlink fix: TaskRunner root has a tracked `UsrLinuxEmu` symlink (mode 120000
 # blob) pointing to /workspace/project/UsrLinuxEmu — only valid on dev workstation.
@@ -47,6 +48,33 @@ jobs:
       - run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake g++
 
       - run: cmake -B "$BUILD_DIR" -DTASKRUNNER_BUILD_MODE=umd-evolution
+
+      - run: cmake --build "$BUILD_DIR" -j$(nproc)
+
+      - run: cd "$BUILD_DIR" && ctest --output-on-failure -j$(nproc)
+
+  default-mode-build-and-test:
+    runs-on: ubuntu-latest
+    env:
+      BUILD_DIR: ${{ github.workspace }}/build_default
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup UsrLinuxEmu symlink target (CI fix)
+        run: rm -f UsrLinuxEmu
+
+      - uses: actions/checkout@v4
+        with:
+          repository: chisuhua/UsrLinuxEmu
+          ref: main
+          path: UsrLinuxEmu
+
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq cmake g++
+
+      # NO -DTASKRUNNER_BUILD_MODE: must exercise the default code path
+      - run: cmake -B "$BUILD_DIR"
 
       - run: cmake --build "$BUILD_DIR" -j$(nproc)
 

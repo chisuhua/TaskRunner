@@ -40,8 +40,12 @@ if(SANITIZER_THREAD)
 endif()
 
 # Build mode option
-set(TASKRUNNER_BUILD_MODE "test-fixture" CACHE STRING
-    "Build mode: test-fixture (default) | umd-evolution")
+# Default changed from "test-fixture" to "umd-evolution" on 2026-07-09
+# (see openspec/changes/umd-evolution-build-default-on, supersedes tadr-108).
+# "test-fixture" remains as opt-out for users who want only the CLI + tests/test_fixture
+# without the LD_PRELOAD shim (libcuda_taskrunner.so) or tests/umd/.
+set(TASKRUNNER_BUILD_MODE "umd-evolution" CACHE STRING
+    "Build mode: umd-evolution (default, includes libcuda_shim + tests/umd) | test-fixture (opt-out)")
 set_property(CACHE TASKRUNNER_BUILD_MODE
     PROPERTY STRINGS "test-fixture" "umd-evolution")
 
@@ -66,11 +70,13 @@ endif()
 include(${CMAKE_SOURCE_DIR}/cmake/Shared.cmake)
 
 # Conditional scope builds
+# Default = umd-evolution (full UMD build). test-fixture is an explicit opt-out.
+# Note: UMDEvolution.cmake internally includes TestFixture.cmake — do NOT re-include.
 if(TASKRUNNER_BUILD_MODE STREQUAL "test-fixture")
-    message(STATUS "Building TaskRunner in TEST-FIXTURE mode (default)")
+    message(STATUS "Building TaskRunner in TEST-FIXTURE mode (opt-out; excludes libcuda_shim + tests/umd)")
     include(${CMAKE_SOURCE_DIR}/cmake/TestFixture.cmake)
 elseif(TASKRUNNER_BUILD_MODE STREQUAL "umd-evolution")
-    message(STATUS "Building TaskRunner in UMD-EVOLUTION mode (experimental, not for production use)")
+    message(STATUS "Building TaskRunner in UMD-EVOLUTION mode (default; includes libcuda_shim + tests/umd)")
     include(${CMAKE_SOURCE_DIR}/cmake/UMDEvolution.cmake)
 else()
     message(FATAL_ERROR "Unknown TASKRUNNER_BUILD_MODE: ${TASKRUNNER_BUILD_MODE}")

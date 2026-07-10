@@ -250,10 +250,18 @@ When test-fixture docs reference umd-evolution content, use relative path `../um
 
 ### Build Mode Selection
 
+> **Changed 2026-07-09**: Default is now **umd-evolution** (was test-fixture).
+> See `openspec/changes/umd-evolution-build-default-on/` and superseded ADR
+> `docs/shared/adr/tadr-108-build-mode-selection.md`.
+
 ```bash
-# Default (test-fixture only)
+# Default (umd-evolution — includes libcuda_shim + tests/umd)
 cmake -B build
 
-# UMD-evolution (experimental)
+# Opt-out: test-fixture only (excludes libcuda_shim + tests/umd;
+# src/umd/cuda_runtime_api.cpp still compiled as part of CLI)
+cmake -B build -DTASKRUNNER_BUILD_MODE=test-fixture
+
+# Explicit umd-evolution (alias for default; kept for backward compat)
 cmake -B build -DTASKRUNNER_BUILD_MODE=umd-evolution
 ```

@@ -1,14 +1,15 @@
 ---
 SCOPE: UMD-EVOLUTION
 STATUS: ACTIVE
-LAST_UPDATED: 2026-07-09
+LAST_UPDATED: 2026-07-10
 HEAD_COMMIT: e3cc24b (TaskRunner) + 4252c0f (UsrLinuxEmu submodule bump)
-TESTS: 318 total (per-suite breakdown unchanged from 2026-07-08)
+TESTS: 328 total (10 executables: 12+15+16+12+107+34+36+40+27+29 = 328 TEST_CASEs; verified via doctest --list-test-cases post-build-default-on)
 AUDIT: docs-audit 53/54 PASS + 1 FAIL (false-positive on cuFunc* promotion — see §Known Issues)
-PROMOTION-TO-ACCEPTED: 4 PROPOSED changes + 1 cross-repo follow-up + 1 time-based window (see §"Forward Roadmap")
+PROMOTION-TO-ACCEPTED: entry 1/5 (build-default-on) merged → 3 PROPOSED changes remain + 1 cross-repo follow-up + 1 time-based window (see §"Forward Roadmap")
+BUILD_DEFAULT: UMD code now compiled by default (no `-DTASKRUNNER_BUILD_MODE` required); see `openspec/changes/umd-evolution-build-default-on/` and superseded `docs/shared/adr/tadr-108-build-mode-selection.md`
 ---
 
-# Current Status (2026-07-09)
+# Current Status (2026-07-10)
 
 ## TL;DR
 

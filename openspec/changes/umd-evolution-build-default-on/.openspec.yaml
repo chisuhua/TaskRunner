@@ -5,29 +5,66 @@ status: PROPOSED
 scope: [umd-evolution]
 goal: Release the TASKRUNNER_BUILD_MODE=umd-evolution build-mode gate so UMD shim code compiles by default. This is prerequisite entry 1/5 for UMD-EVOLUTION → ACCEPTED promotion.
 follows: roadmap/README.md §"Phase 3.1+3.2" (currently requires explicit build-mode toggle)
+supersedes:
+  - tadr-108-build-mode-selection  # canonical "default = test-fixture" decision (ACCEPTED 2026-06-25)
 blocks:
   - l1-l2-bridge-e2e-test-skeleton
   - umd-evolution-acceptance-promotion-adr
+related:
+  - g-gpu-client-default-stub-init  # entry 2/5
 baseline:
-  cmake default build: builds test-fixture only
+  cmake default build: builds test-fixture only (cuda_runtime_api.cpp compiled via CLI target; libcuda_shim/* + tests/umd/ NOT compiled)
   umd-evolution build: builds test-fixture + umd (test 318/318)
-  test count: 318
+  test count: 318 (per current-status.md; tasks.md step 1.1 verifies authoritative count via `ctest -N`)
 target:
-  cmake default build: builds test-fixture + umd
-  umd-evolution build: still works (kept for vision experimentation)
-  test count: 318 (no change in count; UMD is now default-on)
+  cmake default build: builds test-fixture + umd (full UMD library set)
+  umd-evolution build: still works (kept for vision experimentation, treated as alias for default)
+  test-fixture build: excludes src/umd/libcuda_shim/* and tests/umd/ (backward compat opt-out)
+  test count: unchanged from baseline (UMD is now default-on, no new tests added)
 non_goals:
-  - Removing the umd-evolution build mode entirely (kept as experimental escape hatch)
-  - Modifying UsrLinuxEmu side
+  - Removing the umd-evolution build mode entirely (kept as experimental escape hatch + backward-compat alias)
   - Adding new cu* APIs
-risk_level: low
+  - Modifying src/ or include/ source files
+  - Changing STATUS of docs/umd-evolution/README.md (deferred to entry 5/5 promotion ADR)
+risk_level: low-medium
+  # Was misstated as "low" in v1; bumped to low-medium because:
+  # - reverses an ACCEPTED ADR (tadr-108) — governance blast radius
+  # - impacts UsrLinuxEmu CI matrix via shared default mode — cross-repo blast radius
+  # - CMakeLists.txt structural change — build-system blast radius (mitigated by 3-mode matrix verify)
 cross_repo:
-  - None (TaskRunner-only)
-  - No UsrLinuxEmu submodule bump required
-estimated_loc_change: ~10-20 lines in CMakeLists.txt + cmake/UMDEvolution.cmake
+  affected_repos:
+    - repo: UsrLinuxEmu
+      type: submodule-pointer-bump
+      reason: TaskRunner build behavior changes; AGENTS.md §跨仓工作原则 mandates submodule bump for any TaskRunner change
+    - repo: UsrLinuxEmu
+      type: ci-matrix-update
+      files:
+        - .github/workflows/cmake-multi-platform.yml  # uses default mode; build time increases
+        - .github/workflows/perf-nightly.yml  # uses default mode; perf baseline shifts
+      action: evaluate whether to pin TASKRUNNER_BUILD_MODE=test-fixture in these workflows
+    - repo: UsrLinuxEmu
+      type: doc-mirror-update
+      files:
+        - docs/00_adr/README.md  # TaskRunner TADR mirror section: mark tadr-108 SUPERSEDED
+estimated_loc_change:
+  - CMakeLists.txt: ~5 lines (invert if/else routing)
+  - cmake/UMDEvolution.cmake: ~3 lines (simplify now-redundant "experimental" comment, optional)
+  - docs/shared/adr/tadr-108-build-mode-selection.md: ~5 lines (add SUPERSEDED status + pointer)
+  - AGENTS.md: ~3 lines (update Build Mode Selection section)
+  - docs/umd-evolution/roadmap/current-status.md: ~5 lines (note transition)
+  - docs/ONBOARDING.md: ~4 references updated
+  - docs/superpowers/plans/2026-06-24-h5-taskrunner-scope-clarification.md: ~5 references updated
+  - .github/workflows/shim.yml: ~15 lines (new default-mode matrix job)
+  - Total: ~45 lines across 8 files
 acceptance:
   - cmake -B build (no env var) compiles src/umd/libcuda_shim/*.cpp
-  - All 318 existing tests pass via ctest
-  - TASKRUNNER_BUILD_MODE=test-fixture still produces a working test-fixture-only build
-  - TASKRUNNER_BUILD_MODE=umd-evolution still works (no regression)
-  - docs-audit.sh passes
+  - ctest --test-dir build shows all baseline tests pass (count verified in tasks.md step 1.1)
+  - TASKRUNNER_BUILD_MODE=test-fixture cmake -B build produces build excluding libcuda_shim + tests/umd
+  - TASKRUNNER_BUILD_MODE=umd-evolution cmake -B build still works (alias for default, no regression)
+  - No duplicate symbol errors (verified in tasks.md step 3.4)
+  - tools/docs-audit.sh passes in default mode
+  - tadr-108-build-mode-selection.md updated to STATUS: SUPERSEDED with SUPERSEDED_BY pointer
+  - UsrLinuxEmu submodule pointer bumped; ≥1 UsrLinuxEmu CI job passes with new pointer
+  - .github/workflows/shim.yml includes default-mode (no flag) matrix job
+  - docs/ONBOARDING.md and docs/superpowers/plans/2026-06-24-h5-taskrunner-scope-clarification.md updated
+  - UsrLinuxEmu docs/00_adr/README.md "TaskRunner TADR mirror" marks tadr-108 SUPERSEDED

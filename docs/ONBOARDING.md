@@ -111,7 +111,7 @@ GPU 驱动集成层：
 
 ### 2.7 UMD 演化实验层 (umd-evolution scope)
 
-实验性 User Mode Driver 演化层，`PROPOSED/DRAFT` 状态，仅在 `TASKRUNNER_BUILD_MODE=umd-evolution` 下编译。与 test-fixture scope **完全隔离**（零依赖）：
+实验性 User Mode Driver 演化层，`PROPOSED/DRAFT` 状态，**自 2026-07-09 起默认编译**（`cmake -B build` 直接包含 libcuda_shim + tests/umd；可通过 `-DTASKRUNNER_BUILD_MODE=test-fixture` 排除）。与 test-fixture scope **非完全隔离**（CLI 仍依赖 `cuda_runtime_api.cpp`）：
 
 - cuda_api — CUDA API 兼容层
 - module_loader — 插件加载器
@@ -243,7 +243,7 @@ CLI 模式提供交互式 GPU 命令执行入口。
 
 **推荐文件：** cuda_runtime_api.hpp/cpp (Phase 1 CudaRuntimeApi)
 
-实验性层仅在 `TASKRUNNER_BUILD_MODE=umd-evolution` 下编译。
+实验性层**自 2026-07-09 起默认编译**（`cmake -B build`）；可通过 `-DTASKRUNNER_BUILD_MODE=test-fixture` 排除。
 
 ---
 
@@ -343,13 +343,16 @@ CLI 模式提供交互式 GPU 命令执行入口。
 ### 构建
 
 ```bash
-# 默认构建（test-fixture 模式，推荐）
+# 默认构建（自 2026-07-09 起为 umd-evolution 模式，包含 libcuda_shim + tests/umd）
 mkdir -p build && cd build && cmake .. && make -j4
 
 # CLI 模式
 cmake .. -DBUILD_CLI=ON && make -j4
 
-# UMD 实验模式
+# test-fixture opt-out（排除 libcuda_shim + tests/umd）
+cmake .. -DTASKRUNNER_BUILD_MODE=test-fixture && make -j4
+
+# UMD 显式（与默认行为等价，保留向后兼容）
 cmake .. -DTASKRUNNER_BUILD_MODE=umd-evolution && make -j4
 ```
 

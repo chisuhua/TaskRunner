@@ -304,13 +304,20 @@ TEST_CASE("cu_graph: Launch with mock driver calls submit_graph once") {
   g_gpu_client = nullptr;
 }
 
-TEST_CASE("cu_graph: Launch with g_gpu_client nullptr returns NOT_INITIALIZED") {
+TEST_CASE("cu_graph: Launch with g_gpu_client null no longer returns NOT_INITIALIZED") {
+  // g-gpu-client-meyers-singleton-fallback: behavioral change — null g_gpu_client
+  // no longer returns NOT_INITIALIZED; Meyers-singleton CudaStub is used instead.
+  // CudaStub does not override submit_graph (default returns -1), so result is
+  // CUDA_ERROR_UNKNOWN, not NOT_INITIALIZED. The key assertion: g_gpu_client
+  // is NOT mutated by the fallback.
   g_gpu_client = nullptr;
   CUgraph g;
   REQUIRE(cuGraphCreate(&g, 0) == CUDA_SUCCESS);
   CUgraphExec exec;
   REQUIRE(cuGraphInstantiate(&exec, g, nullptr, nullptr, 0) == CUDA_SUCCESS);
-  CHECK(cuGraphLaunch(exec, nullptr) == CUDA_ERROR_NOT_INITIALIZED);
+  CUresult ret = cuGraphLaunch(exec, nullptr);
+  CHECK(ret != CUDA_ERROR_NOT_INITIALIZED);
+  CHECK(g_gpu_client == nullptr);
   cuGraphExecDestroy(exec);
   cuGraphDestroy(g);
   g_gpu_client = &g_mock;

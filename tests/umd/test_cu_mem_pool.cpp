@@ -452,20 +452,26 @@ TEST_CASE("cu_mem_pool: ExportToShareableHandle with Win32 returns NOT_SUPPORTED
   g_gpu_client = nullptr;
 }
 
-TEST_CASE("cu_mem_pool: All 5 REAL-bridged APIs return NOT_INITIALIZED when g_gpu_client null") {
+TEST_CASE("cu_mem_pool: All 4 REAL-bridged APIs no longer return NOT_INITIALIZED when g_gpu_client null") {
+  // g-gpu-client-meyers-singleton-fallback: behavioral change — null g_gpu_client
+  // no longer returns NOT_INITIALIZED; Meyers-singleton CudaStub is used instead.
+  // CudaStub does not override mem_pool_* (defaults return -1), so result is
+  // CUDA_ERROR_UNKNOWN, not NOT_INITIALIZED. The key assertion: g_gpu_client
+  // is NOT mutated by the fallback.
   g_gpu_client = nullptr;
   CUmemPool pool;
   CUmemPoolProps props = make_props(1, 1024 * 1024);
   REQUIRE(cuMemPoolCreate(&pool, &props) == CUDA_SUCCESS);
 
   CUmemPoolPtr ptr = reinterpret_cast<CUmemPoolPtr>(static_cast<uintptr_t>(0x1000));
-  CHECK(cuMemPoolAlloc(&ptr, 4096, pool, nullptr) == CUDA_ERROR_NOT_INITIALIZED);
-  CHECK(cuMemPoolAllocAsync(&ptr, 4096, pool, nullptr, nullptr) == CUDA_ERROR_NOT_INITIALIZED);
-  CHECK(cuMemPoolFreeAsync(ptr, nullptr, pool) == CUDA_ERROR_NOT_INITIALIZED);
+  CHECK(cuMemPoolAlloc(&ptr, 4096, pool, nullptr) != CUDA_ERROR_NOT_INITIALIZED);
+  CHECK(cuMemPoolAllocAsync(&ptr, 4096, pool, nullptr, nullptr) != CUDA_ERROR_NOT_INITIALIZED);
+  CHECK(cuMemPoolFreeAsync(ptr, nullptr, pool) != CUDA_ERROR_NOT_INITIALIZED);
   int fd_out;
   CHECK(cuMemPoolExportToShareableHandle(&fd_out, pool,
                                          CU_MEM_HANDLE_TYPE_POSIX_FILE_DESCRIPTOR,
-                                         0) == CUDA_ERROR_NOT_INITIALIZED);
+                                         0) != CUDA_ERROR_NOT_INITIALIZED);
+  CHECK(g_gpu_client == nullptr);
 
   cuMemPoolDestroy(pool);
   g_gpu_client = &g_mock;

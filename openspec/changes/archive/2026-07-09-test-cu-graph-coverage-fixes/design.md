@@ -1,5 +1,5 @@
 ---
-SCOPE: umd-evolution
+SCOPE: [umd-evolution, test-fixture]
 STATUS: PROPOSED
 ---
 

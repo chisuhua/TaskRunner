@@ -10,6 +10,9 @@
 #include "test_fixture/gpu_driver_client.h"
 #include "stream_fence_registry.hpp"
 
+// g-gpu-client-meyers-singleton-fallback: Meyers fallback for null g_gpu_client
+#include "cuda_driver_accessor.hpp"
+
 #include <atomic>
 #include <cstdint>
 #include <mutex>
@@ -51,9 +54,8 @@ extern "C" CUresult cuStreamSynchronize(CUstream hStream) {
   // 先查 fence：无 pending fence → SUCCESS（向后兼容无 driver、无 graph launch 场景）
   uint64_t fence_id = async_task::umd::shim::get_stream_last_fence(hStream);
   if (fence_id == 0) return CUDA_SUCCESS;
-  // 有 pending fence 但无 driver → 无法等待，报错
-  auto* driver = async_task::gpu::g_gpu_client;
-  if (!driver) return CUDA_ERROR_NOT_INITIALIZED;
+  // 有 pending fence 时通过 fallback accessor 获取 driver（Meyers singleton if null）
+  auto* driver = async_task::umd::shim::get_driver_or_default();
   uint32_t status = 0;
   int ret = driver->wait_fence(fence_id, 0, &status);
   if (ret != 0)    return CUDA_ERROR_UNKNOWN;

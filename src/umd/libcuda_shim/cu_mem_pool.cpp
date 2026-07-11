@@ -9,7 +9,7 @@
 // cuMemPoolAllocAsync / cuMemPoolFreeAsync bridge to the corresponding async
 // driver methods, cuMemPoolExportToShareableHandle bridges to
 // mem_pool_export_shareable. When g_gpu_client is nullptr, all bridged APIs
-// return CUDA_ERROR_NOT_INITIALIZED.
+// fall back to a Meyers-singleton CudaStub (g-gpu-client-meyers-singleton-fallback).
 //
 // B-2 enforced: cuMemPoolCreate rejects vaSpaceHandle=0 (H-1 sentinel).
 // F-2 enforced: cuMemPoolSetAttribute/GetAttribute accept only RELEASE_THRESHOLD

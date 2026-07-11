@@ -107,3 +107,10 @@ add_executable(test_texture_surface
 )
 target_link_libraries(test_texture_surface PRIVATE cuda_taskrunner)
 add_test(NAME test_texture_surface COMMAND test_texture_surface)
+
+# g-gpu-client-meyers-singleton-fallback: regression tests for default fallback
+add_executable(test_shim_default_init
+    tests/umd/test_shim_default_init.cpp
+)
+target_link_libraries(test_shim_default_init PRIVATE cuda_taskrunner)
+add_test(NAME test_shim_default_init COMMAND test_shim_default_init)

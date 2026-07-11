@@ -25,6 +25,9 @@
 // Phase 4: stream fence registry for cuStreamSynchronize bridge
 #include "stream_fence_registry.hpp"
 
+// g-gpu-client-meyers-singleton-fallback: Meyers fallback for null g_gpu_client
+#include "cuda_driver_accessor.hpp"
+
 #include <atomic>
 #include <cstdint>
 #include <iostream>
@@ -44,13 +47,9 @@ struct GraphTable {
 };
 GraphTable g_graphs;
 
-static inline async_task::gpu::IGpuDriver* get_driver_or_log(const char* api_name) {
-  if (!async_task::gpu::g_gpu_client) {
-    std::cerr << "[cu_graph] " << api_name << ": g_gpu_client not initialized\n";
-    return nullptr;
-  }
-  return async_task::gpu::g_gpu_client;
-}
+// Replaced by cuda_driver_accessor.hpp::get_driver_or_default() (Meyers fallback).
+// The local helper that returned nullptr is gone; shim APIs now always get a
+// non-null driver (via fallback CudaStub if user hasn't set g_gpu_client).
 
 struct LaunchTrace {
   std::unordered_map<CUgraphExec, std::int64_t> fence_ids;
@@ -138,8 +137,7 @@ extern "C" CUresult cuGraphInstantiate(CUgraphExec* phGraphExec,
 
 extern "C" CUresult cuGraphLaunch(CUgraphExec hGraphExec, CUstream hStream) {
   if (!hGraphExec) return CUDA_ERROR_INVALID_VALUE;
-  auto* driver = async_task::umd::shim::get_driver_or_log("cuGraphLaunch");
-  if (!driver) return CUDA_ERROR_NOT_INITIALIZED;
+  async_task::gpu::IGpuDriver* driver = async_task::umd::shim::get_driver_or_default();
   std::int64_t fence = driver->submit_graph(
       reinterpret_cast<uint64_t>(hGraphExec),
       static_cast<uint32_t>(reinterpret_cast<uintptr_t>(hStream)));

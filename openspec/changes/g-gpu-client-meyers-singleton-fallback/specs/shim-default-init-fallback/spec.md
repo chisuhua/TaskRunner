@@ -147,8 +147,6 @@ This requirement is verified by `grep -L "cuda_driver_accessor.hpp" src/umd/libc
 - **THEN** all 3 files MUST be listed (each contains the include)
 - **AND** `grep -E "if \(!?g_gpu_client\)" src/umd/libcuda_shim/cu_stream.cpp src/umd/libcuda_shim/cu_graph.cpp src/umd/libcuda_shim/cu_mem_pool.cpp` MUST return no results (no local null guards)
 
-## MODIFIED Requirements
-
 ### Requirement: shim functions return SUCCESS instead of NOT_INITIALIZED when g_gpu_client is null
 
 `cuStreamSynchronize`, `cuGraphLaunch`, and `cuMemPoolCreate` MUST return
@@ -168,11 +166,3 @@ fallback accessor (also out of scope).
 - **WHEN** this change is merged to main
 - **THEN** the change entry in CHANGELOG.md MUST mention that `cuStreamSynchronize`, `cuGraphLaunch`, `cuMemPoolCreate` no longer return `CUDA_ERROR_NOT_INITIALIZED` when `g_gpu_client == nullptr`
 - **AND** the entry MUST point to this spec for migration guidance
-
-## REMOVED Requirements
-
-(none)
-
-## RENAMED Requirements
-
-(none)

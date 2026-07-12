@@ -311,3 +311,17 @@ When all 7 checklist items are DONE:
 - AGENTS.md H-5 3-scope rules no longer require build-mode gate for UMD code
 - New cu* APIs added to UMD are no longer "experimental vision" but production code
 - L1↔L2 bridge test is the regression gate for future UMD changes
+
+## L1↔L2 Bridge Test (shipped 2026-07-12 via l1-l2-bridge-e2e-test-skeleton)
+
+TaskRunner side ships the skeleton (`tests/umd/test_cu_graph_e2e_standalone.cpp`
+with `RealGpuFixture` + 1 placeholder `TEST_CASE` that SKIPs when `/dev/gpgpu0`
+is absent). Full real test code is the responsibility of the **UsrLinuxEmu**
+side: `UsrLinuxEmu/tests/test_cu_graph_e2e_standalone.cpp` must implement the
+fence-signal assertions using `ModuleLoader` to load `plugin_gpu_driver.so`
+and `GpuDriverClient` opened against the live `/dev/gpgpu0`.
+
+The TaskRunner skeleton is forward-compatible: when the UsrLinuxEmu side
+implements the real test, no further TaskRunner-side code change is required.
+The only required handshake is bumping the `external/TaskRunner` submodule
+pointer in UsrLinuxEmu to include commit `c67f9e3`.

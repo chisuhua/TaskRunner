@@ -114,3 +114,13 @@ add_executable(test_shim_default_init
 )
 target_link_libraries(test_shim_default_init PRIVATE cuda_taskrunner)
 add_test(NAME test_shim_default_init COMMAND test_shim_default_init)
+
+# l1-l2-bridge-e2e-test-skeleton: L1<->L2 bridge E2E test skeleton
+add_executable(test_cu_graph_e2e_standalone
+    tests/umd/test_cu_graph_e2e_standalone.cpp
+)
+target_link_libraries(test_cu_graph_e2e_standalone PRIVATE
+    taskrunner_test_fixture    # GpuDriverClient
+    taskrunner_umd_stub        # CudaStub (used by Meyers fallback)
+)
+add_test(NAME test_cu_graph_e2e_standalone COMMAND test_cu_graph_e2e_standalone)

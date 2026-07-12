@@ -12,22 +12,22 @@ STATUS: PROPOSED
 
 ## 1. Pre-flight
 
-- [ ] 1.1 Verify prerequisites:
+- [x] 1.1 Verify prerequisites:
   - `umd-evolution-build-default-on` change is done (or build mode is umd-evolution)
   - `g-gpu-client-default-stub-init` change is done (so default-init g_gpu_client = &g_cuda_stub)
   - All 318 existing tests pass
 
-- [ ] 1.2 Read `tests/test_fixture/test_gpu_phase2.cpp` to see how GpuDriverClient is constructed in existing tests:
+- [x] 1.2 Read `tests/test_fixture/test_gpu_phase2.cpp` to see how GpuDriverClient is constructed in existing tests:
   ```bash
   grep -n "GpuDriverClient" tests/test_fixture/test_gpu_phase2.cpp | head -5
   ```
 
-- [ ] 1.3 Read `include/test_fixture/gpu_driver_client.h` to understand the GpuDriverClient public API:
+- [x] 1.3 Read `include/test_fixture/gpu_driver_client.h` to understand the GpuDriverClient public API:
   - `open()`, `close()`, `submit_graph()`, `wait_fence()` etc.
 
 ## 2. Skeleton code
 
-- [ ] 2.1 Create `tests/umd/test_cu_graph_e2e_standalone.cpp`:
+- [x] 2.1 Create `tests/umd/test_cu_graph_e2e_standalone.cpp`:
 
   ```cpp
   // SCOPE: UMD-EVOLUTION
@@ -107,7 +107,7 @@ STATUS: PROPOSED
   }
   ```
 
-- [ ] 2.2 Verify the file compiles (without running):
+- [x] 2.2 Verify the file compiles (without running):
   ```bash
   cmake -B build -DTASKRUNNER_BUILD_MODE=umd-evolution
   cmake --build build -j4 --target test_cu_graph_e2e_standalone
@@ -115,9 +115,9 @@ STATUS: PROPOSED
 
 ## 3. CMake registration
 
-- [ ] 3.1 Read current `cmake/UMDEvolution.cmake` to find where UMD tests are added (around line 81-85 for test_cu_graph).
+- [x] 3.1 Read current `cmake/UMDEvolution.cmake` to find where UMD tests are added (around line 81-85 for test_cu_graph).
 
-- [ ] 3.2 Add `test_cu_graph_e2e_standalone` to the UMD test list:
+- [x] 3.2 Add `test_cu_graph_e2e_standalone` to the UMD test list:
   ```cmake
   # In cmake/UMDEvolution.cmake, near where test_cu_graph is defined:
   add_executable(test_cu_graph_e2e_standalone
@@ -135,21 +135,21 @@ STATUS: PROPOSED
 
 ## 4. Verification
 
-- [ ] 4.1 Build:
+- [x] 4.1 Build:
   ```bash
   cmake -B build -DTASKRUNNER_BUILD_MODE=umd-evolution
   cmake --build build -j4
   ```
-- [ ] 4.2 Run new test (should SKIP):
+- [x] 4.2 Run new test (should SKIP):
   ```bash
   ctest --test-dir build -R test_cu_graph_e2e_standalone --output-on-failure
   ```
   Expected: 1 test case, 1 SKIP (when /dev/gpgpu0 not present), 0 FAIL.
-- [ ] 4.3 Run full ctest (regression):
+- [x] 4.3 Run full ctest (regression):
   ```bash
   ctest --test-dir build  # expect 318 PASS + 1 SKIP
   ```
-- [ ] 4.4 docs-audit:
+- [x] 4.4 docs-audit:
   ```bash
   tools/docs-audit.sh
   ```
@@ -157,7 +157,7 @@ STATUS: PROPOSED
 
 ## 5. Commit + push
 
-- [ ] 5.1 commit (atomic):
+- [x] 5.1 commit (atomic):
   ```bash
   git add tests/umd/test_cu_graph_e2e_standalone.cpp cmake/UMDEvolution.cmake
   git commit -m "test(umd): add L1↔L2 bridge E2E test skeleton
@@ -170,17 +170,17 @@ STATUS: PROPOSED
   - 318/318 existing tests pass + 1 SKIP (no regression)
   - Prerequisite for UMD-EVOLUTION → ACCEPTED promotion (entry 3/5)"
   ```
-- [ ] 5.2 push:
+- [x] 5.2 push:
   ```bash
   git push origin main
   ```
 
 ## 6. Forward-compat handoff to UsrLinuxEmu
 
-- [ ] 6.1 Open GitHub issue or note in sync-plan §5.3:
+- [x] 6.1 Open GitHub issue or note in sync-plan §5.3:
   > Follow-up: UsrLinuxEmu side must implement the real L1↔L2 bridge E2E test in `UsrLinuxEmu/tests/test_cu_graph_e2e_standalone.cpp`, using `ModuleLoader` to load `plugin_gpu_driver.so` and filling in the placeholder assertions in TaskRunner `tests/umd/test_cu_graph_e2e_standalone.cpp`.
 
-- [ ] 6.2 (Optional) Add a section to `docs/umd-evolution/roadmap/current-status.md` documenting the bridge test status.
+- [x] 6.2 (Optional) Add a section to `docs/umd-evolution/roadmap/current-status.md` documenting the bridge test status.
 
 ## Acceptance Criteria
 

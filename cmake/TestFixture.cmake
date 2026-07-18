@@ -58,3 +58,15 @@ target_include_directories(test_gpu_phase2 PRIVATE
 )
 target_link_libraries(test_gpu_phase2 PRIVATE taskrunner_test_fixture)
 add_test(NAME test_gpu_phase2 COMMAND test_gpu_phase2)
+
+# KFD L1↔L2 bridge E2E test — uses real GpuDriverClient (SKIPs when /dev/gpgpu0 absent)
+add_executable(test_kfd_e2e_bridge
+    tests/test_fixture/test_kfd_e2e_bridge.cpp
+)
+target_include_directories(test_kfd_e2e_bridge PRIVATE
+    ${CMAKE_SOURCE_DIR}/doctest/doctest
+)
+target_link_libraries(test_kfd_e2e_bridge PRIVATE taskrunner_test_fixture)
+add_test(NAME test_kfd_e2e_bridge COMMAND test_kfd_e2e_bridge)
+set_tests_properties(test_kfd_e2e_bridge PROPERTIES
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..)

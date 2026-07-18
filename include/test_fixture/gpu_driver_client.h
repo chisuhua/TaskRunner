@@ -824,6 +824,47 @@ public:
         return 0;
     }
 
+    // ============================================================
+    // KFD ioctl 方法 — L1↔L2 bridge E2E (C-12 E.2.4)
+    // ============================================================
+
+    long kfd_map_memory(uint32_t handle, uint64_t size, uint64_t* out_gpu_va) {
+        if (!is_open()) return -1;
+        struct gpu_map_memory_args args = {};
+        args.handle    = handle;
+        args.n_devices = 1;
+        args.size      = size;
+        long ret = static_cast<long>(ioctl(fd_, GPU_IOCTL_MAP_MEMORY, &args));
+        if (ret == 0 && out_gpu_va) *out_gpu_va = args.gpu_va;
+        return ret;
+    }
+
+    long kfd_unmap_memory(uint32_t handle) {
+        if (!is_open()) return -1;
+        struct gpu_unmap_memory_args args = {};
+        args.handle    = handle;
+        args.n_devices = 1;
+        return static_cast<long>(ioctl(fd_, GPU_IOCTL_UNMAP_MEMORY, &args));
+    }
+
+    long kfd_get_process_aperture(uint32_t num_nodes,
+        struct gpu_aperture_info* out_apertures) {
+        if (!is_open()) return -1;
+        struct gpu_get_process_aperture_args args = {};
+        args.num_nodes     = num_nodes;
+        args.apertures_ptr = reinterpret_cast<uint64_t>(out_apertures);
+        return static_cast<long>(ioctl(fd_,
+            GPU_IOCTL_GET_PROCESS_APERTURE, &args));
+    }
+
+    long kfd_update_queue(uint64_t queue_handle, uint32_t flags) {
+        if (!is_open()) return -1;
+        struct gpu_update_queue_args args = {};
+        args.queue_handle = queue_handle;
+        args.queue_flags  = flags;
+        return static_cast<long>(ioctl(fd_, GPU_IOCTL_UPDATE_QUEUE, &args));
+    }
+
 private:
     int fd_;                      // 设备文件描述符
     std::string device_path_;      // 设备路径

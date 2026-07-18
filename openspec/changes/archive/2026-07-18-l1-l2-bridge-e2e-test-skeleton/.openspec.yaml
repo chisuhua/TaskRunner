@@ -1,0 +1,44 @@
+schema: spec-driven
+created: 2026-07-12
+name: l1-l2-bridge-e2e-test-skeleton
+status: IMPLEMENTED
+scope: [test-fixture]
+goal: Ship TaskRunner-side KFD 5 ioctls L1↔L2 bridge E2E test that exercises GpuDriverClient → UsrLinuxEmu GpgpuDevice → kfd_sim_bridge end-to-end. Closes C-12 E.2.4 deferred work from multi-file integration.
+follows:
+  - phase3-1-igpu-driver-extension       # IGpuDriver abstraction baseline (28→31 methods)
+  - 2026-07-16-kfd-l1-l2-bridge-e2e      # UsrLinuxEmu Phase A (IoctlEntry table with 4 KFD ioctls)
+  - 2026-07-12-l1-l2-bridge-e2e-test-skeleton  # Archived companion (umd-evolution: cuGraphLaunch)
+blocks:
+  - kfd-l1-l2-bridge-e2e-umd-shim       # Future: promote KFD methods to IGpuDriver if UMD shim needs them
+baseline:
+  L1↔L2 bridge test (test-fixture): NONE
+  GpuDriverClient KFD methods: NONE
+  Coverage gap: GpuDriverClient → UsrLinuxEmu GpgpuDevice → KFD sim never tested in TaskRunner test-fixture scope
+target:
+  GpuDriverClient: 4 new KFD public non-virtual methods (kfd_map_memory, kfd_unmap_memory, kfd_get_process_aperture, kfd_update_queue)
+  test_kfd_e2e_bridge: 3 TEST_CASEs (MAP/UNMAP, GET_PROCESS_APERTURE+UPDATE_QUEUE, full 5-ioctl chain)
+  RealGpuFixture: defined with /dev/gpgpu0 detection + graceful skip
+  CMake target: registered in cmake/TestFixture.cmake
+  ctest double-green: TaskRunner test-fixture 4/4 + UsrLinuxEmu 104/104
+non_goals:
+  - Modifying IGpuDriver interface (KFD methods are GpuDriverClient-only; promotion is a separate future change)
+  - Replacing UsrLinuxEmu-side L2 tests (those live in UsrLinuxEmu/tests/test_kfd_l1_l2_bridge_standalone.cpp)
+  - Replacing the existing 32 L1 (mock) test_cu_graph tests
+  - Building real device file infrastructure (UsrLinuxEmu VFS work)
+  - Implementing the full real test in UsrLinuxEmu (separate UsrLinuxEmu-side change 2026-07-16-kfd-l1-l2-bridge-e2e)
+risk_level: medium
+cross_repo:
+  - UsrLinuxEmu: Phase A complete (IoctlEntry + 3 E2E tests), 104/104 ctest PASS
+  - ADR-035 §R5.1 4-step sync applied (TaskRunner commit → submodule bump → UsrLinuxEmu commit → ctest double-green)
+  - No new UsrLinuxEmu commits required by this TaskRunner change
+estimated_loc_change: ~213 lines in tests/test_fixture/test_kfd_e2e_bridge.cpp (new) + ~36 lines in include/test_fixture/gpu_driver_client.h (4 methods) + ~10 lines in cmake/TestFixture.cmake
+acceptance:
+  - GpuDriverClient has 4 KFD public non-virtual methods at include/test_fixture/gpu_driver_client.h:831-866
+  - test_kfd_e2e_bridge exists and compiles (213 lines, doctest framework)
+  - 3 TEST_CASEs with concrete KFD ioctl chain assertions
+  - Gracefully no-ops when /dev/gpgpu0 unavailable (MESSAGE+return; doctest 2.4.11 has no SKIP macro)
+  - Existing 1 test (test_gpu_phase2) still passes — no regression
+  - CMake target registered in cmake/TestFixture.cmake:62-72 with WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/..
+  - docs-audit.sh passes (no new SCOPE/STATUS violations)
+  - IGpuDriver interface unchanged (no KFD virtual methods added)
+  - Cross-repo: TaskRunner commit on main, UsrLinuxEmu submodule pointer bumped, ctest double-green verified

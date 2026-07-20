@@ -212,6 +212,9 @@ private:
     // Phase 1.5: device_ptr → bo_handle 映射 (GpuDriverClient 后端用)
     std::unordered_map<uint64_t, uint64_t> bo_handles_;
 
+    // v1.2: gpu_va → memory_mgr token 翻译 (device_ptr 现在是 gpu_va)
+    std::unordered_map<uint64_t, uint64_t> gpu_va_to_token_;
+
     std::atomic<uint64_t> next_task_id_{1};
     std::atomic<uint64_t> next_fence_id_{1};
 

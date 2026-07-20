@@ -31,6 +31,7 @@
 #include <sys/stat.h>
 #include <cerrno>
 #include <iostream>
+#include <unordered_map>
 
 // System C 接口 (通过符号链接访问)
 #include "UsrLinuxEmu/plugins/gpu_driver/shared/gpu_ioctl.h"
@@ -226,6 +227,7 @@ public:
                       << " (errno=" << errno << ")\n";
             return 0;
         }
+        bo_gpu_va_cache_[args.handle] = args.gpu_va;
         return static_cast<uint64_t>(args.handle);
     }
 
@@ -258,6 +260,7 @@ public:
                       << " (errno=" << errno << ")\n";
             return -1;
         }
+        bo_gpu_va_cache_.erase(bo_handle);
         return 0;
     }
 
@@ -282,6 +285,12 @@ public:
         }
         // D8: 返回 CPU 虚拟地址 (gpu_va 在 System C 中是统一虚拟地址空间)
         return reinterpret_cast<void*>(static_cast<uintptr_t>(args.gpu_va));
+    }
+
+    uint64_t get_bo_gpu_va(uint64_t bo_handle) override {
+        auto it = bo_gpu_va_cache_.find(bo_handle);
+        if (it != bo_gpu_va_cache_.end()) return it->second;
+        return 0;
     }
 
     // ============================================================
@@ -869,6 +878,7 @@ private:
     int fd_;                      // 设备文件描述符
     std::string device_path_;      // 设备路径
     uint64_t current_va_space_handle_ = 0;  // 默认 0 = 走 H-1 sentinel 跳过校验
+    std::unordered_map<uint64_t, uint64_t> bo_gpu_va_cache_;  // bo_handle → gpu_va
 };
 
 /**

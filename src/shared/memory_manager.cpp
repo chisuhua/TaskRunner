@@ -15,7 +15,7 @@ MemoryManager::~MemoryManager() {
     std::lock_guard<std::mutex> lock(mutex_);
     
     for (auto& [ptr, mem] : allocations_) {
-        if (mem.host_ptr && mem.type != DeviceMemory::MemoryType::DEVICE_LOCAL) {
+        if (mem.host_ptr && !mem.externally_managed) {
             std::free(mem.host_ptr);
         }
     }
@@ -26,7 +26,8 @@ uint64_t MemoryManager::allocate_ptr() {
     return next_ptr_.fetch_add(0x1000, std::memory_order_relaxed);
 }
 
-DeviceMemory MemoryManager::allocate(size_t size, DeviceMemory::MemoryType type) {
+DeviceMemory MemoryManager::allocate(size_t size, DeviceMemory::MemoryType type,
+                                      void* host_ptr) {
     if (size == 0) {
         return DeviceMemory();
     }
@@ -37,12 +38,14 @@ DeviceMemory MemoryManager::allocate(size_t size, DeviceMemory::MemoryType type)
     
     DeviceMemory mem(ptr, size, type);
     
-    // HOST_VISIBLE 或 MANAGED 类型需要分配主机指针
-    if (type == DeviceMemory::MemoryType::HOST_VISIBLE || 
-        type == DeviceMemory::MemoryType::MANAGED) {
+    if (host_ptr) {
+        mem.host_ptr = host_ptr;
+        mem.externally_managed = true;
+    } else if (type == DeviceMemory::MemoryType::HOST_VISIBLE || 
+               type == DeviceMemory::MemoryType::MANAGED) {
+        // auto-allocate host memory for HOST_VISIBLE/MANAGED
         mem.host_ptr = std::malloc(size);
         if (!mem.host_ptr) {
-            // 分配失败，回滚
             return DeviceMemory();
         }
         std::memset(mem.host_ptr, 0, size);
@@ -61,9 +64,7 @@ void MemoryManager::free(DeviceMemory mem) {
     
     auto it = allocations_.find(mem.device_ptr);
     if (it != allocations_.end()) {
-        // 释放主机指针（如果有）
-        if (it->second.host_ptr && 
-            it->second.type != DeviceMemory::MemoryType::DEVICE_LOCAL) {
+        if (it->second.host_ptr && !it->second.externally_managed) {
             std::free(it->second.host_ptr);
         }
         allocations_.erase(it);

@@ -95,27 +95,44 @@ CudaScheduler::AllocationResult CudaScheduler::submit_mem_alloc(size_t size) {
         return result;
     }
 
-    // 分配内存 (MemoryManager)
-    auto mem = memory_mgr_.allocate(size);
-    if (!mem.is_valid()) {
-        result.status = -ENOMEM;
-        return result;
-    }
-
-    // Phase 1.5: 通过 IGpuDriver 虚接口分配 (删除 dynamic_cast 抽象泄漏)
+    // Phase 1.5: 通过 IGpuDriver 虚接口分配
     uint64_t bo_handle = driver_->alloc_bo_vram(size, 0);
     if (bo_handle == 0) {
-        memory_mgr_.free(mem);
         result.status = -EIO;
         return result;
     }
-    bo_handles_[mem.device_ptr] = bo_handle;
+
+    // v1.2: get gpu_va for Puller HAL addressing
+    uint64_t gpu_va = driver_->get_bo_gpu_va(bo_handle);
+    if (gpu_va == 0) {
+        driver_->free_bo(bo_handle);
+        result.status = -EIO;
+        return result;
+    }
+
+    // v1.2: map BO to get host_ptr for local access
+    void* host_ptr = driver_->map_bo(bo_handle, size);
+    if (!host_ptr) {
+        driver_->free_bo(bo_handle);
+        result.status = -EIO;
+        return result;
+    }
+
+    // 分配内存 (MemoryManager) with external host_ptr, device_ptr = gpu_va
+    auto mem = memory_mgr_.allocate(size, DeviceMemory::MemoryType::DEVICE_LOCAL, host_ptr);
+    if (!mem.is_valid()) {
+        driver_->free_bo(bo_handle);
+        result.status = -ENOMEM;
+        return result;
+    }
+    bo_handles_[gpu_va] = bo_handle;
+    gpu_va_to_token_[gpu_va] = mem.device_ptr;  // gpu_va → memory_mgr token
 
     // 创建 fence (alloc 是同步操作，立即 signal)
     auto fence = sync_mgr_.create_fence();
     sync_mgr_.signal_fence(fence);
 
-    result.device_ptr = mem.device_ptr;
+    result.device_ptr = gpu_va;
     result.fence_id = fence->id;
     result.status = 0;
 
@@ -131,13 +148,15 @@ int CudaScheduler::submit_mem_free(uint64_t device_ptr) {
         return -EINVAL;
     }
 
-    // 查找内存描述符
-    auto mem = memory_mgr_.find(device_ptr);
+    // 查找内存描述符 (device_ptr 现在是 gpu_va，需要翻译回 token)
+    auto token_it = gpu_va_to_token_.find(device_ptr);
+    if (token_it == gpu_va_to_token_.end()) return -ENOENT;
+    auto mem = memory_mgr_.find(token_it->second);
     if (!mem.is_valid()) {
         return -ENOENT;
     }
 
-    // Phase 1.5: 通过 IGpuDriver 虚接口释放 (删除 dynamic_cast 抽象泄漏)
+    // Phase 1.5: 通过 IGpuDriver 虚接口释放
     auto it = bo_handles_.find(device_ptr);
     if (it != bo_handles_.end()) {
         int ret = driver_->free_bo(it->second);
@@ -148,6 +167,7 @@ int CudaScheduler::submit_mem_free(uint64_t device_ptr) {
     }
 
     memory_mgr_.free(mem);
+    gpu_va_to_token_.erase(device_ptr);
 
     auto fence = sync_mgr_.create_fence();
     sync_mgr_.signal_fence(fence);
@@ -167,7 +187,10 @@ int CudaScheduler::submit_memcpy_h2d(uint64_t device_ptr, uint64_t offset,
         return -EINVAL;
     }
 
-    auto mem = memory_mgr_.find(device_ptr);
+    // device_ptr 现在是 gpu_va，翻译回 token 查找 MemoryManager
+    auto token_it = gpu_va_to_token_.find(device_ptr);
+    if (token_it == gpu_va_to_token_.end()) return -ENOENT;
+    auto mem = memory_mgr_.find(token_it->second);
     if (!mem.is_valid()) {
         return -ENOENT;
     }
@@ -176,7 +199,7 @@ int CudaScheduler::submit_memcpy_h2d(uint64_t device_ptr, uint64_t offset,
         return -EOVERFLOW;
     }
 
-    // Phase 1.5: 通过 IGpuDriver 虚接口提交 memcpy (is_h2d=true)
+    // Phase 1.5: device_ptr+offset 现在是 gpu_va+offset，在 HAL_HEAP_BASE 范围
     int64_t driver_fence = driver_->submit_memcpy(0, reinterpret_cast<uint64_t>(host_ptr),
                                                    device_ptr + offset, size, true);
     if (driver_fence < 0) {
@@ -201,7 +224,10 @@ int CudaScheduler::submit_memcpy_d2h(void* host_ptr, uint64_t device_ptr,
         return -EINVAL;
     }
 
-    auto mem = memory_mgr_.find(device_ptr);
+    // device_ptr 现在是 gpu_va，翻译回 token 查找 MemoryManager
+    auto token_it = gpu_va_to_token_.find(device_ptr);
+    if (token_it == gpu_va_to_token_.end()) return -ENOENT;
+    auto mem = memory_mgr_.find(token_it->second);
     if (!mem.is_valid()) {
         return -ENOENT;
     }

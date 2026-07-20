@@ -155,6 +155,13 @@ public:
     virtual uint64_t alloc_bo_vram(uint64_t size, uint32_t flags) = 0;
 
     /**
+     * @brief 获取 BO 的 GPU 虚拟地址 (gpu_va)
+     * @param bo_handle BO handle
+     * @return gpu_va (HAL_HEAP_BASE 范围)，失败返回 0
+     */
+    virtual uint64_t get_bo_gpu_va(uint64_t bo_handle) = 0;
+
+    /**
      * @brief 释放 GPU 缓冲区对象
      * @param bo_handle 要释放的 BO handle
      * @return 0 成功，-1 失败

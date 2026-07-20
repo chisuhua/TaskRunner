@@ -155,6 +155,7 @@ public:
     uint64_t alloc_bo_vram(uint64_t size, uint32_t flags) override;
     int free_bo(uint64_t bo_handle) override;
     void* map_bo(uint64_t bo_handle, uint64_t size) override;
+    uint64_t get_bo_gpu_va(uint64_t bo_handle) override;
 
     // 提交 (3) - 返回递增 fence_id
     int64_t submit_batch(uint32_t stream_id, const struct gpu_gpfifo_entry* entries,

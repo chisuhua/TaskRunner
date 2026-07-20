@@ -40,6 +40,8 @@ struct DeviceMemory {
     DeviceMemory(uint64_t ptr, size_t sz, MemoryType t)
         : device_ptr(ptr), size(sz), type(t) {}
     
+    bool externally_managed = false;  /* host_ptr owned externally (e.g. UsrLinuxEmu HAL heap) */
+    
     bool is_valid() const { return device_ptr != 0; }
 };
 
@@ -72,8 +74,9 @@ public:
      * @param type 内存类型
      * @return DeviceMemory 描述符
      */
-    DeviceMemory allocate(size_t size, 
-                          DeviceMemory::MemoryType type = DeviceMemory::MemoryType::DEVICE_LOCAL);
+    DeviceMemory allocate(size_t size,
+                          DeviceMemory::MemoryType type = DeviceMemory::MemoryType::DEVICE_LOCAL,
+                          void* host_ptr = nullptr);
     
     /**
      * 释放 GPU 内存

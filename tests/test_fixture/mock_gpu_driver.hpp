@@ -190,6 +190,12 @@ public:
         return std::malloc(size);
     }
 
+    uint64_t get_bo_gpu_va(uint64_t bo_handle) override {
+        record("get_bo_gpu_va", {bo_handle});
+        if (injected_errors_["get_bo_gpu_va"]) return 0;
+        return bo_handle + 0x100000000ULL;  // mock: simulate HAL_HEAP_BASE range
+    }
+
     // ============================================================
     // 提交 (3) - 返回递增 fence_id
     // ============================================================

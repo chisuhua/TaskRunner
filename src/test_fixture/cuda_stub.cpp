@@ -359,6 +359,10 @@ void* CudaStub::map_bo(uint64_t bo_handle, uint64_t size) {
     return std::malloc(size);
 }
 
+uint64_t CudaStub::get_bo_gpu_va(uint64_t bo_handle) {
+    return bo_handle;  // stub: return handle as gpu_va
+}
+
 // ----- 提交 (3) - 返回递增 fence_id -----
 
 int64_t CudaStub::submit_batch(uint32_t stream_id,

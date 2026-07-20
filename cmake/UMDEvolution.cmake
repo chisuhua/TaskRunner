@@ -124,3 +124,13 @@ target_link_libraries(test_cu_graph_e2e_standalone PRIVATE
     taskrunner_umd_stub        # CudaStub (used by Meyers fallback)
 )
 add_test(NAME test_cu_graph_e2e_standalone COMMAND test_cu_graph_e2e_standalone)
+
+# cuda-e2e-real-path: full E2E integration test against real UsrLinuxEmu backend
+add_executable(test_cuda_e2e_real
+    tests/umd/test_cuda_e2e_real.cpp
+)
+target_link_libraries(test_cuda_e2e_real PRIVATE
+    cuda_taskrunner           # CudaRuntimeApi + CudaScheduler
+    taskrunner_test_fixture   # GpuDriverClient
+)
+add_test(NAME test_cuda_e2e_real COMMAND test_cuda_e2e_real)

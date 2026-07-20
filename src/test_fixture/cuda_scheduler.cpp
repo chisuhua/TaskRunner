@@ -202,11 +202,18 @@ int CudaScheduler::submit_memcpy_h2d(uint64_t device_ptr, uint64_t offset,
     // Phase 1.5: device_ptr+offset 现在是 gpu_va+offset，在 HAL_HEAP_BASE 范围
     int64_t driver_fence = driver_->submit_memcpy(0, reinterpret_cast<uint64_t>(host_ptr),
                                                    device_ptr + offset, size, true);
-    if (driver_fence < 0) {
+    if (driver_fence <= 0) {
         return -EIO;
     }
 
-    memory_mgr_.memcpy_h2d(mem, host_ptr, size);
+    // Phase C.2.3: 等待 Puller 完成 memcpy（异步 fence 语义）
+    uint32_t status = 0;
+    int ret = driver_->wait_fence(static_cast<uint64_t>(driver_fence), 5000, &status);
+    if (ret != 0 || status != 1) {
+        std::cerr << "[CudaScheduler] H2D memcpy fence timeout/error ret="
+                  << ret << " status=" << status << "\n";
+        return -ETIMEDOUT;
+    }
 
     auto fence = sync_mgr_.create_fence();
     sync_mgr_.signal_fence(fence);
@@ -238,11 +245,17 @@ int CudaScheduler::submit_memcpy_d2h(void* host_ptr, uint64_t device_ptr,
 
     int64_t driver_fence = driver_->submit_memcpy(0, device_ptr + offset,
                                                    reinterpret_cast<uint64_t>(host_ptr), size, false);
-    if (driver_fence < 0) {
+    if (driver_fence <= 0) {
         return -EIO;
     }
 
-    memory_mgr_.memcpy_d2h(host_ptr, mem, size);
+    uint32_t status = 0;
+    int ret = driver_->wait_fence(static_cast<uint64_t>(driver_fence), 5000, &status);
+    if (ret != 0 || status != 1) {
+        std::cerr << "[CudaScheduler] D2H memcpy fence timeout/error ret="
+                  << ret << " status=" << status << "\n";
+        return -ETIMEDOUT;
+    }
 
     auto fence = sync_mgr_.create_fence();
     sync_mgr_.signal_fence(fence);
@@ -275,24 +288,50 @@ CudaScheduler::LaunchResult CudaScheduler::submit_launch(const async_task::gpu::
     int64_t driver_fence = driver_->submit_launch(0, 0,
         params.grid_dim_x, params.grid_dim_y, params.grid_dim_z,
         params.block_dim_x, params.block_dim_y, params.block_dim_z);
-    if (driver_fence < 0) {
+    if (driver_fence <= 0) {
         task.state = Task::State::FAILED;
         task.error_code = -EIO;
+
+        auto fence = sync_mgr_.create_fence();
+        task.fence_id = fence->id;
+        sync_mgr_.signal_fence(fence);
 
         std::lock_guard<std::mutex> lock(tasks_mutex_);
         pending_tasks_[task_id] = task;
 
         result.status = -EIO;
+        result.task_id = task_id;
+        result.fence_id = fence->id;
+        return result;
+    }
+
+    // Phase C.2.2: 等 Puller 完成 kernel → fence 异步信号
+    uint32_t status = 0;
+    int wait_ret = driver_->wait_fence(static_cast<uint64_t>(driver_fence), 5000, &status);
+    if (wait_ret != 0 || status != 1) {
+        task.state = Task::State::FAILED;
+        task.error_code = -ETIMEDOUT;
+
+        auto fence = sync_mgr_.create_fence();
+        task.fence_id = fence->id;
+        sync_mgr_.signal_fence(fence);
+
+        std::lock_guard<std::mutex> lock(tasks_mutex_);
+        pending_tasks_[task_id] = task;
+
+        result.status = -ETIMEDOUT;
+        result.task_id = task_id;
+        result.fence_id = fence->id;
         return result;
     }
 
     auto fence = sync_mgr_.create_fence();
     task.state = Task::State::COMPLETED;
+    task.fence_id = fence->id;
     sync_mgr_.signal_fence(fence);
 
     {
         std::lock_guard<std::mutex> lock(tasks_mutex_);
-        task.fence_id = fence->id;
         pending_tasks_[task_id] = task;
     }
 

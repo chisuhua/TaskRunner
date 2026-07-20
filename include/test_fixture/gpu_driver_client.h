@@ -390,8 +390,8 @@ public:
             return -1;
         }
 
-        *status_out = args.status;
-        return 0;
+        if (status_out) *status_out = args.status;
+        return (args.status == 1) ? 0 : -ETIMEDOUT;  // Phase C.2.1: 超时 status=0 返回 -ETIMEDOUT
     }
 
     int wait_fence(uint64_t fence_id) override {

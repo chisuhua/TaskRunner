@@ -27,6 +27,10 @@ TaskRunner TADR 分为 3 个 scope：
 | tadr-105 | H-7 deferred mirror | ACCEPTED | ADR-034 |
 | tadr-106 | test-fixture scope 明确化 | ACCEPTED | ADR-036 |
 | tadr-109 | IGpuDriver 31 方法扩展 | ACCEPTED | ADR-033 |
+| tadr-110 | IGpuDriver Phase 3.1/3.2 Real-Path consumer-lens (16 方法 ↔ ioctl 0x50-0x68) | PROPOSED | tadr-301, tadr-305 |
+| tadr-111 | HAL L2 Foundation Removal consumer-lens (5 项 emu 移除 + 27 HAL fn-ptr 影响) | PROPOSED | tadr-110, tadr-302 |
+| tadr-113 | Stage 4.4-4.6 ioctl Extension Tracking (SEM/IB_JUMP/Predicate/AQL/PDL/ContextType/Timeline 7 类待消费) | PROPOSED | tadr-301, tadr-302, ADR-047/049/051/052/046 |
+| tadr-114 | REGISTER_GPU/CREATE_QUEUE/QUERY_QUEUE Semantic Alignment (08-03 派发表强化,query_queue 缺失) | PROPOSED | tadr-301, tadr-110, tadr-111, tadr-113 |
 
 ## umd-evolution scope (2xx)
 
@@ -37,6 +41,8 @@ TaskRunner TADR 分为 3 个 scope：
 | tadr-203 | 同步统一（原 tadr-003）| PROPOSED | — |
 | tadr-204 | umd-evolution scope 明确化 | PROPOSED | ADR-036 |
 | tadr-205 | UMD PoC 路线图（deferred）| PROPOSED | — |
+| tadr-206 | IGpuDriver Phase 3.1/3.2 UMD-Evolution consumer-lens (shim 桥接缺口 5/16 = 31%) | PROPOSED | tadr-110, TADR-401 |
+| tadr-207 | Register/Queue/QueryQueue UMD-Evolution consumer-lens (08-03 强化 shim 桥接审计 + query_queue 阻塞) | PROPOSED | tadr-114, TADR-401 |
 
 ## shared scope (107 + 108 + 3xx)
 
@@ -49,6 +55,16 @@ TaskRunner TADR 分为 3 个 scope：
 | tadr-303 | Error Handling 基础（Result\<T\>）| ACCEPTED | — |
 | tadr-304 | Error Handling 策略层 | ACCEPTED | tadr-303 |
 | tadr-305 | IGpuDriver::memPoolExportShareable 契约 (Phase 4 新增 47 方法) | ACCEPTED | tadr-301 |
+| tadr-306 | stream_id u32 ↔ u64 Cross-Repo Drift (记录性,触发条件驱动,IGpuDriver 契约 exception) | PROPOSED | tadr-301 (exception) |
+
+## promotion scope (4xx)
+
+> TADR-4xx reserved for **promotion proposals** (e.g., promote umd-evolution → ACCEPTED).
+> 与 test-fixture/umd-evolution/shared 3-scope 平行，归档在 `docs/umd-evolution/adr/` 下。
+
+| TADR | 主题 | 状态 | 关联 |
+|------|------|------|------|
+| tadr-401 | UMD-EVOLUTION → ACCEPTED promotion criteria (5-entry checklist) | PROPOSED | tadr-110, tadr-206, tadr-207 |
 
 ## 维护政策
 
@@ -66,4 +82,4 @@ TaskRunner TADR 分为 3 个 scope：
 - 跨仓同步协议: `../../../../docs/00_adr/adr-035-governance-policy.md`
 - AGENTS.md §Scope Classification: `../../../AGENTS.md`
 
-最后更新: 2026-06-25 (H-5.1 scope clarification cleanup)
+最后更新: 2026-08-04 (TADR-110/111/113/114 (test-fixture) + TADR-206/207 (umd-evolution) + TADR-306 (shared, 由 112 迁移))

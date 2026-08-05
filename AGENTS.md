@@ -1,5 +1,23 @@
 # TaskRunner - C++ Hybrid Development
 
+## OVERVIEW
+
+C++ concurrent task framework (singleton `TaskRunner` + `CmdProcessor` workers + `CmdBuffer`/`Barrier`/`EventQueue` primitives). Coupled to UsrLinuxEmu via `IGpuDriver` interface; provides CLI + LD_PRELOAD `libcuda_taskrunner.so` shim. C++17, CMake 3.20+, doctest. Project structure is a **submodule** of UsrLinuxEmu at `external/TaskRunner` — cross-repo work is the default mode here.
+
+## WHERE TO LOOK
+
+| Task | Location | Notes |
+|------|----------|-------|
+| Understand scheduler/event model | `include/test_fixture/{TaskRunner,CmdStream,CmdBuffer,CmdProcessor,EventQueue,TaskQueue,TaskBuffer,Barrier}.h` | read in this order |
+| Add CLI subcommand | `src/test_fixture/cmd_cuda.cpp` + `cli_main.cpp` | dispatch in `cmd_buffer_v2_main()` |
+| Modify GPU ioctl path | `src/test_fixture/gpu_driver_client.cpp` + `include/test_fixture/gpu_driver_client.h` | only allowed consumer of `GPU_IOCTL_*` |
+| Add CUDA runtime API | `src/umd/cuda_runtime_api.cpp` + `include/umd/cuda_runtime_api.hpp` | links into both CLI and shim |
+| Add shim symbol (LD_PRELOAD) | `src/umd/libcuda_shim/cu_*.cpp` | weak→strong override pattern, see `cu_init.cpp` |
+| Write test | `tests/{test_fixture,umd,shared}/*_test.cpp` | doctest framework; `mock_gpu_driver.hpp` for unit tests |
+| Cross-repo TADR | `docs/{test-fixture,umd-evolution,shared}/adr/tadr-*.md` | mirror entry in UsrLinuxEmu `docs/00_adr/README.md` |
+| Build mode switch | `cmake/{Shared,TestFixture,UMDEvolution}.cmake` | `TASKRUNNER_BUILD_MODE={test-fixture,umd-evolution}` |
+| Subdir-level conventions | `src/AGENTS.md`, `include/AGENTS.md`, `tests/AGENTS.md`, `docs/AGENTS.md`, `cmake/AGENTS.md`, `tools/AGENTS.md`, `openspec/AGENTS.md` | per-dir child files |
+
 ## 项目架构 (H-5 3-scope)
 
 ```
@@ -31,7 +49,7 @@ TaskRunner/
 │   ├── umd/                          # umd-evolution 头文件
 │   │   ├── cuda_runtime_api.hpp         # CudaRuntimeApi (Phase 1)
 │   └── shared/                       # shared 头文件
-│       ├── igpu_driver.hpp           # IGpuDriver 接口 (28→31 方法)
+│       ├── igpu_driver.hpp           # IGpuDriver 接口 (28→47 方法, tadr-301)
 │       ├── sync_primitives.hpp       # 同步原语抽象
 │       ├── memory_manager.hpp        # 内存管理器
 │       └── error_handling.hpp        # Result<T> + ErrorCode
@@ -91,8 +109,8 @@ mkdir -p build && cd build && cmake ..
 # 构建 test 模式
 cd build && make -j4
 
-# 构建 CLI 模式
-cd build && cmake .. -DBUILD_CLI=ON && make -j4
+# 构建 CLI 模式 (CLI 默认构建，无 BUILD_CLI flag)
+cd build && make -j4
 
 # 运行测试
 ./build/test_cuda_scheduler
@@ -265,3 +283,39 @@ cmake -B build -DTASKRUNNER_BUILD_MODE=test-fixture
 # Explicit umd-evolution (alias for default; kept for backward compat)
 cmake -B build -DTASKRUNNER_BUILD_MODE=umd-evolution
 ```
+
+## CODE MAP
+
+Core classes (read in this order to understand the scheduler):
+
+| Symbol | Type | Location | Role |
+|--------|------|----------|------|
+| `TaskRunner` | Singleton | `include/test_fixture/TaskRunner.h` | Owns CmdProcessors, dispatch loop, barrier registry |
+| `CmdStream` | Per-thread | `include/test_fixture/CmdStream.h` | Thread-local event source; launches tasks/buffers/barriers |
+| `CmdBuffer` | Buffer | `include/test_fixture/CmdBuffer.h` | Ordered/unordered queue of Task/Barrier/CmdBuffer |
+| `CmdProcessor` | Worker | `include/test_fixture/CmdProcessor.h` | Worker thread; processes dispatch queue, steals work |
+| `EventQueue` | Sync | `include/test_fixture/EventQueue.h` | mutex+condvar queue |
+| `TaskQueue` | Sync | `include/test_fixture/TaskQueue.h` | Stealable task queue |
+| `TaskBuffer` | Buffer | `include/test_fixture/TaskBuffer.h` | Batched task buffer |
+| `Barrier` | Sync | `include/test_fixture/Barrier.h` | 4-type fence (RELEASE/ACQUIRE/WAIT/GROUP) |
+| `IGpuDriver` | Interface | `include/shared/igpu_driver.hpp` | 31-method abstraction (replaces ioctl direct calls) |
+| `GpuDriverClient` | Adapter | `include/test_fixture/gpu_driver_client.h` | Wraps GPU_IOCTL_* system calls |
+| `CudaScheduler` | High-level | `include/test_fixture/cuda_scheduler.hpp` | DI-injected scheduler; uses IGpuDriver |
+| `CudaStub` | Stub | `include/test_fixture/cuda_stub.hpp` | Pure-CPU stub implementation |
+| `CudaRuntimeApi` | Class | `include/umd/cuda_runtime_api.hpp` | Phase 1 shim runtime API |
+| `cuInit` | Shim entry | `src/umd/libcuda_shim/cu_init.cpp` | Strong symbol override + `runtime()` lazy accessor |
+
+## SUBDIR GUIDES
+
+| Path | What it covers |
+|------|----------------|
+| `src/` | Source layout, scope annotations, file patterns |
+| `src/test_fixture/` | Scheduler + CLI + stub architecture |
+| `src/umd/` | CudaRuntimeApi + CUDA driver shim |
+| `src/umd/libcuda_shim/` | 17-file CUDA driver shim (`cu_*.cpp` weak→strong override pattern) |
+| `include/` | Header organization, public API surface |
+| `tests/` | Doctest usage, mock infrastructure, per-scope test layout |
+| `docs/` | ADR organization, 3-scope doc conventions |
+| `cmake/` | Build system architecture (3 module files) |
+| `tools/` | Tooling scripts (docs-audit.sh, coverage.sh, verify-phase17.sh) |
+| `openspec/` | OpenSpec workflow (changes/, specs/, config.yaml) |

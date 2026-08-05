@@ -6,7 +6,7 @@ STATUS: ACCEPTED
 # docs/architecture/ — TaskRunner 整体架构目录
 
 > **范围**: TaskRunner 用户态 CUDA/Vulkan API 兼容层 + Runtime Stub
-> **最后更新**: 2026-06-23（H-4.5 docs governance cleanup）
+> **最后更新**: 2026-08-04 (新增 2 份 gap-analysis: phase-3-1-3-2 + stage4-ioctl-consumer)
 > **关联**: [docs/adr/](../adr/) (决策记录) + [docs/roadmap/](../roadmap/) (实施路径图)
 
 TaskRunner 架构的 **consumer-lens 视图**（与 UsrLinuxEmu 仓 SSOT 交叉引用，不重复内容）。
@@ -19,6 +19,8 @@ TaskRunner 架构的 **consumer-lens 视图**（与 UsrLinuxEmu 仓 SSOT 交叉�
 | [layers.md](./layers.md) | 分层视图 (App → Stub → Scheduler → IGpuDriver → Backend) | ✅ Live |
 | [data-flow.md](./data-flow.md) | 数据流图 (CUDA kernel launch / Vulkan submit / 测试注入) | ✅ Live |
 | [capabilities.md](./capabilities.md) | Capability 分组 (gpu-driver-arch / gpu-phase2 / governance) | ✅ Live |
+| [phase-3-1-3-2-real-path-implementation-gap-analysis.md](./phase-3-1-3-2-real-path-implementation-gap-analysis.md) | Phase 3.1/3.2 Real-Path 实施差距 (CudaStub 缺口 + umd E2E 回归) | 🔄 Proposed |
+| [stage4-ioctl-consumer-gap-analysis.md](./stage4-ioctl-consumer-gap-analysis.md) | Stage 4.4-4.6 ioctl Consumer 差距 (7 类上游能力未消费) | 🔄 Proposed |
 
 ## 与 UsrLinuxEmu SSOT 关系
 

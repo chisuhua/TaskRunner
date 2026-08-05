@@ -1,6 +1,6 @@
 ---
 SCOPE: UMD-EVOLUTION
-STATUS: ACCEPTED
+STATUS: PROPOSED
 DATE: 2026-06-30
 RELATED_DESIGN: ../../superpowers/specs/2026-06-30-umd-evolution-redesign.md
 ---
@@ -13,6 +13,7 @@ This directory holds the canonical architecture documentation for UMD-EVOLUTION,
 
 - `README.md` (this file) — Architecture overview + component diagram
 - `runtime-layering.md` — Detailed Phase 1/2 layering design
+- `umd-evolution-promotion-gap-analysis.md` — UMD-EVOLUTION → ACCEPTED promotion 差距 (TADR-401)
 
 ## Component Stack (As Of 2026-06-30)
 

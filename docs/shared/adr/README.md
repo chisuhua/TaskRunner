@@ -56,6 +56,8 @@ TaskRunner TADR 分为 3 个 scope：
 | tadr-304 | Error Handling 策略层 | ACCEPTED | tadr-303 |
 | tadr-305 | IGpuDriver::memPoolExportShareable 契约 (Phase 4 新增 47 方法) | ACCEPTED | tadr-301 |
 | tadr-306 | stream_id u32 ↔ u64 Cross-Repo Drift (记录性,触发条件驱动,IGpuDriver 契约 exception) | PROPOSED | tadr-301 (exception) |
+| tadr-307 | **IGpuDriver Kernel Module Extension**（PTX-EMU Image Executor HAL Backend 集成；新增 3 个纯虚方法 #48-#50 load/launch/unload_kernel_module + cu_module.cpp::cuModuleLoadData 替换 NOT_IMPLEMENTED + cu_launch.cpp fast-path；consumer-side 对偶 UsrLinuxEmu adr-076）| STALE (superseded by tadr-308, 2026-08-18) | tadr-301, UsrLinuxEmu adr-076, PTX-EMU ADR-0029 §D8 |
+| tadr-308 | **IGpuDriver VRAM-Load Extension**（PTX-EMU Image Executor H2D DMA 集成；append-only 新增 1 个 IGpuDriver 方法 `load_kernel_module` 默认 `-ENOSYS`；CUmodule 统一为 code BO GPU VA，含 `cuModuleLoad` 路径改造；UMD 侧 PTXIR header 解析 kernel_name；consumer-side 对偶 UsrLinuxEmu ADR-090 v1 §D1；5 项 owner 决策已落地 2026-08-18）| PROPOSED | tadr-301 (exception), tadr-307 (STALE), UsrLinuxEmu ADR-090 v1, PTX-EMU ADR-0029 §D8, CppTLM #19 |
 
 ## promotion scope (4xx)
 
@@ -82,4 +84,4 @@ TaskRunner TADR 分为 3 个 scope：
 - 跨仓同步协议: `../../../../docs/00_adr/adr-035-governance-policy.md`
 - AGENTS.md §Scope Classification: `../../../AGENTS.md`
 
-最后更新: 2026-08-04 (TADR-110/111/113/114 (test-fixture) + TADR-206/207 (umd-evolution) + TADR-306 (shared, 由 112 迁移))
+最后更新: 2026-08-18 (TADR-308 新增 (shared, IGpuDriver VRAM-Load Extension, PTX-EMU Image Executor H2D DMA consumer-side 对偶 UsrLinuxEmu ADR-090 v1 + 替代 STALE TADR-307))

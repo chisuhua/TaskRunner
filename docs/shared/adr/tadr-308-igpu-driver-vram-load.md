@@ -282,35 +282,38 @@ CUresult cuModuleUnload(CUmodule module) {
 }
 ```
 
-> **⚠️ Oracle M1 警告（2026-08-18）**：
-> `cuModuleUnload` 当前实现**未清理** `func_to_module` / `mod_to_func` / `func_to_name` / `func_to_attrs` 等 handle 表，
-> 会导致**悬挂 CUfunction handle**（已 unload 的 module 的 function 仍可被 `cuLaunchKernel` 调用）。
+> **⚠️ Oracle M1 警告（2026-08-18）+ Oracle 2026-08-20 F4 缩窄**：
+> `cuModuleUnload` 当前实现（`cu_module.cpp:99-114`）**部分**清理 handle 表：
+> - ✅ **已清理**：`func_to_name`（per line 107 循环 erase）
+> - ❌ **未清理**：`func_to_attrs` + `func_to_module`（导致悬挂 CUfunction handle）
 >
-> **修复草案**（`tasks.md T-005b` 新增任务）：
+> Oracle 2026-08-20 `ses_fe0443831...` F4 实地验证：`mod_to_func` + `mod_to_name` 也已清理，仅 `func_to_attrs`/`func_to_module` 需补充。
+>
+> **修复草案**（`tasks.md T-005b` 修订，per Oracle F4 缩窄范围）：
 > ```cpp
 > extern "C" CUresult cuModuleUnload(CUmodule module) {
 >   std::lock_guard<std::mutex> lock(g_handles.mu);
->   // M1 修复: 清理所有 func_to_* 表
+>   // M1 + F4 修复: 补充清理 func_to_attrs + func_to_module (func_to_name 已清理)
 >   auto it = g_handles.mod_to_func.find(module);
 >   if (it != g_handles.mod_to_func.end()) {
 >     for (CUfunction func : it->second) {
->       g_handles.func_to_name.erase(func);
->       g_handles.func_to_attrs.erase(func);
->       g_handles.func_to_module.erase(func);
+>       g_handles.func_to_attrs.erase(func);   // F4: 新增
+>       g_handles.func_to_module.erase(func);  // F4: 新增
 >     }
 >     g_handles.mod_to_func.erase(it);
 >   }
 >   g_handles.mod_to_name.erase(module);
->   // 然后调 free_bo
+>   // 然后调 free_bo (per T-003 G2: VA → get_bo_gpu_va → BO handle → free_bo)
 >   uint64_t vram_addr = reinterpret_cast<uint64_t>(module);
->   int rc = runtime()->free_bo(vram_addr);
+>   uint32_t bo_handle = 0;
+>   int rc = runtime()->get_bo_gpu_va(vram_addr, &bo_handle);
+>   if (rc != 0) return cuda_error_from_errno(rc);
+>   rc = runtime()->free_bo(bo_handle);
 >   return cuda_error_from_errno(rc);
 > }
 > ```
 >
-> 此外，Oracle 建议新增 `IGpuDriver::unload_kernel_module(uint64_t handle)` 默认 -ENOSYS 方法，
-> 替代直接复用 `free_bo`（语义边界混淆，资源记账混乱）。此改动影响 tadr-308 §Decision 1.2 的"不删除任何现有方法"原则
-> ——需 owner 决策是否升级为 append 第 2 个新方法。
+> ~~Oracle 建议新增 `IGpuDriver::unload_kernel_module(uint64_t handle)` 默认 -ENOSYS 方法~~ → **per Oracle 2026-08-20 修订**：PoC 阶段选 G2 路径（VA 反查 + free_bo），**不**新增 IGpuDriver 方法（per ADR-023 append-only）。如未来需要更明确 unload 语义，发起独立 sub-change（见 tasks.md T-014 placeholder）。
 
 `cu_launch.cpp` 本轮**不动**（0x28 LAUNCH 已 deprecated，-ENOSYS per ADR-090 v2 §D2.2 — v2 修正 v1 §D2.2 编号漂移）。
 
@@ -444,6 +447,9 @@ cuLaunchKernel(fn, ...);         // fn 是 kernel handle, 与 mod 解耦
 | **#19 PTX-EMU Image Executor 关系澄清** | tadr-308 §Decision 1.1 应明确"不调 PTX-EMU 8 个 ABI（per ADR-090 v1 D3）"，避免读者误解路径依赖 | Oracle **M7** | ⏳ HARD |
 | **#20 `image_size` 字段类型对齐** | 已修订 `size_t → uint64_t` 对齐 ioctl 0x27 真实 `u64` | Oracle **C7** | ✅ 已修订 |
 | **#21 ADR-090 v1 §D4 矛盾解决** | ADR-090 v1 §D4 描述"删除 3 纯虚方法"与 tadr-308 §Decision 2 "append-only" 表面矛盾。**per Oracle 2026-08-20 修订**：不 amend v1 Superseded 文档；改在 tadr-308 §1.5/§Consequences + tasks.md T-010 DROP 替代（3 处覆盖真相） | Oracle **M8 修订** | ✅ 已解决 |
+| **#22 CUfunction 独立计数器（D6 owner 决策）** | `cuModuleGetFunction` (cu_module.cpp:82) 与原 `cuModuleLoad`（已废弃）共享 `g_handles.next_id`。tadr-308 §Decision 1.2 改 `cuModuleLoad` 为 VRAM-load 后，`cuModuleGetFunction` **必须**同步改为独立 `next_func_id` 计数器，避免函数 ID 与模块 ID (GPU VA) 撞号。**owner 已决策 (2026-08-18 Sisyphus)**：选项 A（独立计数器，与仓内 `cu_array`/`cu_event`/`cu_stream` 惯例一致）| Oracle **MF-4 / D6** | ✅ 已决策 (选项 A) |
+| **#23 DISPATCH_KERNEL packet 携带 vram_addr (G1)** | `cuLaunchKernel` 路径**不消费** vram_addr（per Oracle G1 重大发现）。修复：在 `submit_batch` (igpu_driver.hpp:191) 扩展 `GPU_OP_DISPATCH_KERNEL = 0x04` packet payload = `{vram_addr(u64), kernel_name(str), grid/block/args/smem}`。**owner 决策**：在 tasks.md T-013 实施 | Oracle **G1** | 📋 待 T-013 实施 |
+| **#24 PTX-EMU 真实 fixture 验证（T-009b）** | 用 PTX-EMU `tests/ptxir/fixtures/multi_kernel_basic.ptxir` + `cute_rmsnorm.ptxir` 验证 24B header 格式 + string_table tail 推断 + MANIFEST parse | Oracle **A′ T-009b** | 📋 待 T-009b 实施 |
 
 ## Migration
 
@@ -462,10 +468,10 @@ cuLaunchKernel(fn, ...);         // fn 是 kernel handle, 与 mod 解耦
 
 | 仓 | 跟踪载体 | 当前状态 |
 |---|---|---|
-| UsrLinuxEmu | ADR-090 v1 + annex §E | ✅ Accepted (commit `e03b5a1` + `37a91b6`) |
-| CppTLM | #19 v3.0 RFC | ✅ Gate #2 ack 2026-08-18 |
-| PTX-EMU | HSK-6 公告草稿 | 🚫 [PTX-EMU #12](https://github.com/chisuhua/PTX-EMU/issues/12) closed, 待 PTX-EMU owner 发出 commit |
-| TaskRunner | tadr-308 (本文件) + openspec change | 📋 本 change 待 owner 启动 |
+| UsrLinuxEmu | [ADR-090 v2](https://github.com/chisuhua/UsrLinuxEmu/blob/main/docs/00_adr/adr-090-ptxir-via-h2d-dma-v2.md) (canonical ✅ Accepted) + [annex §E](https://github.com/chisuhua/UsrLinuxEmu/blob/main/docs/05-advanced/adr-090-cross-repo-coordination.md) | ✅ Accepted (commit `e03b5a1` + `37a91b6`); v1 🚫 Superseded |
+| CppTLM | [issue #19](https://github.com/chisuhua/CppTLM/issues/19) v3.0 RFC | ✅ Gate #2 ack 2026-08-18 |
+| PTX-EMU | [ADR-0029 §D8](https://github.com/chisuhua/PTX-EMU/blob/main/docs/adr/ADR-0029-ptxemu-image-executor.md#d8-cp-端集成约定--hal-扩展方案usrlinuxemu--ptx-emu-跨仓契约) amendment | 🚫 **per ADR-090 v2 §C4**: §D8 仍描述旧 HAL 方案，待 PTX-EMU owner 发起 amendment (D8.1~D8.8 + D8-Alt); [PTX-EMU #12](https://github.com/chisuhua/PTX-EMU/issues/12) closed |
+| TaskRunner | tadr-308 (本文件) + openspec change `2026-08-18-tadr-308-igpu-driver-vram-load` | 📋 本 change 已 Apply 待 owner 启动 (per Oracle A′ 修订 2026-08-20 + 5 个 atomic commit 已落) |
 
 ## References
 

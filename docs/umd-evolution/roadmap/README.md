@@ -47,7 +47,7 @@ For a new session after this one:
 | `phase-1-6-7-extensions-complete.md` | Phase 1.5/1.6/1.7 follow-ups |
 | `phase-3-3-complete.md` | **Phase 3.3 (Event timing + Texture/Surface) complete (NEW)** |
 | `phase-3-deferred.md` | Phase 3 historical deferred status (superseded by ACTIVE prep notes) |
-| `tadr-308-implementation-roadmap.md` | **TADR-308 (IGpuDriver VRAM-Load Extension) 实施专项路线图 (2026-08-20 NEW)** |
+| `tadr-308-implementation-roadmap.md` | **TADR-308 (IGpuDriver VRAM-Load Extension) 实施专项路线图 v2 (2026-08-20 R2 NEW)** — per Oracle R2 verdict (REVISE further) + Metis review 揭示 3 CRITICAL 架构错误 + 6 项跨仓协调 (Phase 0 BLOCKING GATE) |
 
 ## Authoritative References
 

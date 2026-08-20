@@ -1,7 +1,7 @@
 ---
 SCOPE: UMD-EVOLUTION
 STATUS: ACTIVE
-LAST_UPDATED: 2026-07-05
+LAST_UPDATED: 2026-08-20
 ---
 
 # UMD-EVOLUTION Roadmap Status
@@ -47,6 +47,7 @@ For a new session after this one:
 | `phase-1-6-7-extensions-complete.md` | Phase 1.5/1.6/1.7 follow-ups |
 | `phase-3-3-complete.md` | **Phase 3.3 (Event timing + Texture/Surface) complete (NEW)** |
 | `phase-3-deferred.md` | Phase 3 historical deferred status (superseded by ACTIVE prep notes) |
+| `tadr-308-implementation-roadmap.md` | **TADR-308 (IGpuDriver VRAM-Load Extension) 实施专项路线图 (2026-08-20 NEW)** |
 
 ## Authoritative References
 

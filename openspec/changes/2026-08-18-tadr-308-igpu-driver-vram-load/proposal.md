@@ -15,10 +15,14 @@ UsrLinuxEmu [ADR-090 v1](https://github.com/chisuhua/UsrLinuxEmu/blob/main/docs/
 ### 1. `include/shared/igpu_driver.hpp` 新增 1 方法（append-only per ADR-023 §D4）
 
 ```cpp
-// 新增方法(默认 -ENOSYS, 不破坏 3 个现有实现者)
-virtual int load_kernel_module(const void* image, size_t image_size,
+// 新增方法(默认 -ENOSYS + 参数校验, 不破坏 3 个现有实现者)
+virtual int load_kernel_module(const void* image, uint64_t image_size,
                                uint64_t* out_vram_addr) {
-    (void)image; (void)image_size; (void)out_vram_addr;
+    // 参数校验 (对齐 tadr-308 §Decision 1.1 + ioctl 0x27 真实契约)
+    if (!out_vram_addr) return -EFAULT;
+    if (!image) return -EINVAL;
+    if (image_size == 0 || image_size > MAX_KERNEL_IMAGE_SIZE) return -EINVAL;
+    (void)image; (void)image_size;
     return -ENOSYS;
 }
 ```

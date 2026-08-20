@@ -113,7 +113,7 @@ TEST_CASE("IGpuDriver::load_kernel_module default impl returns -ENOSYS", "[tadr-
 **Implement**:
 ```cpp
 // include/shared/igpu_driver.hpp
-virtual int load_kernel_module(const void* image, size_t image_size,
+virtual int load_kernel_module(const void* image, uint64_t image_size,
                                uint64_t* out_vram_addr) {
     (void)image; (void)image_size; (void)out_vram_addr;
     return -ENOSYS;
@@ -152,7 +152,7 @@ CUresult cuModuleLoadData(CUmodule* module, const void* image) {
     // C2 修订: image_size 来源 — 取决于 owner 决策 T-000c
     // 方案 1 (PTXIR magic 头扫描): size_t image_size = ptixir_total_size(image);
     // 方案 2 (强制 LoadDataEx):     return CUDA_ERROR_INVALID_VALUE;
-    size_t image_size = 0;  // 占位 — T-000c 决策后填充
+    size_t image_size = 0;  // 占位 — T-000c 决策后填充 (实际 type 与 image_size_t 一致)
     if (image_size == 0) return CUDA_ERROR_INVALID_VALUE;
 
     uint64_t vram_addr = 0;
@@ -302,7 +302,7 @@ TEST_CASE("load_kernel_module error paths", "[tadr-308][T-005]") {
 **Implement**:
 ```cpp
 // include/shared/igpu_driver.hpp (默认体，参数校验 + 无 mutex)
-virtual int load_kernel_module(const void* image, size_t image_size,
+virtual int load_kernel_module(const void* image, uint64_t image_size,
                                uint64_t* out_vram_addr) {
     if (!out_vram_addr) return -EFAULT;
     if (!image && image_size > 0) return -EINVAL;
@@ -409,50 +409,54 @@ extern "C" CUresult cuModuleUnload(CUmodule module) {
 
 ---
 
-## T-008: 同步更新既有测试预期（C5 修复）
+## T-008: 补 `func_to_attrs`/`func_to_module` 映射测试（MF-2 修订）
 
-> **Oracle C5 警告（2026-08-18）**：当前 `tests/umd/test_cuda_shim.cpp:1037` 断言
-> `cuModuleLoadData(&mod, nullptr) == CUDA_ERROR_NOT_IMPLEMENTED`。T-002 改后返回 `CUDA_ERROR_NOT_SUPPORTED`（经 load_kernel_module 默认 -ENOSYS → cuda_error_from_errno）。
-> 此外 line 179-201 14 处 `cuModuleUnload(mod) == CUDA_SUCCESS` 测试在 T-005b 后预期不变（仍然 SUCCESS），但 M1 清理逻辑需测试覆盖。
+> **Oracle MF-2 修订（2026-08-19 Oracle `ses_fe13e43d2ffexPXVzuMj7hcyHK`）**：原 T-008 提议 NOT_IMPLEMENTED→NOT_SUPPORTED 错误码翻转，但 `include/cuda.h:67` 已将 `CUDA_ERROR_NOT_IMPLEMENTED` 定义为 `CUDA_ERROR_NOT_SUPPORTED` 的宏别名（同值 801），翻转无实际效果。T-008 改为补 `func_to_attrs`/`func_to_module` 表清理测试。
+>
+> 断言字面量顺带对齐 `NOT_SUPPORTED` 并注释别名（可读性提升）。
 
 **Write failing test**:
 ```cpp
-// tests/umd/test_cuda_shim.cpp:1035-1041 (修订)
-TEST_CASE("STUB APIs return NOT_SUPPORTED post tadr-308") {
+// tests/umd/test_cuda_shim.cpp (补充 M1 表清理测试 — 验证 T-005b 后 func_to_* 表完全清理)
+TEST_CASE("cuModuleUnload cleans up func_to_attrs AND func_to_module (MF-2)", "[tadr-308][T-008]") {
   CUmodule mod;
-  // tadr-308 修订: cuModuleLoadData 转发到 load_kernel_module → 默认 -ENOSYS
-  CHECK(cuModuleLoadData(&mod, nullptr) == CUDA_ERROR_NOT_SUPPORTED);
+  const uint8_t image[] = {0x50, 0x54, 0x49, 0x52};  // PTXIR magic
+  REQUIRE(cuModuleLoadData(&mod, image) == CUDA_SUCCESS);
+  CUfunction fn;
+  REQUIRE(cuModuleGetFunction(&fn, mod, "kernel") == CUDA_SUCCESS);
+
+  // 验证表已填充 (before unload)
+  REQUIRE(cuFuncGetModule(&mod, fn) == CUDA_SUCCESS);
+
+  REQUIRE(cuModuleUnload(mod) == CUDA_SUCCESS);
+
+  // 验证表已完全清理 (M1 + MF-2: func_to_name, func_to_attrs, func_to_module, mod_to_func)
+  CHECK(cuModuleGetFunction(&fn, mod, "kernel") == CUDA_ERROR_INVALID_HANDLE);
+  CHECK(cuFuncGetModule(&mod, fn) == CUDA_ERROR_INVALID_HANDLE);  // MF-2: func_to_module 必须清理
+}
+
+// tests/umd/test_cuda_shim.cpp:1035-1041 (字面量对齐 + 注释别名)
+TEST_CASE("STUB APIs post tadr-308", "[tadr-308][T-008]") {
+  CUmodule mod;
+  // tadr-308: cuModuleLoadData 走 load_kernel_module 默认 -ENOSYS
+  // CUDA_ERROR_NOT_IMPLEMENTED == CUDA_ERROR_NOT_SUPPORTED (include/cuda.h:67 宏别名)
+  CHECK(cuModuleLoadData(&mod, nullptr) == CUDA_ERROR_NOT_SUPPORTED);  // 等价 NOT_IMPLEMENTED
   // 其他仍 NOT_IMPLEMENTED (未走新路径)
   CHECK(cuModuleLoadDataEx(&mod, nullptr, 0, nullptr, nullptr) ==
         CUDA_ERROR_NOT_IMPLEMENTED);
   CHECK(cuModuleLoadFatBinary(&mod, nullptr) == CUDA_ERROR_NOT_IMPLEMENTED);
 }
-
-// tests/umd/test_cuda_shim.cpp:179-201 (补充 M1 测试)
-TEST_CASE("cuModuleUnload cleans up func tables (M1)") {
-  CUmodule mod;
-  const uint8_t image[] = {0x50, 0x54, 0x49, 0x52};
-  REQUIRE(cuModuleLoadData(&mod, image) == CUDA_SUCCESS);
-  CUfunction fn;
-  REQUIRE(cuModuleGetFunction(&fn, mod, "kernel") == CUDA_SUCCESS);
-  REQUIRE(cuModuleUnload(mod) == CUDA_SUCCESS);
-  // 验证 handle 表已清理
-  CHECK(cuModuleGetFunction(&fn, mod, "kernel") == CUDA_ERROR_INVALID_HANDLE);
-}
 ```
 
-**Verify fail**: 当前测试断言 `NOT_IMPLEMENTED`，T-002 改后返回 `NOT_SUPPORTED` 触发测试失败。
+**Verify fail**: 当前 `cuModuleUnload` 仅清理 `func_to_name` + `mod_to_func` + `mod_to_name`，未清理 `func_to_attrs` 和 `func_to_module`（per Oracle MF-2 / M1）。`cuFuncGetModule` 在 unload 后仍能返回旧 mod handle（悬挂 handle），触发测试失败。
 
 **Implement**:
-```cpp
-// tests/umd/test_cuda_shim.cpp (修订 line 1037)
-- CHECK(cuModuleLoadData(&mod, nullptr) == CUDA_ERROR_NOT_IMPLEMENTED);
-+ CHECK(cuModuleLoadData(&mod, nullptr) == CUDA_ERROR_NOT_SUPPORTED);
-```
+- T-005b 已负责 `func_to_attrs`/`func_to_module` 清理
+- 本 T-008 仅补测试覆盖 + 注释字面量别名
 
 **Verify pass**: `ctest -R test_cuda_shim` PASS。
 
-**Commit**: `test(cuda_shim): update cuModuleLoadData expected error code (tadr-308 T-008)`
+**Commit**: `test(cuda_shim): cover func_to_attrs/func_to_module cleanup (tadr-308 T-008 MF-2)`
 
 ---
 
@@ -520,6 +524,10 @@ TEST_CASE("cuModuleUnload cleans up func tables (M1)") {
 > 3. ✅ M11 kernel_name 解析 → 方案 A（UMD 侧解析 PTXIR header）
 > 4. ✅ M8 ADR-090 v1 §D4 amend → T-010 跨仓同步
 > 5. ✅ #14 父仓契约核验 → T-009 提前实施
+>
+> **Oracle MF-5 门禁声明（2026-08-19 `ses_fe13e43d2ffexPXVzuMj7hcyHK`）**：
+> - **§A（PTXIR magic 头扫描）+ §C（kernel_name 解析）以 T-009 完成 PTXIR 真实格式核验为硬前置**
+> - **§B（cuModuleLoad VRAM-load）豁免门禁**：仅依赖 ioctl 0x27 契约（u64 image_size + u64 out_vram_addr），该契约 Oracle 已在 session `ses_fe13e43d2ffexPXVzuMj7hcyHK` 中核验父仓 `plugins/gpu_driver/shared/gpu_ioctl.h:747-779` 通过
 
 **Action**：3 个子任务（§A / §B / §C）实施上述 3 个代码决策。
 
@@ -527,7 +535,7 @@ TEST_CASE("cuModuleUnload cleans up func tables (M1)") {
 
 **目的**：解决 C2 image_size 来源缺失。
 
-**Implement**（`src/umd/libcuda_shim/p2t/cu_module.cpp` 或新文件 `ptxir_parser.hpp`）：
+**Implement**（新建 `src/umd/libcuda_shim/ptxir_parser.hpp`，避免 shim 文件膨胀）：
 ```cpp
 namespace async_task::umd::shim {
 
@@ -541,13 +549,13 @@ struct ptixir_header {
 };
 #pragma pack(pop)
 
-inline size_t ptixir_total_size(const void* image) {
+inline uint64_t ptixir_total_size(const void* image) {
   if (!image) return 0;
   const uint8_t* p = static_cast<const uint8_t*>(image);
   ptixir_header hdr;
   std::memcpy(&hdr, p, PTXIR_HEADER_SIZE);
   if (hdr.magic != PTXIR_MAGIC) return 0;  // non-PTXIR
-  return static_cast<size_t>(hdr.total_size);
+  return hdr.total_size;
 }
 
 }  // namespace async_task::umd::shim
@@ -555,7 +563,7 @@ inline size_t ptixir_total_size(const void* image) {
 
 **集成**：T-002 `cuModuleLoadData` 调用前：
 ```cpp
-size_t image_size = ptixir_total_size(image);
+uint64_t image_size = ptixir_total_size(image);
 if (image_size == 0) return CUDA_ERROR_INVALID_VALUE;  // 引导用户改 LoadDataEx
 ```
 
@@ -603,13 +611,30 @@ extern "C" CUresult cuModuleLoad(CUmodule* module, const char* fname) {
 
 **注意**：原 `cuModuleLoad` 路径 (`next_id.fetch_add(1)`) 已废弃，所有 CUmodule 统一为 GPU VA。
 
-**Commit**: `feat(cu_module): unify cuModuleLoad + cuModuleLoadData to VRAM-load path (T-011 §B)`
+> **Oracle MF-4 / D6 警告（2026-08-19 `ses_fe13e43d2ffexPXVzuMj7hcyHK`）**：
+> `cu_module.cpp:82` `cuModuleGetFunction` 与原 `cuModuleLoad`（已废弃）共享 `g_handles.next_id` 计数器。
+> §B 改 `cuModuleLoad` 为 VRAM-load 后，`cuModuleGetFunction` 必须同步改为独立 `next_func_id` 计数器，避免函数 ID 与模块 ID（GPU VA）撞号。
+>
+> **修改示例**：
+> ```cpp
+> // g_handles 结构体加:
+> std::atomic<uint64_t> next_func_id{1};  // 独立于 next_id (CUmodule 已改为 VA)
+>
+> // cu_module.cpp:82 cuModuleGetFunction 改:
+> //  *hfunc = reinterpret_cast<CUfunction>(g_handles.next_id.fetch_add(1));
+> // 改为:
+> *hfunc = reinterpret_cast<CUfunction>(g_handles.next_func_id.fetch_add(1));
+> ```
+>
+> 这与仓内既有惯例一致（`cu_array.cpp`/`cu_event.cpp`/`cu_stream.cpp` 每张 HandleTable 都有独立 `next_id`）。
+
+**Commit**: `feat(cu_module): unify cuModuleLoad + cuModuleLoadData to VRAM-load path + independent func counter (T-011 §B)`
 
 ### §C: UMD 侧 PTXIR header 解析拿 kernel_name（方案 A 实施）
 
 **目的**：解决 M11 kernel_name 字段缺失（ioctl 0x27 不输出 kernel_name）。
 
-**Implement**（`src/umd/libcuda_shim/p2t/cu_module.cpp` 新增 helper）：
+**Implement**（追加到 §A 新建的 `src/umd/libcuda_shim/ptxir_parser.hpp`，与 §A 共享 PTXIR header 假设）：
 ```cpp
 namespace async_task::umd::shim {
 
@@ -624,7 +649,7 @@ struct ptixir_kernel_entry {
 };
 #pragma pack(pop)
 
-inline std::string ptixir_first_kernel_name(const void* image, size_t image_size) {
+inline std::string ptixir_first_kernel_name(const void* image, uint64_t image_size) {
   if (!image || image_size < PTXIR_HEADER_SIZE + sizeof(ptixir_kernel_entry)) {
     return {};
   }

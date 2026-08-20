@@ -81,16 +81,18 @@ inline CUresult cuda_error_from_errno(int rc) {
 
 **Commit**: `feat(shim): add cuda_error_from_errno helper (tadr-308 T-000b)`
 
-### T-000c: image_size 来源 owner 决策（C2）
+### T-000c: image_size 来源 owner 决策（C2）— **DECIDED per Oracle A′ 2026-08-20**
 
-**目的**：CUDA API `cuModuleLoadData` 无 size 参数，T-002 实施前需 owner 选方案 1（PTXIR magic 头）或方案 2（强制 `cuModuleLoadDataEx`）。
+**目的**：CUDA API `cuModuleLoadData` 无 size 参数，T-002 实施前需 owner 选方案 1（PTXIR 24B header 扫描）或方案 2（强制 `cuModuleLoadDataEx`）。
 
 **Action**：
-1. 在 [tadr-308 §Decision 1.3.1](../shared/adr/tadr-308-igpu-driver-vram-load.md) C2 警告段标注 owner 决策
-2. 在 [issues/10](https://github.com/chisuhua/TaskRunner/issues/10) 提请 owner 决策
-3. owner 决策前 T-002 **不实施**
+1. ~~在 [tadr-308 §Decision 1.3.1](../shared/adr/tadr-308-igpu-driver-vram-load.md) C2 警告段标注 owner 决策~~ → **已在 Commit 2 (83abae0) 落地**：选择方案 1（PTXIR 24B header + string_table tail 推断）
+2. ~~在 [issues/10](https://github.com/chisuhua/TaskRunner/issues/10) 提请 owner 决策~~ → **已落地**（commit 9431cce 反映）
+3. ~~owner 决策前 T-002 **不实施**~~ → **解除阻塞**（per Commit 2 owner 决策 + Oracle A′ 验证 2026-08-20）
 
-**Commit**: `docs(tadr-308): mark C2 image_size decision pending (T-000c)`
+**Commit**: ✅ `docs(tadr-308): apply Oracle A' decision (commit 83abae0)` — 已合并到 Commit 2
+
+**实施位置**（per tadr-308 §A + tasks.md T-011 §A）：`src/umd/libcuda_shim/ptxir_parser.hpp` 提供 `ptxir_total_size()` helper，T-002 在 `cuModuleLoadData` 调用前用其推断 size。
 
 ---
 
@@ -174,31 +176,61 @@ CUresult cuModuleLoadData(CUmodule* module, const void* image) {
 
 ---
 
-## T-003: `cuModuleUnload` 接入 `free_bo` 路径 (TDD 5 步)
+## T-003: `cuModuleUnload` 接入 `free_bo` 路径 (TDD 5 步) — G2 VA 翻译扩展
 
 **Write failing test**:
 ```cpp
-TEST_CASE("cuModuleUnload forwards to free_bo", "[tadr-308][T-003]") {
-    CUmodule module = (CUmodule)0xDEADBEEFCAFEBABE;
+TEST_CASE("cuModuleUnload forwards to free_bo via VA translation (G2)", "[tadr-308][T-003]") {
+    // 模拟 ioctl 0x27 返回 vram_addr
+    CUmodule module = (CUmodule)0xDEADBEEFCAFEBABEULL;
     CUresult rc = cuModuleUnload(module);
     REQUIRE(rc == CUDA_SUCCESS);
-    REQUIRE(mock_drv()->last_freed_bo() == 0xDEADBEEFCAFEBABE);
+    // G2 修订: free_bo 接受 BO handle (u32), CUmodule 是 GPU VA (u64)
+    // 需通过 get_bo_gpu_va(vram_addr) 反查 → u32 handle → free_bo(handle)
+    REQUIRE(mock_drv()->last_freed_bo_handle() == /*translated*/);
 }
 ```
 
 **Verify fail**: `cuModuleUnload` 当前返回 NOT_IMPLEMENTED。
 
-**Implement**:
+**Implement** (G2 修订版):
 ```cpp
 // src/umd/libcuda_shim/cu_module.cpp:99 (cuModuleUnload 当前实现位置)
 CUresult cuModuleUnload(CUmodule module) {
     if (!module) return CUDA_ERROR_INVALID_VALUE;
+
+    std::lock_guard<std::mutex> lock(g_handles.mu);
+
+    // T-005b: 清理 func_to_attrs/func_to_module 表
+    auto it = g_handles.mod_to_func.find(module);
+    if (it != g_handles.mod_to_func.end()) {
+        for (CUfunction func : it->second) {
+            g_handles.func_to_name.erase(func);
+            g_handles.func_to_attrs.erase(func);  // MF-2 修订: T-005b 已加
+            g_handles.func_to_module.erase(func);
+        }
+        g_handles.mod_to_func.erase(it);
+    }
+    g_handles.mod_to_name.erase(module);
+
+    // G2: CUmodule 是 u64 GPU VA → 通过 get_bo_gpu_va 反查 BO handle → free_bo(handle)
     uint64_t vram_addr = reinterpret_cast<uint64_t>(module);
-    int rc = runtime()->free_bo(vram_addr);
-    return cuda_error_from_errno(rc);  // NOT static_cast<CUresult>(rc) — errno 负值会变非法 CUDA error code
+    uint32_t bo_handle = 0;
+    int rc = runtime()->get_bo_gpu_va(vram_addr, &bo_handle);  // 反查
+    if (rc != 0) return cuda_error_from_errno(rc);
+
+    rc = runtime()->free_bo(bo_handle);  // free_bo 接 u32 handle
+    return cuda_error_from_errno(rc);
 }
 ```
 
+> **G2 修订（per Oracle session `ses_fe0443831ffenUxpEQxZqWE8Cp` Part B G2）**：
+> 1. `free_bo` 当前签名接 u32 BO handle（`gpu_driver_client.h:256-258`）
+> 2. CUmodule 重定义为 u64 GPU VA 后，类型不匹配
+> 3. 解决：调 `get_bo_gpu_va(vram_addr, &handle)` 反查 BO handle，再调 `free_bo(handle)`
+> 4. 备选方案：直接调 ioctl 0x29 `GPU_IOCTL_UNLOAD_KERNEL_MODULE`（`module_handle = vram_addr` 语义，per ADR-090 v2 §D1.2 表保留）
+> 5. 选择反查路径因为：(a) 不新增 ioctl 0x29 调用链；(b) `get_bo_gpu_va` 已存在 (`igpu_driver.hpp:162`)
+>
 > **修正点（per 2026-08-18 review）**：
 > 1. 加 `if (!module)` nullptr 检查（之前缺失）
 > 2. 用 `cuda_error_from_errno(rc)` 而非 `static_cast<CUresult>(rc)`——`free_bo` 返回负 errno（如 -EINVAL/-ENOMEM），CUresult 枚举仅 0-999 合法，强转会产生非法 CUDA error code
@@ -206,7 +238,7 @@ CUresult cuModuleUnload(CUmodule module) {
 
 **Verify pass**: `ctest -R tadr-308` PASS。
 
-**Commit**: `feat(cu_module): forward cuModuleUnload to free_bo (tadr-308 T-003)`
+**Commit**: `feat(cu_module): forward cuModuleUnload to free_bo via VA translation G2 (tadr-308 T-003)`
 
 ---
 
@@ -462,38 +494,135 @@ TEST_CASE("STUB APIs post tadr-308", "[tadr-308][T-008]") {
 
 ## T-009: 父仓契约核验（Gate #14）
 
-> **Oracle 第二轮审查硬前置**（per `ses_feaa41dfaffeVTyUSpzNH5FDx2`）：Oracle 沙盒内 UsrLinuxEmu 符号链接断裂，ioctl 0x27/HAL #66/ADR-090 v1/PTX-EMU ABI/CppTLM ABI 未独立核验。
+> **Oracle 第二轮审查硬前置**（per `ses_feaa41dfaffeVTyUSpzNH5FDx2`）：Oracle 沙盒内 UsrLinuxEmu 符号链接断裂，ioctl 0x27/HAL #66/ADR-090 v2/PTX-EMU ABI/CppTLM ABI 未独立核验。
 
 **Action**（owner apply change 前必做）：
 
 1. **拉取 UsrLinuxEmu 仓**：`git clone https://github.com/chisuhua/UsrLinuxEmu` 后核对
-   - `plugins/gpu_driver/shared/gpu_ioctl.h:723-779` ioctl 0x27 struct 字段
-   - `plugins/gpu_driver/hal/gpu_hal.h:351` HAL #66 签名
-   - `docs/00_adr/adr-090-ptxir-via-h2d-dma.md` ADR-090 v1 全文 §D1 §D2 §D3
+   - `plugins/gpu_driver/shared/gpu_ioctl.h:740-750` ioctl 0x27 struct 字段（**注意**：v2 §D2.1 doc drift，**以 shipped header 为准**）
+   - `plugins/gpu_driver/hal/gpu_hal.h:370` HAL #66 签名（`int (*kernel_module_load)(void *ctx, void *args)`）
+   - `plugins/gpu_driver/hal/hal_user.cpp:692` `user_kernel_module_load` 实现（H2D DMA write，**零 ptxemu 符号**）
+   - `docs/00_adr/adr-090-ptxir-via-h2d-dma-v2.md` ADR-090 v2（canonical ✅ Accepted）§D1 §D2 §D3
+   - `docs/00_adr/adr-090-ptxir-via-h2d-dma.md` ADR-090 v1（🚫 Superseded by v2）仅做历史参考
 
 2. **拉取 PTX-EMU 仓**：`git clone https://github.com/chisuhua/PTX-EMU` 后核对
-   - `include/cudart/cpptlm_module.h` v2 8 个 ABI 函数签名
-   - `docs/adr/ADR-0029-ptxemu-image-executor.md` §D8 集成约定
+   - `include/cudart/cpptlm_module.h:12-52` 8 个 ABI 函数签名（CPPTLM_MODULE_VERSION 1 — 修正 Oracle session `ses_fe0443831...` 验证）
+   - `include/ptx_ir/ptxir_format.h:53-62` PTXIR 24B header 真实结构
+   - `include/ptx_ir/ptxir_format.h:65-69` 6B TOC entry
+   - `src/ptx_ir/ptxir_writer.cpp:33-82` `write_manifest_section` MANIFEST 序列化（cubin_hash + kernel_name + ptx_address_size + params + kernels[]）
+   - `docs/adr/ADR-0029-ptxemu-image-executor.md`（**注意**：§D8 仍描述旧 HAL 方案，per v2 §C4 待 amendment）
+   - `docs/adr/ADR-0028-multi-kernel-manifest.md` 多 kernel manifest 扩展
 
 3. **拉取 CppTLM 仓**：`git clone https://github.com/chisuhua/CppTLM` 后核对
    - issue #19 v3.0 RFC 真实承诺
-   - Mode A → Mode B 演进时间表
+   - Mode A → Mode B 演进时间表（per ADR-090 v2 §D3）
 
 4. **核验通过判据**：
-   - tadr-308 §Decision 1.1 字段类型 (`uint64_t image_size` + `uint64_t* out_vram_addr`) 与 ioctl 0.27 struct 一致
-   - tadr-308 §1.5 kernel_name 路径（如选方案 A）不依赖 PTX-EMU ABI
-   - tadr-308 §Consequences 0x28 deprecated 描述与 UsrLinuxEmu 实际 handler 一致
-   - tadr-308 §Consequences 0x29 走 FREE_BO 路径描述与 UsrLinuxEmu 实际 handler 一致
+   - tadr-308 §Decision 1.1 字段类型 (`uint64_t image_size` + `uint64_t* out_vram_addr`) 与 shipped ioctl 0x27 struct 一致
+   - tadr-308 §1.2 CUmodule = GPU VA 重定义 与 ADR-090 v2 §D1 `out_vram_addr` 一致
+   - tadr-308 §1.5 kernel_name 路径（Oracle A′）由应用在 `cuModuleGetFunction` 传入，**不**依赖 PTX-EMU ABI（per ADR-090 v2 §D1.2 表"❌ 不经 HAL"）
+   - tadr-308 §Decision 2 "不删除" 与 tadr-301 rule 4 "FORBIDDEN" 一致（tadr-307 仅文档未 ship）
 
 **依赖**：本任务**无前置代码**，可在 T-001 ~ T-008 实施前并行执行。
 
-**Verify pass**：owner 在 usrlx PTX-EMU CppTLM 三仓 README 或 issue 评论中确认核对结果。
+**Verify pass**：owner 在 UsrLinuxEmu PTX-EMU CppTLM 三仓 README 或 issue 评论中确认核对结果。
 
 **Commit**: `docs(tadr-308): add T-009 父仓契约核验 trace (owner verified)`
 
 ---
 
-## T-010: ADR-090 v1 §D4 amend 同步（Gate #21）
+## T-009b: PTX-EMU 真实 PTXIR fixture 验证（per Oracle A′ 修订 2026-08-20）
+
+> **背景（per Oracle session `ses_fe0443831...` Part D Recommendation）**：tadr-308 §A 的 PTXIR 解析代码依赖 PTX-EMU 真实 PTXIR 格式（24B header + string_table tail + TOC + MANIFEST section）。在 shim 实施前**必须用真实 fixture 验证**，避免假设错（已教训：tadr-308 旧 §A "PTIR" magic + 16B + total_size 字段 全部错误）。
+
+**Action**:
+
+1. **复制 PTX-EMU fixtures 到 TaskRunner tests**:
+   ```bash
+   cp /workspace/project/PTX-EMU/tests/ptxir/fixtures/multi_kernel_basic.ptxir \
+      tests/umd/fixtures/multi_kernel_basic.ptxir
+   cp /workspace/project/PTX-EMU/tests/ptxir/fixtures/cute_rmsnorm.ptxir \
+      tests/umd/fixtures/cute_rmsnorm.ptxir
+   ```
+
+2. **写一次性验证脚本** (`tools/verify_ptxir_format.sh`):
+   ```bash
+   #!/bin/bash
+   set -e
+   # 验证 magic = "PTXI" + 24B header
+   for f in tests/umd/fixtures/*.ptxir; do
+     magic=$(head -c 4 "$f")
+     if [ "$magic" != "PTXI" ]; then
+       echo "FAIL: $f magic = '$magic', expected 'PTXI'"
+       exit 1
+     fi
+     # 验证 header_size = 24 at offset 20-23 (LE)
+     hs=$(od -An -tx1 -N 4 -j 20 "$f" | tr -d ' \n')
+     hs_dec=$((16#$hs))
+     if [ "$hs_dec" != "24" ]; then
+       echo "FAIL: $f header_size = $hs_dec, expected 24"
+       exit 1
+     fi
+     # 验证 string_table_offset + string_table_size = file size (字符串表在尾部)
+     st_off=$(od -An -tu4 -N 4 -j 12 "$f" | tr -d ' \n ')
+     st_size=$(od -An -tu4 -N 4 -j 16 "$f" | tr -d ' \n ')
+     file_size=$(stat -c%s "$f")
+     if [ "$((st_off + st_size))" != "$file_size" ]; then
+       echo "FAIL: $f string_table end ($((st_off + st_size))) != file_size ($file_size)"
+       exit 1
+     fi
+     echo "OK: $f (magic=PTXI, header_size=24, total_size=$file_size)"
+   done
+   ```
+
+3. **写 TaskRunner C++ fixture reader 单元测试** (`tests/umd/test_ptxir_format.cpp`):
+   ```cpp
+   TEST_CASE("PTXIR 24B header validation against real fixtures", "[tadr-308][T-009b]") {
+     // Read tests/umd/fixtures/multi_kernel_basic.ptxir
+     // Verify magic "PTXI", version=4, header_size=24
+     // Verify total_size = string_table_offset + string_table_size
+   }
+
+   TEST_CASE("ptxir_total_size() helper works on real fixture", "[tadr-308][T-009b]") {
+     // Load fixture, call shim helper, verify returned size == file size
+   }
+   ```
+
+4. **MANIFEST 解析验证** (multi_kernel fixture 含多个 kernel):
+   ```cpp
+   TEST_CASE("ptxir_list_kernel_names() returns multi-kernel fixture names", "[tadr-308][T-009b]") {
+     // Load multi_kernel_basic.ptxir
+     // Parse TOC, find MANIFEST section
+     // Iterate kernels[] vector (per ADR-0028)
+     // Assert non-empty vector of kernel names
+   }
+   ```
+
+**依赖**：本任务**无前置代码**，可与 T-009 同步并行执行。
+
+**Verify pass**: `bash tools/verify_ptxir_format.sh` PASS + `ctest -R tadr-308` PASS。
+
+**Commit**: `test(ptxir): validate 24B header + MANIFEST parse against real PTX-EMU fixtures (tadr-308 T-009b)`
+
+---
+
+## T-010: ~~ADR-090 v1 §D4 amend 同步（Gate #21）~~ — **DROPPED per Oracle 修订 2026-08-20**
+
+> **删除原因**：ADR-090 v1 已被 ADR-090 v2 ✅ Accepted 取代（per UsrLinuxEmu `docs/00_adr/README.md` v2 = canonical），amend Superseded 文档是浪费。如需 v1 §D4 描述修正，**在 v2 或 tadr-308 自身补充**即可（v2 §D1.2 表已涵盖 kernel_name ❌ 不经 HAL/ioctl 关键事实）。
+>
+> **替代措施**：已合入 tadr-308 §1.5 修订块（per Commit 2）+ tadr-308 §Consequences 修订（per Commit 4）。无需独立 T-010 任务。
+>
+> **保留为历史 changelog**（不删除段落，记录决策变更原因）:
+
+旧 T-010 内容保留如下作 changelog 备份：
+
+> **Oracle 第三轮审查 M8**（2026-08-18 session `ses_feaa41dfaffeVTyUSpzNH5FDx2`）：tadr-308 §Decision 2 "append-only" 与 ADR-090 v1 §D4 "删除 3 纯虚方法" 描述表面矛盾。真相是 tadr-307 仅有文档无 ship 代码（无代码可删），需跨仓文档同步。
+>
+> **Action**（已 DROPPED）：
+> 1. **tadr-308 端**（已完成）：`docs/shared/adr/tadr-308-igpu-driver-vram-load.md` §Decision 2 加 "M8 警告" 段；说明 tadr-307 实际仅有文档无 ship 代码
+> 2. **UsrLinuxEmu 端**（DROPPED）：amend `docs/00_adr/adr-090-ptxir-via-h2d-dma.md` §D4 描述（v1 已 Superseded，改为在 v2 §D1.2 表或 tadr-308 §Consequences 修订）
+>
+> 关联: chisuhua/UsrLinuxEmu ADR-090 v2 commit `e03b5a1`
 
 > **Oracle 第三轮审查 M8**：tadr-308 §Decision 2 "append-only" 与 ADR-090 v1 §D4 "删除 3 纯虚方法" 描述表面矛盾。真相是 tadr-307 仅有文档无 ship 代码（无代码可删），需跨仓文档同步。
 
@@ -531,31 +660,49 @@ TEST_CASE("STUB APIs post tadr-308", "[tadr-308][T-008]") {
 
 **Action**：3 个子任务（§A / §B / §C）实施上述 3 个代码决策。
 
-### §A: PTXIR magic 头扫描 helper（方案 1 实施）
+### §A: PTXIR 24B header 扫描 helper（per Oracle A′ 修订 2026-08-20）
 
-**目的**：解决 C2 image_size 来源缺失。
+**目的**：解决 C2 image_size 来源缺失（per Oracle session `ses_fe0443831...`）。
 
-**Implement**（新建 `src/umd/libcuda_shim/ptxir_parser.hpp`，避免 shim 文件膨胀）：
+**真实 PTXIR v4 格式**（per [PTX-EMU `include/ptx_ir/ptxir_format.h:53-62`](../../../../../PTX-EMU/include/ptx_ir/ptxir_format.h)）：
+- header 24B: `magic[4] + version u16 + flags u16 + section_count u16 + reserved u16 + string_table_offset u32 + string_table_size u32 + header_size u32`
+- **layout 字符串表在尾部**（per `ptxir_format.h:12` Header comment）
+- **NO total_size 字段** — 推断为 `string_table_offset + string_table_size`
+
+**Implement**（新建 `src/umd/libcuda_shim/ptxir_parser.hpp`，避免 shim 文件膨胀，与 §C 共享）：
 ```cpp
 namespace async_task::umd::shim {
 
-constexpr uint32_t PTXIR_MAGIC = 0x50544952;  // "PTIR" little-endian
-constexpr size_t PTXIR_HEADER_SIZE = 16;
+// PTX-EMU v4 header 24B (per ptxir_format.h:53-62)
+constexpr char PTXIR_MAGIC[4] = {'P', 'T', 'X', 'I'};
+constexpr size_t PTXIR_HEADER_SIZE = 24;
+
 #pragma pack(push, 1)
 struct ptixir_header {
-  uint32_t magic;       // PTXIR_MAGIC
-  uint32_t version;     // currently 1 or 2
-  uint64_t total_size;  // entire image byte count
+  char     magic[4];              // "PTXI"
+  uint16_t version;               // currently 4
+  uint16_t flags;                 // must be 0
+  uint16_t section_count;
+  uint16_t reserved;
+  uint32_t string_table_offset;   // absolute file offset
+  uint32_t string_table_size;
+  uint32_t header_size;           // = 24
 };
 #pragma pack(pop)
 
-inline uint64_t ptixir_total_size(const void* image) {
+static_assert(sizeof(ptixir_header) == 24, "PTXIR header must be 24B");
+
+// §A: 推断 image 总字节数 (per layout "string table at end")
+// 失败返回 0 (non-PTXIR 或 header 损坏)
+inline uint64_t ptxir_total_size(const void* image) {
   if (!image) return 0;
   const uint8_t* p = static_cast<const uint8_t*>(image);
   ptixir_header hdr;
   std::memcpy(&hdr, p, PTXIR_HEADER_SIZE);
-  if (hdr.magic != PTXIR_MAGIC) return 0;  // non-PTXIR
-  return hdr.total_size;
+  if (std::memcmp(hdr.magic, PTXIR_MAGIC, 4) != 0) return 0;  // non-PTXIR
+  if (hdr.header_size != PTXIR_HEADER_SIZE) return 0;          // sanity check
+  return static_cast<uint64_t>(hdr.string_table_offset) +
+         static_cast<uint64_t>(hdr.string_table_size);
 }
 
 }  // namespace async_task::umd::shim
@@ -563,11 +710,13 @@ inline uint64_t ptixir_total_size(const void* image) {
 
 **集成**：T-002 `cuModuleLoadData` 调用前：
 ```cpp
-uint64_t image_size = ptixir_total_size(image);
-if (image_size == 0) return CUDA_ERROR_INVALID_VALUE;  // 引导用户改 LoadDataEx
+uint64_t image_size = ptxir_total_size(image);
+if (image_size == 0) return CUDA_ERROR_INVALID_VALUE;  // non-PTXIR → use LoadDataEx
 ```
 
-**Commit**: `feat(shim): add PTXIR magic header scanner for image_size (T-011 §A)`
+**T-009b 验证**：用 `tests/umd/fixtures/multi_kernel_basic.ptxir` 跑 `ptxir_total_size()` 必须返回真实文件大小（156 字节）。
+
+**Commit**: `feat(shim): add PTXIR 24B header scanner for image_size (T-011 §A per Oracle A')`
 
 ### §B: `cuModuleLoad` 改走 VRAM-load 路径（方案 A 实施）
 
@@ -630,49 +779,104 @@ extern "C" CUresult cuModuleLoad(CUmodule* module, const char* fname) {
 
 **Commit**: `feat(cu_module): unify cuModuleLoad + cuModuleLoadData to VRAM-load path + independent func counter (T-011 §B)`
 
-### §C: UMD 侧 PTXIR header 解析拿 kernel_name（方案 A 实施）
+### §C: UMD 侧 PTXIR MANIFEST 解析（optional validation, **DEFERRED per Oracle A′**）
 
-**目的**：解决 M11 kernel_name 字段缺失（ioctl 0x27 不输出 kernel_name）。
-
-**Implement**（追加到 §A 新建的 `src/umd/libcuda_shim/ptxir_parser.hpp`，与 §A 共享 PTXIR header 假设）：
-```cpp
-namespace async_task::umd::shim {
-
-constexpr uint32_t PTXIR_KERNEL_NAME_OFFSET = 16;  // header 后首个 kernel manifest
-constexpr size_t PTXIR_KERNEL_NAME_MAX = 256;
-
-#pragma pack(push, 1)
-struct ptixir_kernel_entry {
-  uint32_t name_offset;  // offset from image start
-  uint32_t name_length;
-  uint64_t entry_point;  // code offset
-};
-#pragma pack(pop)
-
-inline std::string ptixir_first_kernel_name(const void* image, uint64_t image_size) {
-  if (!image || image_size < PTXIR_HEADER_SIZE + sizeof(ptixir_kernel_entry)) {
-    return {};
-  }
-  ptixir_kernel_entry entry;
-  std::memcpy(&entry, static_cast<const uint8_t*>(image) + PTXIR_HEADER_SIZE,
-              sizeof(entry));
-  if (entry.name_offset + entry.name_length > image_size) return {};
-  return std::string(static_cast<const char*>(image) + entry.name_offset,
-                      entry.name_length);
-}
-
-}  // namespace async_task::umd::shim
-```
-
-**集成**：T-002 `cuModuleLoadData` 成功后：
-```cpp
-std::string kernel_name = ptixir_first_kernel_name(image, image_size);
-if (!kernel_name.empty()) {
-  g_handles.mod_to_name[*module] = kernel_name;
-}
-```
-
-**Commit**: `feat(shim): parse kernel_name from PTXIR header in UMD (T-011 §C)`
+> **状态变更（per Oracle session `ses_fe0443831...` A′ 2026-08-20）**：tadr-308 §1.5 方案 A 降级为 **可选 MANIFEST 验证**。
+>
+> **降级原因**：
+> 1. launch 流程**从未**需要 UMD 从 PTXIR 提取 kernel_name（kernel_name 由应用在 `cuModuleGetFunction` 传入）
+> 2. §C 旧实现（16B header + 自定义 `ptixir_kernel_entry` 在 offset 16）假设全部错误
+> 3. 仅当希望 `CUDA_ERROR_NOT_FOUND` 提前错误（typo kernel_name 检测）时才需要 §C
+>
+> **PoC 阶段**：本任务 **DEFERRED**（不在 T-001 ~ T-008 实施范围）。未来增强：
+> - 若 owner 决策需要 typo 检测，**单独发起** sub-change
+> - 实施格式：24B header + TOC walk (找 type=6 MANIFEST) + iterate kernels[] 向量 (per ADR-0028)
+>
+> **占位实施**（per ADR-0028 多 kernel manifest）：
+> ```cpp
+> // 追加到 §A 的 src/umd/libcuda_shim/ptxir_parser.hpp (24B header 共享)
+> namespace async_task::umd::shim {
+>
+> #pragma pack(push, 1)
+> struct ptixir_toc_entry {
+>   uint8_t  type;                  // PtxirSectionType (REGDECL=1, ..., MANIFEST=6)
+>   uint8_t  reserved;
+>   uint32_t offset;                // absolute file offset
+> };
+> #pragma pack(pop)
+>
+> // 列出 MANIFEST section 内 kernels[] 向量 (per ADR-0028 + ptxir_writer.cpp:33-82)
+> inline std::vector<std::string>
+> ptxir_list_kernel_names(const void* image, uint64_t image_size) {
+>   std::vector<std::string> names;
+>   if (!image || image_size < PTXIR_HEADER_SIZE) return names;
+>   const uint8_t* p = static_cast<const uint8_t*>(image);
+>   ptixir_header hdr;
+>   std::memcpy(&hdr, p, PTXIR_HEADER_SIZE);
+>   if (std::memcmp(hdr.magic, PTXIR_MAGIC, 4) != 0) return names;
+>
+>   // 1. walk TOC entries
+>   for (uint16_t i = 0; i < hdr.section_count; ++i) {
+>     size_t toc_off = PTXIR_HEADER_SIZE + i * sizeof(ptixir_toc_entry);
+>     if (toc_off + sizeof(ptixir_toc_entry) > image_size) break;
+>     ptixir_toc_entry toc;
+>     std::memcpy(&toc, p + toc_off, sizeof(toc));
+>     if (toc.type != 6 /* MANIFEST */) continue;  // only interested in MANIFEST
+>
+>     // 2. parse MANIFEST section (per ptxir_writer.cpp:33-82)
+>     // - cubin_hash (32B) skip
+>     // - kernel_name (NUL-terminated string) skip (v1 compat)
+>     // - ptx_address_size (u8) skip
+>     // - params (u16 count + N × entries) skip
+>     // - kernels: u16 count + N × (NUL string + u32 arg_count + u32 arg_byte_size)
+>     const uint8_t* mp = p + toc.offset;
+>     const uint8_t* mend = mp + (image_size - toc.offset);
+>     mp += 32;  // skip cubin_hash
+>     while (mp < mend && *mp) ++mp;  // skip kernel_name NUL-terminated
+>     ++mp;
+>     if (mp >= mend) return names;
+>     ++mp;  // skip ptx_address_size
+>     if (mp + 2 > mend) return names;
+>     uint16_t param_count;
+>     std::memcpy(&param_count, mp, 2);
+>     mp += 2;
+>     for (uint16_t pi = 0; pi < param_count && mp < mend; ++pi) {
+>       while (mp < mend && *mp) ++mp;  // param name
+>       ++mp;
+>       mp += 2;  // param size
+>       ++mp;     // param kind
+>     }
+>     if (mp + 2 > mend) return names;
+>     uint16_t kernel_count;
+>     std::memcpy(&kernel_count, mp, 2);
+>     mp += 2;
+>     for (uint16_t ki = 0; ki < kernel_count && mp < mend; ++ki) {
+>       const char* name_start = reinterpret_cast<const char*>(mp);
+>       while (mp < mend && *mp) ++mp;  // kernel name NUL-terminated
+>       names.emplace_back(name_start, mp - reinterpret_cast<const uint8_t*>(name_start));
+>       ++mp;
+>       mp += 8;  // skip arg_count u32 + arg_byte_size u32
+>     }
+>     return names;
+>   }
+>   return names;
+> }
+>
+> }  // namespace async_task::umd::shim
+> ```
+>
+> **集成** (optional, 仅在 typo 检测 enabled 时):
+> ```cpp
+> // cu_module.cpp cuModuleGetFunction 内:
+> if (g_handles.validation_enabled.count(*module)) {
+>   auto names = ptxir_list_kernel_names(image_bytes_, image_size_);
+>   if (std::find(names.begin(), names.end(), name) == names.end()) {
+>     return CUDA_ERROR_NOT_FOUND;
+>   }
+> }
+> ```
+>
+> **Commit** (when implemented): `feat(shim): optional MANIFEST validation for CUDA_ERROR_NOT_FOUND (T-011 §C deferred)`
 
 **T-011 实施依赖**：T-000a (CudaRuntimeApi) + T-000b (cuda_error_from_errno) + T-002 + T-009 + T-010 全部 ✅
 
@@ -680,7 +884,122 @@ if (!kernel_name.empty()) {
 
 ---
 
-## 验收总结
+## T-013 NEW: DISPATCH_KERNEL packet payload 规格 — G1 launch 路径修复（per Oracle 2026-08-20）
+
+> **Oracle 重大发现（per session `ses_fe0443831...` Part B G1）**：
+> 现行 `cuLaunchKernel` → `runtime()->launch_kernel(name, ...)` → `CudaScheduler::submit_launch(stream_id, kernel_index, ...)` → `IGpuDriver::submit_launch` (`igpu_driver.hpp:219`)
+> **VRAM 加载的 image 在 `vram_addr` 永远不会被 launch 路径引用**。
+>
+> **问题**：`submit_launch` 接 `kernel_index`（不是 vram_addr）；CudaRuntimeApi 需要手动 `register_kernel()`；VRAM-load 路径返回的 vram_addr 与 kernel_index 无映射。
+>
+> **修复方向**（per Oracle Part D Recommendation 2）：
+> 不新增 IGpuDriver 方法（per ADR-023 append-only），而是扩展 `submit_batch` (igpu_driver.hpp:191) 携带新 packet payload：
+> **DISPATCH_KERNEL packet** = `{vram_addr(u64), kernel_name(str), grid/block/args/smem}`
+>
+> CppTLM Mode B (per ADR-090 v2 §D3.3) SQ/CQ doorbell 收到 DISPATCH_KERNEL packet 后，调 `ptxemu_image_execute_named` 执行。
+
+**Write failing test**:
+```cpp
+TEST_CASE("cuLaunchKernel after cuModuleLoadData submits DISPATCH_KERNEL with vram_addr",
+          "[tadr-308][T-013]") {
+    // 1. load PTXIR image → vram_addr
+    CUmodule mod;
+    const uint8_t ptxir[] = {/* real PTXIR fixture bytes */};
+    REQUIRE(cuModuleLoadData(&mod, ptxir) == CUDA_SUCCESS);
+    uint64_t expected_vram = (uint64_t)mod;  // CUmodule = vram_addr
+
+    // 2. get function
+    CUfunction fn;
+    REQUIRE(cuModuleGetFunction(&fn, mod, "my_kernel") == CUDA_SUCCESS);
+
+    // 3. launch — expect submit_batch with DISPATCH_KERNEL packet
+    void* args[] = {nullptr};
+    REQUIRE(cuLaunchKernel(fn, 1, 1, 1, 1, 1, 1, 0, nullptr, args, nullptr) ==
+            CUDA_SUCCESS);
+
+    // 4. verify mock received DISPATCH_KERNEL with vram_addr + name
+    auto& mock = *mock_drv();
+    REQUIRE(mock.last_submit_batch_packet_type() == GPU_OP_DISPATCH_KERNEL);
+    REQUIRE(mock.last_submit_batch_vram_addr() == expected_vram);
+    REQUIRE(mock.last_submit_batch_kernel_name() == "my_kernel");
+}
+```
+
+**Verify fail**: 当前 `cuLaunchKernel` (`cu_launch.cpp:62-95`) 调 `runtime()->launch_kernel(name, ...)`，仅传 kernel name，**vram_addr 丢失**。Mock 收不到 DISPATCH_KERNEL packet。
+
+**Implement**:
+
+1. **新增 `DISPATCH_KERNEL` packet payload 结构** (在 `include/shared/igpu_driver.hpp` 或新 `include/shared/dispatch_kernel_packet.hpp`):
+   ```cpp
+   namespace async_task::shared {
+   constexpr uint32_t GPU_OP_DISPATCH_KERNEL = 0x04;  // 新增 opcode
+
+   struct dispatch_kernel_packet {
+     uint64_t vram_addr;      // cuModuleLoadData 返回的 vram_addr (= CUmodule)
+     uint32_t grid_x, grid_y, grid_z;
+     uint32_t block_x, block_y, block_z;
+     uint32_t shared_mem_bytes;
+     uint64_t args_ptr;       // 用户态 void** kernel_args
+     uint64_t args_count;
+     char     kernel_name[256]; // 应用在 cuModuleGetFunction 传入
+   };
+   }
+   ```
+
+2. **修改 `cu_launch.cpp`** (`cu_launch.cpp:62-95`):
+   ```cpp
+   extern "C" CUresult cuLaunchKernel(CUfunction f, uint32_t grid_x, ...) {
+     // ... 现有 grid/block/args 校验 ...
+     std::string kernel_name = resolve_func_name_impl(f);
+     CUmodule mod = (CUmodule)0;
+     cuFuncGetModule(&mod, f);  // 反查 func_to_module[f]
+
+     // G1 修复: 构造 DISPATCH_KERNEL packet 携带 vram_addr (= mod) + name
+     dispatch_kernel_packet pkt{};
+     pkt.vram_addr = reinterpret_cast<uint64_t>(mod);  // ★ vram_addr 关键
+     // ... grid/block/args/smem 填充 ...
+     std::strncpy(pkt.kernel_name, kernel_name.c_str(), 255);
+     pkt.kernel_name[255] = '\0';
+
+     // 调 runtime()->submit_batch (已有 IGpuDriver 方法, 不新增)
+     int rc = runtime()->submit_batch(
+         default_stream_id_,
+         &pkt, sizeof(pkt),
+         GPU_OP_DISPATCH_KERNEL);
+     return cuda_error_from_errno(rc);
+   }
+   ```
+
+3. **`GpuDriverClient::submit_batch` 扩展**: 接 `GPU_OP_DISPATCH_KERNEL` opcode，序列化 packet 到 `gpu_submit_batch_args` (已有 ioctl)，**不新增 ioctl**。
+
+4. **GpuDriverClient::submit_launch 现状**: 已存在但走 `kernel_index` 路径，与 VRAM-load 路径不兼容。本任务**保留** `submit_launch` 不变（其他路径仍在用），仅扩展 `submit_batch`。
+
+**依赖**:
+- T-001~T-008 全部 ✅
+- T-009 父仓契约核验 ✅ (verify UsrLinuxEmu submit_batch dispatch table 接受新 opcode)
+- T-009b PTX-EMU fixture 验证 ✅ (verify DISPATCH_KERNEL packet payload 兼容真实 PTXIR)
+
+**Verify pass**: `ctest -R tadr-308` PASS + e2e (mock) launch 路径核验 PASS。
+
+**Commit**: `feat(cu_launch): DISPATCH_KERNEL packet carries vram_addr + name (tadr-308 T-013 G1 fix)`
+
+---
+
+## T-014 NEW: `unload_kernel_module` 方法评估 — Oracle 2026-08-20 评估
+
+> **Oracle Part D Recommendation 2 延伸**（per `ses_fe0443831...`）：
+> 当前 T-003 用 `get_bo_gpu_va + free_bo` 路径卸载（绕过 ioctl 0x29）。
+> 备选方案：直接调 `GPU_IOCTL_UNLOAD_KERNEL_MODULE` (ioctl 0x29)，per ADR-090 v2 §D1.2 表保留。
+>
+> **决策**（owner 必决）：采用 T-003 路径（VA 反查 + free_bo）OR 新增 IGpuDriver `unload_kernel_module` 调 ioctl 0x29。
+>
+> **推荐**（per Oracle Part E A′）：
+> - PoC 阶段选 **T-003 路径**（不新增 IGpuDriver 方法，per ADR-023 append-only）
+> - 长期：若 ioctl 0x29 获得更明确语义（区分 unload code BO vs free BO），可单独 T-014+ sub-change 升级
+>
+> **本 T-014 占位为决策记录**：实际不实施代码，仅 owner 决策记录。Commit 在 T-003 完成时一并包含。
+
+---
 
 | Task | 描述 | TDD Phase | Commit Hash | Status |
 |---|---|---|---|---|

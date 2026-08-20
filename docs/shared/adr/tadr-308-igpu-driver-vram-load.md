@@ -37,7 +37,7 @@ RELATED: PTX-EMU ADR-0029
 ```cpp
 /** @brief 加载 PTXIR image 到 CppTLM VRAM (H2D DMA 路径)
  *
- * 对齐 UsrLinuxEmu [ADR-090 v1 §D1](../../../../docs/00_adr/adr-090-ptxir-via-h2d-dma.md#d1-修订点) + ioctl 0x27 struct `gpu_load_kernel_module_args` (per `plugins/gpu_driver/shared/gpu_ioctl.h:723-779`)。
+ * 对齐 UsrLinuxEmu [ADR-090 v2 §D1](../../../../docs/00_adr/adr-090-ptxir-via-h2d-dma-v2.md#d1-8-函数-abi-全量采纳) + ioctl 0x27 struct `gpu_load_kernel_module_args` (per `plugins/gpu_driver/shared/gpu_ioctl.h:740-750`)。
  * 默认实现返回 -ENOSYS（不破坏 3 个 现有 IGpuDriver 实现者）。
  *
  * @param image        PTXIR image bytes (host pointer)
@@ -227,7 +227,7 @@ virtual int load_kernel_module(const void* image, uint64_t image_size,
 **tadr-307 提议的删除清单作废**——tadr-308 **不删除**任何现有 IGpuDriver 方法，**仅追加** 1 个新方法。理由：
 - 现有 49 个虚方法已被多个实现者覆盖，删除会破坏向后兼容
 - `submit_batch` (`include/shared/igpu_driver.hpp:191`) 已存在（**真实方法名**, 不是 `submit_pushbuffer_batch`——后者是 PTX-EMU owner review 中的笔误）
-- launch/unload kernel module 走 `submit_batch` 路径（DISPATCH_KERNEL packet per ADR-090 v1 §D3.3），不需要新增方法
+- launch/unload kernel module 走 `submit_batch` 路径（DISPATCH_KERNEL packet per ADR-090 v2 §D3.3 + tasks.md T-013），不需要新增方法
 
 > **⚠️ Oracle 2026-08-18 第二轮审查 M8 警告（session `ses_feaa41dfaffeVTyUSpzNH5FDx2`）**：
 > tadr-308 §Decision 2 与 [ADR-090 v1 §D4](../docs/00_adr/adr-090-ptxir-via-h2d-dma.md#d4-taskrunner-tadr-308-修订需求) 描述**表面矛盾**：
@@ -236,7 +236,7 @@ virtual int load_kernel_module(const void* image, uint64_t image_size,
 >
 > **真相澄清**：tadr-307 提议的 3 个方法（load/launch/unload_kernel_module）**从未 ship**——tadr-307 仅是 PROPOSED 文档（per `tasks.md T-006` "tadr-307 是 PROPOSED 未实施"），仓内 IGpuDriver grep 0 命中 `kernel_module` 方法。**没有代码可删除**。
 >
-> **跨仓一致性建议**：owner apply change 时同步 amend ADR-090 v1 §D4 描述（"删除 3 方法" → "无需删除，因 tadr-307 仅文档未 ship"）。
+> **跨仓一致性建议（per Oracle 2026-08-20 修订）**：ADR-090 v1 已被 v2 ✅ Accepted 取代，**不**amend v1 Superseded 文档。**已在 tadr-308 §1.5 (Commit 2) + §Consequences (Commit 4) + tasks.md T-010 DROP 替代**——3 处覆盖 v1 §D4 描述真相。
 
 ### 3. tadr-307 标 STALE（不撤不删）
 
@@ -259,7 +259,7 @@ tadr-307 是 PROPOSED 未实施（仓内 IGpuDriver 49 虚方法中无任何 ker
 // src/umd/libcuda_shim/cu_module.cpp:135 (现状: strong-symbol override stub)
 CUresult cuModuleLoadData(CUmodule* module, const void* image) {
     // 旧实现: NOT_IMPLEMENTED
-    // 新实现 (per tadr-308 + ADR-090 v1 §D3):
+    // 新实现 (per tadr-308 + ADR-090 v2 §D3 + tasks.md T-002):
     if (!module || !image) return CUDA_ERROR_INVALID_VALUE;
     uint64_t vram_addr = 0;
     int rc = runtime()->load_kernel_module(image, image_size, &vram_addr);
@@ -312,7 +312,7 @@ CUresult cuModuleUnload(CUmodule module) {
 > 替代直接复用 `free_bo`（语义边界混淆，资源记账混乱）。此改动影响 tadr-308 §Decision 1.2 的"不删除任何现有方法"原则
 > ——需 owner 决策是否升级为 append 第 2 个新方法。
 
-`cu_launch.cpp` 本轮**不动**（0x28 LAUNCH 已 deprecated，-ENOSYS per ADR-090 v1 §D2.2）。
+`cu_launch.cpp` 本轮**不动**（0x28 LAUNCH 已 deprecated，-ENOSYS per ADR-090 v2 §D2.2 — v2 修正 v1 §D2.2 编号漂移）。
 
 > **Oracle M4 注解（2026-08-18）**：`cu_launch.cpp` 当前实现（`runtime()->launch_kernel(name, ...)`）**不读 CUmodule**，
 > `CUmodule` 重定义对 launch 路径**无实际效果**。重定义主要为 `cuFuncGetModule` + `cuModuleUnload` 链服务（M1 修复后生效）。
@@ -437,13 +437,13 @@ cuLaunchKernel(fn, ...);         // fn 是 kernel handle, 与 mod 解耦
 
 | Gate | 描述 | 来源 | 阻塞状态 |
 |---|---|---|:---:|
-| **#15 ADR-090 v1 canonical 引用修正** | tadr-308 §Context/§Reference 引用 `adr-090-ptxir-via-h2d-dma-v2.md` 404，UsrLinuxEmu 实际只有 v1 canonical (`adr-090-ptxir-via-h2d-dma.md`)。已修订引用 | Oracle **C6** | ⏳ HARD |
+| **#15 ADR-090 v2 canonical 引用确认** | tadr-308 §Context 引用 `adr-090-ptxir-via-h2d-dma-v2.md` — Oracle 2026-08-20 验证 v2 ✅ Accepted 为 canonical，v1 🚫 Superseded by v2 | Oracle **C6 修订** | ✅ 已确认 |
 | **#16 `kernel_name` 解析路径 owner 决策** | ioctl 0x27 已删 `kernel_name` 字段（per ADR-090 v1 D2），tadr-308 必须决策 M11 三方案（UMD PTXIR 解析 / lookup / 加 ioctl 字段） | Oracle **M11 重大新发现** | ⏳ HARD |
 | **#17 `MAX_KERNEL_IMAGE_SIZE` (64MB) 边界处理** | ioctl 0.27 handler 强制 `image_size ∈ [1, 64MB]`，UMD 侧默认体需校验，超限返回 -EINVAL 而非让 ioctl 失败 | Oracle **M10** | ⏳ HARD |
 | **#18 HAL #66 vs ioctl 0.27 引用准确化** | tadr-308 §Decision 1.1 引用"HAL #66"误导（实际是 void*args 单参数），应改为 "ioctl 0x27 struct `gpu_load_kernel_module_args`" | Oracle **M6** | ⏳ HARD |
 | **#19 PTX-EMU Image Executor 关系澄清** | tadr-308 §Decision 1.1 应明确"不调 PTX-EMU 8 个 ABI（per ADR-090 v1 D3）"，避免读者误解路径依赖 | Oracle **M7** | ⏳ HARD |
 | **#20 `image_size` 字段类型对齐** | 已修订 `size_t → uint64_t` 对齐 ioctl 0x27 真实 `u64` | Oracle **C7** | ✅ 已修订 |
-| **#21 ADR-090 v1 §D4 amend 同步** | ADR-090 v1 §D4 描述"删除 3 纯虚方法"与 tadr-308 §Decision 2 "append-only" 表面矛盾，owner apply change 时需 amend v1 §D4 描述真相 | Oracle **M8** | ⏳ HARD |
+| **#21 ADR-090 v1 §D4 矛盾解决** | ADR-090 v1 §D4 描述"删除 3 纯虚方法"与 tadr-308 §Decision 2 "append-only" 表面矛盾。**per Oracle 2026-08-20 修订**：不 amend v1 Superseded 文档；改在 tadr-308 §1.5/§Consequences + tasks.md T-010 DROP 替代（3 处覆盖真相） | Oracle **M8 修订** | ✅ 已解决 |
 
 ## Migration
 
@@ -469,12 +469,21 @@ cuLaunchKernel(fn, ...);         // fn 是 kernel handle, 与 mod 解耦
 
 ## References
 
-- UsrLinuxEmu [ADR-090 v1](https://github.com/chisuhua/UsrLinuxEmu/blob/main/docs/00_adr/adr-090-ptxir-via-h2d-dma.md) (canonical)
+- UsrLinuxEmu [ADR-090 v2](https://github.com/chisuhua/UsrLinuxEmu/blob/main/docs/00_adr/adr-090-ptxir-via-h2d-dma-v2.md) (**canonical** ✅ Accepted; v1 🚫 Superseded by v2)
+- UsrLinuxEmu [ADR-090 v1](https://github.com/chisuhua/UsrLinuxEmu/blob/main/docs/00_adr/adr-090-ptxir-via-h2d-dma.md) (历史参考，🚫 Superseded)
+- UsrLinuxEmu [ADR-036 three-way-separation](../../../../docs/00_adr/adr-036-three-way-separation.md) ✅ Accepted
+- UsrLinuxEmu [ADR-023 HAL interface](../../../../docs/00_adr/adr-023-hal-interface.md) ✅ Accepted (HAL append-only 治理)
+- UsrLinuxEmu [ADR-035 governance-policy](../../../../docs/00_adr/adr-035-governance-policy.md) ✅ Accepted (跨仓 R5.1 4 步)
+- PTX-EMU [ADR-0023 ptxir-binary-format](../../../../../PTX-EMU/docs/adr/ADR-0023-ptxir-binary-format.md) ✅ Accepted (24B header + TOC + Extend-Only 版本管理)
+- PTX-EMU [ADR-0028 multi-kernel-manifest](../../../../../PTX-EMU/docs/adr/ADR-0028-multi-kernel-manifest.md) ✅ Accepted (kernels[] 向量 + backward-compat)
+- PTX-EMU [ADR-0029 ptxemu-image-executor](../../../../../PTX-EMU/docs/adr/ADR-0029-ptxemu-image-executor.md) ✅ Accepted (cpptlm_module.h 8 ABI; **§D8 待 amendment per ADR-090 v2 §C4**)
+- PTX-EMU [`include/ptx_ir/ptxir_format.h`](../../../../../PTX-EMU/include/ptx_ir/ptxir_format.h) PTXIR 24B header + TOC + section 真实格式定义
 - UsrLinuxEmu [annex §E 跟踪表](https://github.com/chisuhua/UsrLinuxEmu/blob/main/docs/05-advanced/adr-090-cross-repo-coordination.md) (`Gate #2 ✅`)
 - Oracle session `ses_fef78854dffeLfDJh7p8ELuMLy` (v2 决策 + 4 轮评估)
 - Oracle session `ses_ff2106f84ffeM2oItBEa9iu4hL` (v1 启动，识别 ADR-076 v1 违规)
 - Oracle session `ses_feb85d969ffe0qPwACwwapfXen` (**2026-08-18 深度审查**：识别 5 CRITICAL + 5 MAJOR + 4 MINOR 问题，含 CUmodule 命名空间冲突 C1、image_size 来源缺失 C2、CudaRuntimeApi 缺方法 C3、cuda_error_from_errno 不存在 C4、测试预期被破坏 C5、func_to_module 清理缺失 M1、IGpuDriver 加 mutex 违反抽象 M3)
-- Oracle session `ses_feaa41dfaffeVTyUSpzNH5FDx2` (**2026-08-18 第二轮调研 + 审查**：Phase 1 外部调研 CUDA Driver API + PTX-EMU `cpptlm_module.h` v2 + UsrLinuxEmu `gpu_ioctl.h`/`gpu_hal.h` 真实契约；Phase 2 新增 2 CRITICAL + 6 MAJOR + 3 MINOR，含 ADR-090 v2→v1 引用错误 C6、`image_size` 类型不匹配 C7、HAL #66 void*args 单参数引用不准确 M6、PTX-EMU 不参与说明缺失 M7、ADR-090 v1 §D4 矛盾 M8、MAX_KERNEL_IMAGE_SIZE 边界 M10、`kernel_name` 字段缺失重大新发现 M11)
+- Oracle session `ses_feaa41dfaffeVTyUSpzNH5FDx2` (**2026-08-18 第二轮调研 + 审查**：Phase 1 外部调研 CUDA Driver API + PTX-EMU `cpptlm_module.h` v2 + UsrLinuxEmu `gpu_ioctl.h`/`gpu_hal.h` 真实契约；Phase 2 新增 2 CRITICAL + 6 MAJOR + 3 MINIOR，含 v2 404 假断言 C6 [Oracle 2026-08-20 验证 v2 存在且 canonical, 反向]、`image_size` 类型不匹配 C7、HAL #66 void*args 单参数引用不准确 M6、PTX-EMU 不参与说明缺失 M7、ADR-090 v1 §D4 矛盾 M8、MAX_KERNEL_IMAGE_SIZE 边界 M10、`kernel_name` 字段缺失重大新发现 M11)
+- Oracle session `ses_fe0443831ffenUxpEQxZqWE8Cp` (**2026-08-20 终极验证 + A′ 决策**)：验证 (1) v2 存在 + canonical + v1 Superseded；(2) PTX-EMU 24B header + TOC + MANIFEST 真实格式；(3) shipped `gpu_ioctl.h` 字段；(4) `hal_user.cpp:692` 已实现 H2D DMA + 零 ptxemu 符号；(5) GpuDriverClient inline `.h` not `.cpp`；(6) CUmodule=VA redefinition 必要性；建议 A′ (kernel_name app-supplied, image_size 24B 推断, §A 用 string_table tail, §C 降级可选, G1 DISPATCH_KERNEL packet, G2 free_bo VA 翻译)
 - CppTLM [issue #19](https://github.com/chisuhua/CppTLM/issues/19) (Gate #2 ack)
 - PTX-EMU [issue #12](https://github.com/chisuhua/PTX-EMU/issues/12) (Gate #3 跟踪, closed)
 - TaskRunner [issue #10](https://github.com/chisuhua/TaskRunner/issues/10) (Gate #4 跟踪, closed)

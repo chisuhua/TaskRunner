@@ -83,7 +83,7 @@ inline CUresult cuda_error_from_errno(int rc) {
 
 ### T-000c: image_size 来源 owner 决策（C2）— **DECIDED per Oracle A′ 2026-08-20**
 
-**目的**：CUDA API `cuModuleLoadData` 无 size 参数，T-002 实施前需 owner 选方案 1（PTXIR 24B header 扫描）或方案 2（强制 `cuModuleLoadDataEx`）。
+**目的**：CU目的 CUDA API `cuModuleLoadData` 无 size 参数，T-002 实施前需 owner 选方案 1（PTXIR 24B header 扫描）或方案 2（强制 `cuModuleLoadDataEx`）。
 
 **Action**：
 1. ~~在 [tadr-308 §Decision 1.3.1](../shared/adr/tadr-308-igpu-driver-vram-load.md) C2 警告段标注 owner 决策~~ → **已在 Commit 2 (83abae0) 落地**：选择方案 1（PTXIR 24B header + string_table tail 推断）
@@ -93,6 +93,95 @@ inline CUresult cuda_error_from_errno(int rc) {
 **Commit**: ✅ `docs(tadr-308): apply Oracle A' decision (commit 83abae0)` — 已合并到 Commit 2
 
 **实施位置**（per tadr-308 §A + tasks.md T-011 §A）：`src/umd/libcuda_shim/ptxir_parser.hpp` 提供 `ptxir_total_size()` helper，T-002 在 `cuModuleLoadData` 调用前用其推断 size。
+
+### T-000d NEW: `CudaRuntimeApi::unload_kernel_module` 扩展（per Oracle R2 2026-08-20）
+
+> **背景（per Oracle session `ses_fdffa6689ffeQ0vsWd06LuQgbg` Part C）**：
+> v1 设计的 T-003 G2 reverse lookup 路径 (`get_bo_gpu_va` 反查) 不存在（该方法仅正向 bo_handle→gpu_va）。
+> v2 设计的直接调 ioctl 0x29 路径也不可行（`user_kernel_module_unload` 当前返 `-ENOSYS`，per `hal_user.cpp:722-726`）。
+> **R2 最终方案**：新增 append-only `IGpuDriver::unload_kernel_module(vram_addr)` (per ADR-023 §D4) + CudaRuntimeApi 包装。
+
+**Action**（owner apply change 前必做）：
+
+1. **新增 `CudaRuntimeApi::unload_kernel_module(uint64_t vram_addr)`** 方法（`include/umd/cuda_runtime_api.hpp`）：
+   ```cpp
+   class CudaRuntimeApi {
+     // ... 现有 5 方法 ...
+     CudaError unload_kernel_module(uint64_t vram_addr);  // NEW (T-000d)
+   };
+   ```
+
+2. **CudaRuntimeApi 实现** (`src/umd/cuda_runtime_api.cpp`)：
+   ```cpp
+   CudaError CudaRuntimeApi::unload_kernel_module(uint64_t vram_addr) {
+     int rc = scheduler_->driver()->unload_kernel_module(vram_addr);  // T-014 新方法
+     return (rc < 0) ? cuda_error_from_errno(rc) : CudaError::OK;
+   }
+   ```
+
+3. **`runtime()` 访问器更新** (`src/umd/libcuda_shim/cu_module.cpp`)：新增 `unload_kernel_module` 方法转发。
+
+**依赖**：
+- T-014 NEW（IGpuDriver 新增 `unload_kernel_module` 默认 -ENOSYS）
+- Phase 0 #2（父仓 ioctl 0x29 handler 实现，per Oracle R2）
+
+**Verify pass**: 单测覆盖 (a) `unload_kernel_module(0xDEADBEEF)` 返 `-ENOSYS` 默认；(b) mock 测试返 mock 自定义值。
+
+**Commit**: `feat(cuda_runtime_api): add unload_kernel_module for cuModuleUnload (tadr-308 T-000d)`
+
+### T-000e NEW: `CudaRuntimeApi::dispatch_kernel` typed wrapper（per Oracle R2 2026-08-20）
+
+> **背景（per Oracle R2 Part C）**：
+> v1 设计的 T-013 G1 直接构造 `dispatch_kernel_packet` 自定义 struct 调 `submit_batch` 不可行（`submit_batch` 接受 `const gpu_gpfifo_entry*`，类型不兼容）。
+> **R2 最终方案**：构造 `gpu_gpfifo_entry` (method=0x10C) 在 CudaRuntimeApi 内，typed wrapper 暴露。
+
+**Action**：
+
+1. **新增 `CudaRuntimeApi::dispatch_kernel(...)` typed wrapper** (`include/umd/cuda_runtime_api.hpp`)：
+   ```cpp
+   class CudaRuntimeApi {
+     // ... 现有 5 方法 + unload_kernel_module (T-000d) ...
+     CudaError dispatch_kernel(uint64_t vram_addr,
+                              const char* kernel_name,
+                              Dim3 grid, Dim3 block,
+                              size_t shared_mem,
+                              uint64_t kernargs_va,
+                              uint32_t stream_id);  // NEW (T-000e)
+   };
+   ```
+
+2. **CudaRuntimeApi 实现**（`src/umd/cuda_runtime_api.cpp`）：
+   ```cpp
+   CudaError CudaRuntimeApi::dispatch_kernel(
+       uint64_t vram_addr, const char* kernel_name,
+       Dim3 grid, Dim3 block, size_t shared_mem,
+       uint64_t kernargs_va, uint32_t stream_id) {
+     gpu_gpfifo_entry entry{};
+     entry.method = GPU_OP_DISPATCH_KERNEL;  // 0x10C (per Phase 0 #1)
+     entry.payload[0] = vram_addr;
+     entry.payload[1] = pack_grid(grid);          // 复用 gpfifo_translator 约定
+     entry.payload[2] = pack_block(block);
+     entry.payload[3] = static_cast<uint32_t>(shared_mem);
+     entry.payload[4] = kernargs_va;
+     entry.payload[5] = reinterpret_cast<uint64_t>(kernel_name);  // host pointer
+     entry.payload[6] = pack_flags_args(/*...*/);
+
+     int64_t fence_id = scheduler_->driver()->submit_batch(
+         stream_id, &entry, 1, GPU_SUBMIT_FENCE);
+     return (fence_id < 0) ? cuda_error_from_errno(fence_id) : CudaError::OK;
+   }
+   ```
+
+3. **helper 函数** `pack_grid/pack_block/pack_flags_args` 静态方法（建议 `include/shared/gpfifo_packing.hpp`）
+
+**依赖**：
+- Phase 0 #1 (`GPU_OP_DISPATCH_KERNEL = 0x10C` 定义)
+- Phase 0 #3 (Mode A consumer 决策)
+- Phase 0 #4 (HSK-6 joint protocol payload layout)
+
+**Verify pass**: 单测覆盖 (a) `dispatch_kernel(vram, "my_kernel", ...)` 构造正确 payload[5] = host pointer；(b) mock 捕获 entry.method == 0x10C。
+
+**Commit**: `feat(cuda_runtime_api): add dispatch_kernel typed wrapper for DISPATCH_KERNEL (tadr-308 T-000e)`
 
 ---
 
@@ -176,24 +265,28 @@ CUresult cuModuleLoadData(CUmodule* module, const void* image) {
 
 ---
 
-## T-003: `cuModuleUnload` 接入 `free_bo` 路径 (TDD 5 步) — G2 VA 翻译扩展
+## T-003: `cuModuleUnload` 接入 `unload_kernel_module` 路径 (TDD 5 步) — **v3 per Oracle R2**
+
+> **v1 → v2 → v3 演进（per Oracle R1 + R2 + Metis）**：
+> - ❌ v1 reverse lookup via `get_bo_gpu_va`（Metis 揭穿：该方法仅正向 bo_handle → gpu_va）
+> - ❌ v2 direct ioctl 0x29 call（Oracle R2 揭穿：`user_kernel_module_unload` 当前返 `-ENOSYS`，per `hal_user.cpp:722-726`）
+> - ✅ **v3** 新增 append-only `IGpuDriver::unload_kernel_module(vram_addr)` (per ADR-023 §D4) + CudaRuntimeApi 包装 (T-000d)
 
 **Write failing test**:
 ```cpp
-TEST_CASE("cuModuleUnload forwards to free_bo via VA translation (G2)", "[tadr-308][T-003]") {
-    // 模拟 ioctl 0x27 返回 vram_addr
+TEST_CASE("cuModuleUnload forwards to unload_kernel_module (v3 per R2)", "[tadr-308][T-003]") {
+    // 模拟 ioctl 0x27 返回 vram_addr (CUmodule = GPU VA)
     CUmodule module = (CUmodule)0xDEADBEEFCAFEBABEULL;
     CUresult rc = cuModuleUnload(module);
     REQUIRE(rc == CUDA_SUCCESS);
-    // G2 修订: free_bo 接受 BO handle (u32), CUmodule 是 GPU VA (u64)
-    // 需通过 get_bo_gpu_va(vram_addr) 反查 → u32 handle → free_bo(handle)
-    REQUIRE(mock_drv()->last_freed_bo_handle() == /*translated*/);
+    // v3: CudaRuntimeApi::unload_kernel_module(vram_addr) → IGpuDriver::unload_kernel_module → ioctl 0x29
+    REQUIRE(mock_drv()->last_unload_vram_addr() == 0xDEADBEEFCAFEBABEULL);
 }
 ```
 
-**Verify fail**: `cuModuleUnload` 当前返回 NOT_IMPLEMENTED。
+**Verify fail**: `cuModuleUnload` 当前返回 NOT_IMPLEMENTED，且 CudaRuntimeApi 没有 `unload_kernel_module` 方法（T-000d 待实施）。
 
-**Implement** (G2 修订版):
+**Implement** (v3 per Oracle R2 Part B + C):
 ```cpp
 // src/umd/libcuda_shim/cu_module.cpp:99 (cuModuleUnload 当前实现位置)
 CUresult cuModuleUnload(CUmodule module) {
@@ -201,26 +294,41 @@ CUresult cuModuleUnload(CUmodule module) {
 
     std::lock_guard<std::mutex> lock(g_handles.mu);
 
-    // T-005b: 清理 func_to_attrs/func_to_module 表
+    // T-005b: 清理 func_to_attrs/func_to_module 表 (per F4 缩窄)
     auto it = g_handles.mod_to_func.find(module);
     if (it != g_handles.mod_to_func.end()) {
         for (CUfunction func : it->second) {
-            g_handles.func_to_name.erase(func);
-            g_handles.func_to_attrs.erase(func);  // MF-2 修订: T-005b 已加
-            g_handles.func_to_module.erase(func);
+            g_handles.func_to_attrs.erase(func);  // F4: 新增
+            g_handles.func_to_module.erase(func);  // F4: 新增
         }
         g_handles.mod_to_func.erase(it);
     }
     g_handles.mod_to_name.erase(module);
 
-    // G2: CUmodule 是 u64 GPU VA → 通过 get_bo_gpu_va 反查 BO handle → free_bo(handle)
+    // v3: CUmodule = u64 GPU VA → CudaRuntimeApi::unload_kernel_module → IGpuDriver 新方法 → ioctl 0x29
     uint64_t vram_addr = reinterpret_cast<uint64_t>(module);
-    uint32_t bo_handle = 0;
-    int rc = runtime()->get_bo_gpu_va(vram_addr, &bo_handle);  // 反查
-    if (rc != 0) return cuda_error_from_errno(rc);
-
-    rc = runtime()->free_bo(bo_handle);  // free_bo 接 u32 handle
+    int rc = runtime()->unload_kernel_module(vram_addr);  // 委托 T-000d → T-014
     return cuda_error_from_errno(rc);
+}
+```
+
+> **v3 关键变更（per Oracle R2 Part B）**：
+> 1. ~~v1 reverse lookup via `get_bo_gpu_va`~~ ❌ 该方法仅正向 bo_handle→gpu_va，无反查
+> 2. ~~v2 direct ioctl 0x29 call~~ ❌ `user_kernel_module_unload` 当前 `-ENOSYS`（per `hal_user.cpp:722-726`）
+> 3. ✅ **v3** 新增 append-only `IGpuDriver::unload_kernel_module(vram_addr)` (per T-014)
+> 4. CudaRuntimeApi::unload_kernel_module 包装 (per T-000d)
+> 5. 依赖 Phase 0 #2 (父仓 ioctl 0x29 handler 实现，per Oracle R2)
+>
+> **为什么不用 `free_bo`**：`free_bo` 接 u32 BO handle 且 ioctl FREE_BO 验证 `handles_.valid(handle)` (per `gpgpu_device.cpp:242-266`)。Code BO (ioctl 0x27 创建) **不在** `handles_`/`bo_map_` 表内，FREE_BO 从设计层面就无法释放 code BO。
+
+> **修正点（per 2026-08-18 review）**：
+> 1. 加 `if (!module)` nullptr 检查（之前缺失）
+> 2. 用 `cuda_error_from_errno(rc)` 而非 `static_cast<CUresult>(rc)`——`unload_kernel_module` 返回负 errno
+> 3. 行号修正：`:93` → `:99`（实测 `cuModuleUnload` 在 cu_module.cpp:99）
+
+**Verify pass**: `ctest -R tadr-308` PASS（含 T-014 测试 + T-000d 测试 + T-005b func_to_*/func_to_module 测试）。
+
+**Commit**: `feat(cu_module): forward cuModuleUnload to unload_kernel_module (v3 per Oracle R2, tadr-308 T-003)`
 }
 ```
 
@@ -884,23 +992,31 @@ extern "C" CUresult cuModuleLoad(CUmodule* module, const char* fname) {
 
 ---
 
-## T-013 NEW: DISPATCH_KERNEL packet payload 规格 — G1 launch 路径修复（per Oracle 2026-08-20）
+## T-013 NEW: DISPATCH_KERNEL packet payload 规格 — **G1 v2 per Oracle R2**
 
-> **Oracle 重大发现（per session `ses_fe0443831...` Part B G1）**：
+> **Oracle 重大发现 R1（per `ses_fe0443831...` Part B G1）**：
 > 现行 `cuLaunchKernel` → `runtime()->launch_kernel(name, ...)` → `CudaScheduler::submit_launch(stream_id, kernel_index, ...)` → `IGpuDriver::submit_launch` (`igpu_driver.hpp:219`)
 > **VRAM 加载的 image 在 `vram_addr` 永远不会被 launch 路径引用**。
 >
-> **问题**：`submit_launch` 接 `kernel_index`（不是 vram_addr）；CudaRuntimeApi 需要手动 `register_kernel()`；VRAM-load 路径返回的 vram_addr 与 kernel_index 无映射。
->
-> **修复方向**（per Oracle Part D Recommendation 2）：
-> 不新增 IGpuDriver 方法（per ADR-023 append-only），而是扩展 `submit_batch` (igpu_driver.hpp:191) 携带新 packet payload：
-> **DISPATCH_KERNEL packet** = `{vram_addr(u64), kernel_name(str), grid/block/args/smem}`
->
-> CppTLM Mode B (per ADR-090 v2 §D3.3) SQ/CQ doorbell 收到 DISPATCH_KERNEL packet 后，调 `ptxemu_image_execute_named` 执行。
+> **v1 → v2 演进（per Oracle R2 `ses_fdffa6689...`）**：
+> - ❌ v1 自定义 `dispatch_kernel_packet` struct 调 `submit_batch`（Metis 揭穿：`submit_batch` 接受 `const gpu_gpfifo_entry*`，类型不兼容）
+> - ✅ v2 使用 `gpu_gpfifo_entry`（`method=0x10C`）+ 56B payload + kernel_name host pointer
+> - **关键决策**：构造 `gpu_gpfifo_entry` 放在 `CudaRuntimeApi::dispatch_kernel` typed wrapper (T-000e) 内，shim 层只调 typed API
+
+**payload layout**（per `gpu_gpfifo_entry::payload[7]` 56B 总空间）：
+```cpp
+// payload[0] = vram_addr (u64)            // CUmodule (= module handle from 0x27)
+// payload[1] = grid packed                // 复用 gpfifo_translator 约定: grid_x | grid_y<<16 | grid_z<<24
+// payload[2] = block packed               // block_x | block_y<<8 | block_z<<16
+// payload[3] = shared_mem (u32)           // 复用约定
+// payload[4] = kernargs GPU VA            // 类似 gpu_pdl_payload
+// payload[5] = kernel_name HOST pointer   // user-space emulation (precedent: image_ptr host ptr)
+// payload[6] = flags/args_count
+```
 
 **Write failing test**:
 ```cpp
-TEST_CASE("cuLaunchKernel after cuModuleLoadData submits DISPATCH_KERNEL with vram_addr",
+TEST_CASE("cuLaunchKernel submits DISPATCH_KERNEL with 0x10C method (v2 per R2)",
           "[tadr-308][T-013]") {
     // 1. load PTXIR image → vram_addr
     CUmodule mod;
@@ -912,41 +1028,25 @@ TEST_CASE("cuLaunchKernel after cuModuleLoadData submits DISPATCH_KERNEL with vr
     CUfunction fn;
     REQUIRE(cuModuleGetFunction(&fn, mod, "my_kernel") == CUDA_SUCCESS);
 
-    // 3. launch — expect submit_batch with DISPATCH_KERNEL packet
+    // 3. launch — expect dispatch_kernel typed wrapper
     void* args[] = {nullptr};
-    REQUIRE(cuLaunchKernel(fn, 1, 1, 1, 1, 1, 1, 0, nullptr, args, nullptr) ==
+    REQUIRE(cuLaunchKernel(fn, 1, 1, 1, 1, 1, 1, 0, nullptr, args, NULL) ==
             CUDA_SUCCESS);
 
-    // 4. verify mock received DISPATCH_KERNEL with vram_addr + name
+    // 4. verify mock received gpfifo_entry with method=0x10C + payload[5]=kernel_name host ptr
     auto& mock = *mock_drv();
-    REQUIRE(mock.last_submit_batch_packet_type() == GPU_OP_DISPATCH_KERNEL);
-    REQUIRE(mock.last_submit_batch_vram_addr() == expected_vram);
-    REQUIRE(mock.last_submit_batch_kernel_name() == "my_kernel");
+    REQUIRE(mock.last_gpfifo_entry().method == 0x10C);  // GPU_OP_DISPATCH_KERNEL
+    REQUIRE(mock.last_gpfifo_entry().payload[0] == expected_vram);
+    REQUIRE(std::string(reinterpret_cast<const char*>(mock.last_gpfifo_entry().payload[5]))
+            == "my_kernel");
 }
 ```
 
-**Verify fail**: 当前 `cuLaunchKernel` (`cu_launch.cpp:62-95`) 调 `runtime()->launch_kernel(name, ...)`，仅传 kernel name，**vram_addr 丢失**。Mock 收不到 DISPATCH_KERNEL packet。
+**Verify fail**: 当前 `cuLaunchKernel` (`cu_launch.cpp:62-95`) 调 `runtime()->launch_kernel(name, ...)`，仅传 kernel name，**vram_addr 丢失**。Mock 收不到 gpfifo_entry with 0x10C。
 
 **Implement**:
 
-1. **新增 `DISPATCH_KERNEL` packet payload 结构** (在 `include/shared/igpu_driver.hpp` 或新 `include/shared/dispatch_kernel_packet.hpp`):
-   ```cpp
-   namespace async_task::shared {
-   constexpr uint32_t GPU_OP_DISPATCH_KERNEL = 0x04;  // 新增 opcode
-
-   struct dispatch_kernel_packet {
-     uint64_t vram_addr;      // cuModuleLoadData 返回的 vram_addr (= CUmodule)
-     uint32_t grid_x, grid_y, grid_z;
-     uint32_t block_x, block_y, block_z;
-     uint32_t shared_mem_bytes;
-     uint64_t args_ptr;       // 用户态 void** kernel_args
-     uint64_t args_count;
-     char     kernel_name[256]; // 应用在 cuModuleGetFunction 传入
-   };
-   }
-   ```
-
-2. **修改 `cu_launch.cpp`** (`cu_launch.cpp:62-95`):
+1. **重构 `cu_launch.cpp`** (`cu_launch.cpp:62-95`)：
    ```cpp
    extern "C" CUresult cuLaunchKernel(CUfunction f, uint32_t grid_x, ...) {
      // ... 现有 grid/block/args 校验 ...
@@ -954,50 +1054,95 @@ TEST_CASE("cuLaunchKernel after cuModuleLoadData submits DISPATCH_KERNEL with vr
      CUmodule mod = (CUmodule)0;
      cuFuncGetModule(&mod, f);  // 反查 func_to_module[f]
 
-     // G1 修复: 构造 DISPATCH_KERNEL packet 携带 vram_addr (= mod) + name
-     dispatch_kernel_packet pkt{};
-     pkt.vram_addr = reinterpret_cast<uint64_t>(mod);  // ★ vram_addr 关键
-     // ... grid/block/args/smem 填充 ...
-     std::strncpy(pkt.kernel_name, kernel_name.c_str(), 255);
-     pkt.kernel_name[255] = '\0';
-
-     // 调 runtime()->submit_batch (已有 IGpuDriver 方法, 不新增)
-     int rc = runtime()->submit_batch(
-         default_stream_id_,
-         &pkt, sizeof(pkt),
-         GPU_OP_DISPATCH_KERNEL);
+     // T-013 v2: 调用 CudaRuntimeApi::dispatch_kernel typed wrapper (T-000e)
+     // 不直接构造 gpfifo_entry; 包装在 CudaRuntimeApi 内
+     int rc = runtime()->dispatch_kernel(
+         reinterpret_cast<uint64_t>(mod),  // vram_addr (= CUmodule)
+         kernel_name.c_str(),              // kernel_name (host pointer)
+         /*grid, block, smem, args, stream*/
+         );
+     // kernel_name 生命周期: cuLaunchKernel 同步语义, string 由调用者保证存活至返回
      return cuda_error_from_errno(rc);
    }
    ```
 
-3. **`GpuDriverClient::submit_batch` 扩展**: 接 `GPU_OP_DISPATCH_KERNEL` opcode，序列化 packet 到 `gpu_submit_batch_args` (已有 ioctl)，**不新增 ioctl**。
+2. **`CudaRuntimeApi::dispatch_kernel`** 实现（per T-000e）：
+   - 构造 `gpu_gpfifo_entry{ method=0x10C, payload[0..6] 按上述 layout }`
+   - 调 `IGpuDriver::submit_batch(stream_id, &entry, 1, GPU_SUBMIT_FENCE)` raw pass-through
 
-4. **GpuDriverClient::submit_launch 现状**: 已存在但走 `kernel_index` 路径，与 VRAM-load 路径不兼容。本任务**保留** `submit_launch` 不变（其他路径仍在用），仅扩展 `submit_batch`。
+3. **`GpuDriverClient::submit_batch` 适配**：接受新 method=0x10C entry，序列化到 `gpu_submit_batch_args` (已存在 ioctl 0x07)，**不新增 ioctl**。
 
 **依赖**:
-- T-001~T-008 全部 ✅
-- T-009 父仓契约核验 ✅ (verify UsrLinuxEmu submit_batch dispatch table 接受新 opcode)
-- T-009b PTX-EMU fixture 验证 ✅ (verify DISPATCH_KERNEL packet payload 兼容真实 PTXIR)
+- T-000d/T-000e (CudaRuntimeApi extensions)
+- Phase 0 #1 (UsrLinuxEmu `GPU_OP_DISPATCH_KERNEL = 0x10C` 定义)
+- Phase 0 #3 (Mode A consumer 决策)
+- Phase 0 #4 (HSK-6 joint protocol payload layout)
+- T-009b (PTX-EMU fixture 验证)
 
-**Verify pass**: `ctest -R tadr-308` PASS + e2e (mock) launch 路径核验 PASS。
+**Verify pass**: `ctest -R tadr-308` PASS（含 mock 捕获 gpfifo_entry 0x10C + payload[5]=kernel_name）+ e2e mock launch 路径核验 PASS。
 
-**Commit**: `feat(cu_launch): DISPATCH_KERNEL packet carries vram_addr + name (tadr-308 T-013 G1 fix)`
+**Commit**: `feat(cu_launch): cuLaunchKernel calls dispatch_kernel typed wrapper carrying vram_addr (v2 per Oracle R2, tadr-308 T-013)`
 
 ---
 
-## T-014 NEW: `unload_kernel_module` 方法评估 — Oracle 2026-08-20 评估
+## T-014 NEW: `IGpuDriver::unload_kernel_module` append-only 方法实施（per Oracle R2）
 
-> **Oracle Part D Recommendation 2 延伸**（per `ses_fe0443831...`）：
-> 当前 T-003 用 `get_bo_gpu_va + free_bo` 路径卸载（绕过 ioctl 0x29）。
-> 备选方案：直接调 `GPU_IOCTL_UNLOAD_KERNEL_MODULE` (ioctl 0x29)，per ADR-090 v2 §D1.2 表保留。
->
-> **决策**（owner 必决）：采用 T-003 路径（VA 反查 + free_bo）OR 新增 IGpuDriver `unload_kernel_module` 调 ioctl 0x29。
->
-> **推荐**（per Oracle Part E A′）：
-> - PoC 阶段选 **T-003 路径**（不新增 IGpuDriver 方法，per ADR-023 append-only）
-> - 长期：若 ioctl 0x29 获得更明确语义（区分 unload code BO vs free BO），可单独 T-014+ sub-change 升级
->
-> **本 T-014 占位为决策记录**：实际不实施代码，仅 owner 决策记录。Commit 在 T-003 完成时一并包含。
+> **Oracle R2 决策（per `ses_fdffa6689...` Part B + C）**：
+> - ❌ T-014 v1 (placeholder)：仅决策记录，无代码
+> - ✅ **T-014 v2** 升级为实际 IGpuDriver append-only 方法实施任务 (per ADR-023 §D4 / tadr-301 前例 — tadr-308 已添加 `load_kernel_module` 默认 -ENOSYS)
+> - 必须新增 IGpuDriver 方法（v1 reverse lookup 不可行 + v2 ioctl 0x29 handler -ENOSYS stub 不可行）
+
+**Write failing test**:
+```cpp
+TEST_CASE("IGpuDriver::unload_kernel_module 默认 -ENOSYS", "[tadr-308][T-014]") {
+    auto* drv = IGpuDriver::create_mock();
+    uint64_t vram_addr = 0xDEADBEEFCAFEBABEULL;
+    int rc = drv->unload_kernel_module(vram_addr);
+    REQUIRE(rc == -ENOSYS);
+}
+```
+
+**Verify fail**: 当前 `unload_kernel_module` 方法在 `IGpuDriver` 不存在，编译失败。
+
+**Implement**:
+
+1. **新增 `IGpuDriver::unload_kernel_module` append-only 方法**（`include/shared/igpu_driver.hpp`）：
+   ```cpp
+   class IGpuDriver {
+     // ... 现有 47 方法 (per tadr-301) + load_kernel_module (T-001) ...
+     /** Unload kernel module by GPU VA (per ADR-090 v2 §D1)
+      *  Default -ENOSYS (per ADR-023 append-only).
+      *  实现于 GpuDriverClient::unload_kernel_module (T-003 v3 路径)
+      *  依赖父仓 ioctl 0x29 handler (Phase 0 #2)
+      */
+     virtual int unload_kernel_module(uint64_t vram_addr) {
+       (void)vram_addr;
+       return -ENOSYS;
+     }
+   };
+   ```
+
+2. **GpuDriverClient 实现**（`include/test_fixture/gpu_driver_client.h` inline）：
+   ```cpp
+   inline int GpuDriverClient::unload_kernel_module(uint64_t vram_addr) {
+     gpu_unload_kernel_module_args args{};
+     args.module_handle = vram_addr;
+     return ioctl(fd_, GPU_IOCTL_UNLOAD_KERNEL_MODULE, &args) == 0
+            ? 0 : -errno;
+   }
+   ```
+
+3. **3 个现有实现者更新**：
+   - `cuda_stub.hpp` (test_fixture): 加 `int unload_kernel_module(uint64_t) override { return -ENOSYS; }`（stub 不实现，留 Phase 0 #2 后处理）
+   - `gpu_driver_client.h` (test_fixture): 上述实现
+   - `mock_gpu_driver.hpp` (tests): 加 mock capture 字段 + 默认返 -ENOSYS
+
+**依赖**:
+- Phase 0 #2 (父仓 ioctl 0x29 handler 实现, per Oracle R2 Part D)
+
+**Verify pass**: `ctest -R tadr-308` PASS（含 T-000d 测试 + T-003 测试）。
+
+**Commit**: `feat(igpu_driver): append unload_kernel_module default -ENOSYS (tadr-308 T-014)`
 
 ---
 

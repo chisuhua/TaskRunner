@@ -1,13 +1,14 @@
 ---
 SCOPE: shared
 STATUS: PROPOSED
-DATE: 2026-08-18
+DATE: 2026-08-18 (R2 synced 2026-08-20 per Oracle session ses_fdffa6689ffeQ0vsWd06LuQgbg)
 CHANGE: igpu-driver-vram-load
 RELATED: tadr-301-igpu-driver-contract.md
 RELATED: tadr-307-igpu-driver-kernel-module-extension.md (STALE)
 RELATED: tadr-107-shared-infrastructure-boundary.md
 RELATED: UsrLinuxEmu adr-090-ptxir-via-h2d-dma-v2.md
-RELATED: PTX-EMU ADR-0029
+RELATED: PTX-EMU ADR-0029 §D8 HAL extension proposal
+ORACLE_R2_SYNC: tasks.md Commit 10 (cc59cf8) + tadr-308 Commit 11 (this)
 ---
 
 > **AUTHOR**: Sisyphus (UsrLinuxEmu Architecture Team)
@@ -313,7 +314,11 @@ CUresult cuModuleUnload(CUmodule module) {
 > }
 > ```
 >
-> ~~Oracle 建议新增 `IGpuDriver::unload_kernel_module(uint64_t handle)` 默认 -ENOSYS 方法~~ → **per Oracle 2026-08-20 修订**：PoC 阶段选 G2 路径（VA 反查 + free_bo），**不**新增 IGpuDriver 方法（per ADR-023 append-only）。如未来需要更明确 unload 语义，发起独立 sub-change（见 tasks.md T-014 placeholder）。
+> ~~Oracle 建议新增 `IGpuDriver::unload_kernel_module(uint64_t handle)` 默认 -ENOSYS 方法~~ → **per Oracle 2026-08-20 R2 修订（推翻 R1 决策）**：
+> - **必须**新增 append-only `IGpuDriver::unload_kernel_module(vram_addr)` 默认 -ENOSYS 方法 (per ADR-023 §D4 / tadr-301 前例)
+> - **理由**：T-003 G2 reverse lookup (`get_bo_gpu_va`) 不可行（该方法仅正向 bo_handle→gpu_va）；T-003 v2 直接调 ioctl 0x29 也不可行（`user_kernel_module_unload` 当前 `-ENOSYS`，per `hal_user.cpp:722-726`）
+> - **实施任务**：[tasks.md T-014](../changes/2026-08-18-tadr-308-igpu-driver-vram-load/tasks.md#t-014-new-igpu-driverunload_kernel_module-append-only-方法实施per-oracle-r2)
+> - **依赖**：Phase 0 #2（父仓 ioctl 0x29 handler 实现，per Oracle R2 Part D #2）
 
 `cu_launch.cpp` 本轮**不动**（0x28 LAUNCH 已 deprecated，-ENOSYS per ADR-090 v2 §D2.2 — v2 修正 v1 §D2.2 编号漂移）。
 
@@ -448,7 +453,7 @@ cuLaunchKernel(fn, ...);         // fn 是 kernel handle, 与 mod 解耦
 | **#20 `image_size` 字段类型对齐** | 已修订 `size_t → uint64_t` 对齐 ioctl 0x27 真实 `u64` | Oracle **C7** | ✅ 已修订 |
 | **#21 ADR-090 v1 §D4 矛盾解决** | ADR-090 v1 §D4 描述"删除 3 纯虚方法"与 tadr-308 §Decision 2 "append-only" 表面矛盾。**per Oracle 2026-08-20 修订**：不 amend v1 Superseded 文档；改在 tadr-308 §1.5/§Consequences + tasks.md T-010 DROP 替代（3 处覆盖真相） | Oracle **M8 修订** | ✅ 已解决 |
 | **#22 CUfunction 独立计数器（D6 owner 决策）** | `cuModuleGetFunction` (cu_module.cpp:82) 与原 `cuModuleLoad`（已废弃）共享 `g_handles.next_id`。tadr-308 §Decision 1.2 改 `cuModuleLoad` 为 VRAM-load 后，`cuModuleGetFunction` **必须**同步改为独立 `next_func_id` 计数器，避免函数 ID 与模块 ID (GPU VA) 撞号。**owner 已决策 (2026-08-18 Sisyphus)**：选项 A（独立计数器，与仓内 `cu_array`/`cu_event`/`cu_stream` 惯例一致）| Oracle **MF-4 / D6** | ✅ 已决策 (选项 A) |
-| **#23 DISPATCH_KERNEL packet 携带 vram_addr (G1)** | `cuLaunchKernel` 路径**不消费** vram_addr（per Oracle G1 重大发现）。修复：在 `submit_batch` (igpu_driver.hpp:191) 扩展 `GPU_OP_DISPATCH_KERNEL = 0x04` packet payload = `{vram_addr(u64), kernel_name(str), grid/block/args/smem}`。**owner 决策**：在 tasks.md T-013 实施 | Oracle **G1** | 📋 待 T-013 实施 |
+| **#23 DISPATCH_KERNEL packet 携带 vram_addr (G1 v2 per Oracle R2)** | `cuLaunchKernel` 路径**不消费** vram_addr（per Oracle G1 重大发现）。修复：**v2 设计**——使用 `gpu_gpfifo_entry`（`method=0x10C` + 56B payload）而非自定义 packet struct，构造在 `CudaRuntimeApi::dispatch_kernel` typed wrapper 内 (T-000e)。payload[0]=vram_addr, payload[5]=kernel_name host pointer。**owner 决策**：在 tasks.md T-013 v2 实施 | Oracle **G1 + R2** | 📋 待 T-013 v2 + Phase 0 #1/#3/#4 实施 |
 | **#24 PTX-EMU 真实 fixture 验证（T-009b）** | 用 PTX-EMU `tests/ptxir/fixtures/multi_kernel_basic.ptxir` + `cute_rmsnorm.ptxir` 验证 24B header 格式 + string_table tail 推断 + MANIFEST parse | Oracle **A′ T-009b** | 📋 待 T-009b 实施 |
 
 ## Migration
@@ -490,6 +495,9 @@ cuLaunchKernel(fn, ...);         // fn 是 kernel handle, 与 mod 解耦
 - Oracle session `ses_feb85d969ffe0qPwACwwapfXen` (**2026-08-18 深度审查**：识别 5 CRITICAL + 5 MAJOR + 4 MINOR 问题，含 CUmodule 命名空间冲突 C1、image_size 来源缺失 C2、CudaRuntimeApi 缺方法 C3、cuda_error_from_errno 不存在 C4、测试预期被破坏 C5、func_to_module 清理缺失 M1、IGpuDriver 加 mutex 违反抽象 M3)
 - Oracle session `ses_feaa41dfaffeVTyUSpzNH5FDx2` (**2026-08-18 第二轮调研 + 审查**：Phase 1 外部调研 CUDA Driver API + PTX-EMU `cpptlm_module.h` v2 + UsrLinuxEmu `gpu_ioctl.h`/`gpu_hal.h` 真实契约；Phase 2 新增 2 CRITICAL + 6 MAJOR + 3 MINIOR，含 v2 404 假断言 C6 [Oracle 2026-08-20 验证 v2 存在且 canonical, 反向]、`image_size` 类型不匹配 C7、HAL #66 void*args 单参数引用不准确 M6、PTX-EMU 不参与说明缺失 M7、ADR-090 v1 §D4 矛盾 M8、MAX_KERNEL_IMAGE_SIZE 边界 M10、`kernel_name` 字段缺失重大新发现 M11)
 - Oracle session `ses_fe0443831ffenUxpEQxZqWE8Cp` (**2026-08-20 终极验证 + A′ 决策**)：验证 (1) v2 存在 + canonical + v1 Superseded；(2) PTX-EMU 24B header + TOC + MANIFEST 真实格式；(3) shipped `gpu_ioctl.h` 字段；(4) `hal_user.cpp:692` 已实现 H2D DMA + 零 ptxemu 符号；(5) GpuDriverClient inline `.h` not `.cpp`；(6) CUmodule=VA redefinition 必要性；建议 A′ (kernel_name app-supplied, image_size 24B 推断, §A 用 string_table tail, §C 降级可选, G1 DISPATCH_KERNEL packet, G2 free_bo VA 翻译)
+- Metis session `ses_fe0048690ffeOIUPxgOHrfUI1s` (**2026-08-20 实施路线图审查**)：揭示 3 CRITICAL 架构错误 (`submit_batch` 签名不兼容、`get_bo_gpu_va` 仅正向、CudaRuntimeApi 缺方法)，触发 Oracle R2 重新设计。详见 [实施路线图](../../umd-evolution/roadmap/tadr-308-implementation-roadmap.md)
+- Oracle session `ses_fdffa6689ffeQ0vsWd06LuQgbg` (**2026-08-20 R2 验证 + REVISE further verdict**)：验证 T-013 G1 v2 重新设计（gpu_gpfifo_entry + 56B payload + kernel_name host pointer），T-003 G2 v2 → v3 (需新增 append-only `IGpuDriver::unload_kernel_module` 因为 `user_kernel_module_unload` 当前返 `-ENOSYS` per `hal_user.cpp:722-726`)，6 项 Phase 0 BLOCKING GATE 跨仓协调（特别是 #1 定义 `GPU_OP_DISPATCH_KERNEL = 0x10C` + #2 ioctl 0x29 handler 实现 + #3 Mode A consumer 决策）。详见 [实施路线图](../../umd-evolution/roadmap/tadr-308-implementation-roadmap.md) §Phase 0
+- [实施路线图](../../umd-evolution/roadmap/tadr-308-implementation-roadmap.md) **R2 修订版**（per Oracle R2 + Metis）—— 后续实施以路线图为准
 - CppTLM [issue #19](https://github.com/chisuhua/CppTLM/issues/19) (Gate #2 ack)
 - PTX-EMU [issue #12](https://github.com/chisuhua/PTX-EMU/issues/12) (Gate #3 跟踪, closed)
 - TaskRunner [issue #10](https://github.com/chisuhua/TaskRunner/issues/10) (Gate #4 跟踪, closed)

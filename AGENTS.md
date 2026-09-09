@@ -1,8 +1,42 @@
 # TaskRunner - C++ Hybrid Development
 
+## ⚠️ PROJECT IDENTITY (必读 — 在本目录启动 opencode 前确认)
+
+**当前工作目录 = TaskRunner 仓** (`/workspace/project/UsrLinuxEmu/external/TaskRunner`)。
+
+| 角色 | 仓库 | 关系 |
+|------|------|------|
+| **Working project (本仓)** | TaskRunner | 修改、commit、push 在此仓进行 |
+| **Parent repo (父仓)** | UsrLinuxEmu | **仅作参考**,不作为 working project |
+
+**父仓访问方式**: 符号链接 `UsrLinuxEmu -> /workspace/project/UsrLinuxEmu` (本仓根目录)
+
+### 何时查父仓 (read-only 参考)
+
+- 上游 GPU 接口定义: `UsrLinuxEmu/plugins/gpu_driver/shared/gpu_ioctl.h`
+- 跨仓治理协议: `UsrLinuxEmu/docs/00_adr/adr-035-governance-policy.md`
+- TADR mirror 索引: `UsrLinuxEmu/docs/00_adr/README.md` (只读)
+- 联调指南: `UsrLinuxEmu/docs/07-integration/`
+
+### 何时**不**动父仓
+
+- ❌ 不要在父仓创建/编辑/提交工作文件 (那是父仓 owner 的工作)
+- ❌ 不要把 TaskRunner TADR 写到父仓 `docs/00_adr/` (mirror 由跨仓协议自动同步,见下方 §跨仓工作原则)
+- ❌ 不要对父仓执行会修改它的 skill (例如在父仓跑 `/guide-arch` 默认作用于 cwd)
+
+### Skill 兼容性参考
+
+| Skill | 适用于本仓? | 备注 |
+|-------|--------------|------|
+| `/guide-arch` | ❌ 不适用 | 默认期望 `docs/adr/ADR-*.md`,本仓用 `docs/{test-fixture,umd-evolution,shared}/adr/tadr-*.md` (38 TADRs 3-scope)。Skill 的 discovery (ADR-0016) 会把真实 TADR 视为 "0 ADR",并尝试创建平行命名空间 → 破坏现有 3-scope 体系。 |
+| `/guide-design` / `/guide-plan` / `/guide-ship` | ✅ 适用 | 通过本仓 `openspec/` 工作流 (config.yaml + 16 archived changes + 2 active spec deltas) |
+| 父仓 skills | ❌ | 父仓 owner 自行管理,不在本仓触发 |
+
+**反例** (2026-08-13 已识别): 用户在本目录运行 `/guide-arch` → skill 默认作用于 cwd (本仓) → 默认 `docs/adr/` 不存在 → 必须识别为 skill 不适用并退出,而非绕过 discovery (`SPEC_WORKFLOW_ADR_DIR` 强制覆盖) 或切换到父仓执行 (后者会污染父仓工作树)。详见 `.rddf/state/sessions.json` 中历史 `stage_arch` session。
+
 ## OVERVIEW
 
-C++ concurrent task framework (singleton `TaskRunner` + `CmdProcessor` workers + `CmdBuffer`/`Barrier`/`EventQueue` primitives). Coupled to UsrLinuxEmu via `IGpuDriver` interface; provides CLI + LD_PRELOAD `libcuda_taskrunner.so` shim. C++17, CMake 3.20+, doctest. Project structure is a **submodule** of UsrLinuxEmu at `external/TaskRunner` — cross-repo work is the default mode here.
+C++ concurrent task framework (singleton `TaskRunner` + `CmdProcessor` workers + `CmdBuffer`/`Barrier`/`EventQueue` primitives). Coupled to UsrLinuxEmu via `IGpuDriver` interface; provides CLI + LD_PRELOAD `libcuda_taskrunner.so` shim. C++17, CMake 3.20+, doctest. Project structure is a **submodule** of UsrLinuxEmu at `external/TaskRunner` — cross-repo work (sync protocol) is described in §跨仓工作原则, but **project identity is fixed as TaskRunner**.
 
 ## WHERE TO LOOK
 
